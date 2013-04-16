@@ -34,6 +34,40 @@ import ornl.elision.context.Context
 import ornl.elision.util.other_hashify
 
 /**
+ * Simplify creation and matching of ruleset references.
+ */
+object RulesetRef {
+  /**
+   * Extract the parts of a ruleset reference.
+   * 
+   * @param rr		The reference.
+   * @return	The ruleset name.
+   */
+  def unapply(rr: RulesetRef) = Some((rr.name))
+  
+  /**
+   * Make a new reference to the named ruleset in the rule library of the given
+   * context.
+   * 
+   * @param context		The context.
+   * @param name			The ruleset name.
+   * @return	The new reference.
+   */
+  def apply(context: Context, name: String) =
+    context.ruleLibrary.makeRulesetRef(name)
+  
+  /**
+   * Make a new reference to the named ruleset in the given rule library.
+   * 
+   * @param library		The rule library.
+   * @param name			The ruleset name.
+   * @return	The new reference.
+   */
+  def apply(library: RuleLibrary, name: String) =
+    library.makeRulesetRef(name)
+}
+
+/**
  * A ruleset reference.
  * 
  * == Purpose ==
@@ -89,36 +123,3 @@ abstract class RulesetRef extends BasicAtom with Rewriter {
     })
 }
 
-/**
- * Simplify creation and matching of ruleset references.
- */
-object RulesetRef {
-  /**
-   * Extract the parts of a ruleset reference.
-   * 
-   * @param rr		The reference.
-   * @return	The ruleset name.
-   */
-  def unapply(rr: RulesetRef) = Some((rr.name))
-  
-  /**
-   * Make a new reference to the named ruleset in the rule library of the given
-   * context.
-   * 
-   * @param context		The context.
-   * @param name			The ruleset name.
-   * @return	The new reference.
-   */
-  def apply(context: Context, name: String) =
-    context.ruleLibrary.makeRulesetRef(name)
-  
-  /**
-   * Make a new reference to the named ruleset in the given rule library.
-   * 
-   * @param library		The rule library.
-   * @param name			The ruleset name.
-   * @return	The new reference.
-   */
-  def apply(library: RuleLibrary, name: String) =
-    library.makeRulesetRef(name)
-}

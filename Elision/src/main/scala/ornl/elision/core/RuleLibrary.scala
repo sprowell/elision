@@ -77,87 +77,24 @@ class BindablePatternException(msg: String) extends ElisionException(msg)
 class LiteralPatternException(msg: String) extends ElisionException(msg)
 
 /**
- * A ruleset reference.
+ * Encapsulate a rule library.
+ * 
+ * == Purpose ==
+ * A rule library instance contains rules and methods for accessing relevant
+ * rules and for performing "automated" rewriting.
+ * 
+ * Rules can be organized into rulesets.  A single rule may be in multiple
+ * rulesets.  A rule can also be placed in no rulesets, though this is not
+ * advisable, as it is difficult to access the rule later.  In fact, the
+ * only way to see rules that are not part of any active ruleset is via the
+ * `getRuleList` method.
+ * 
+ * The rule library also manages the rulesets.  These must be declared before
+ * they can be used, and they can be enabled and disabled to better control
+ * rewriting.
+ * 
+ * @param allowUndeclared	Iff true, allow the use of undeclared rulesets.
  */
-abstract class RulesetRef extends BasicAtom with Rewriter {
-
-  val depth = 0
-  val deBruijnIndex = 0
-  val constantPool = None
-  val isTerm = true
-  val isConstant = true
-  val theType = RSREF
-  /** The name of the referenced ruleset. */
-  val name: String
-  
-  /**
-   * Ruleset references cannot be rewritten.
-   */
-  def rewrite(binds: Bindings) = (this, false)
-    
-  override def hashCode = 61*name.hashCode
-  lazy val otherHashCode = (name.toString).foldLeft(BigInt(0))(other_hashify)+1
-  
-  override def equals(other: Any) =
-    (other match {
-      case rr:RulesetRef => rr.name == name
-      case _ => false
-    })
-}
-
-/**
- * Creation and matching of ruleset references.
- */
-object RulesetRef {
-  /**
-  * Extract the parts of a ruleset reference.
-  * 
-  * @param rr		The reference.
-  * @return	The ruleset name.
-  */
-  def unapply(rr: RulesetRef) = Some((rr.name))
-  
-  /**
-  * Make a new reference to the named ruleset in the rule library of the given
-  * context.
-  * 
-  * @param context		The context.
-  * @param name			The ruleset name.
-  * @return	The new reference.
-  */
-  def apply(context: Context, name: String) =
-    context.ruleLibrary.makeRulesetRef(name)
-  
-  /**
-  * Make a new reference to the named ruleset in the given rule library.
-  * 
-  * @param library		The rule library.
-  * @param name			The ruleset name.
-  * @return	The new reference.
-  */
-  def apply(library: RuleLibrary, name: String) =
-    library.makeRulesetRef(name)
-}
-
-/**
-* Encapsulate a rule library.
-* 
-* == Purpose ==
-  * A rule library instance contains rules and methods for accessing relevant
-* rules and for performing "automated" rewriting.
-* 
-* Rules can be organized into rulesets.  A single rule may be in multiple
-* rulesets.  A rule can also be placed in no rulesets, though this is not
-* advisable, as it is difficult to access the rule later.  In fact, the
-* only way to see rules that are not part of any active ruleset is via the
-* `getRuleList` method.
-* 
-* The rule library also manages the rulesets.  These must be declared before
-* they can be used, and they can be enabled and disabled to better control
-* rewriting.
-* 
-* @param allowUndeclared	Iff true, allow the use of undeclared rulesets.
-*/
 class RuleLibrary(val allowUndeclared:Boolean = false)
 extends Fickle with Mutable {
 
@@ -248,8 +185,8 @@ extends Fickle with Mutable {
    * Disable a ruleset.
    * 
    * @param name	The name of the ruleset to disable.
-  * @return	This context.
-  */
+   * @return	This context.
+   */
   def disableRuleset(name: String) = {
     _active -= getRulesetBit(name)
     _activeNames -= name
@@ -277,20 +214,20 @@ extends Fickle with Mutable {
     rewrite _
   
   /**
-  * Set the limit for the number of rewrites.  Use a negative number
-  * to indicate no rewrites, and zero to turn off rewriting.
-  * 
-  * @param limit	The limit of the number of rewrites.
-  * @return	This rule library.
-  */
+   * Set the limit for the number of rewrites.  Use a negative number
+   * to indicate no rewrites, and zero to turn off rewriting.
+   * 
+   * @param limit	The limit of the number of rewrites.
+   * @return	This rule library.
+   */
   def setLimit(limit: BigInt) = { _limit = limit ; this }
   
   /**
-  * Set whether to rewrite children recursively.
-  * 
-  * @param descend	Whether to rewrite children recursively.
-  * @return	This rule library.
-  */
+   * Set whether to rewrite children recursively.
+   * 
+   * @param descend	Whether to rewrite children recursively.
+   * @return	This rule library.
+   */
   def setDescend(descend: Boolean) = { _descend = descend ; this }
   
   /**
@@ -324,16 +261,16 @@ extends Fickle with Mutable {
   //======================================================================
   
   /**
-  * Rewrite the provided atom once, if possible.  Children may be rewritten,
-  * depending on whether descent is enabled.
-  * 
-  * Do not memoize this method.
-  * 
-  * @param atom      The atom to rewrite.
-  * @param rulesets  The rulesets to use, or `Set.empty` to use all enabled.
-  * @return  The rewritten atom, and true iff any rules were successfully
-  *          applied.
-  */
+   * Rewrite the provided atom once, if possible.  Children may be rewritten,
+   * depending on whether descent is enabled.
+   * 
+   * Do not memoize this method.
+   * 
+   * @param atom      The atom to rewrite.
+   * @param rulesets  The rulesets to use, or `Set.empty` to use all enabled.
+   * @return  The rewritten atom, and true iff any rules were successfully
+   *          applied.
+   */
   def rewriteOnce(atom: BasicAtom,
       rulesets: Set[String]): (BasicAtom, Boolean) = {
 
@@ -352,15 +289,15 @@ extends Fickle with Mutable {
   }
   
   /**
-  * Rewrite the atom at the top level, once.
-  * 
-  * Do not memoize this method.
-  * 
-  * @param atom      The atom to rewrite.
-  * @param rulesets  The rulesets to use, or `Set.empty` to use all enabled.
-  * @return  The rewritten atom, and true iff any rules were successfully
-  *          applied.
-  */
+   * Rewrite the atom at the top level, once.
+   * 
+   * Do not memoize this method.
+   * 
+   * @param atom      The atom to rewrite.
+   * @param rulesets  The rulesets to use, or `Set.empty` to use all enabled.
+   * @return  The rewritten atom, and true iff any rules were successfully
+   *          applied.
+   */
   private def _rewriteTop(atom: BasicAtom,
       rulesets: Set[String]): (BasicAtom, Boolean) = {
 
@@ -392,16 +329,16 @@ extends Fickle with Mutable {
   }
   
   /**
-  * Recursively rewrite the atom and its children.  This method understands
-  * atom collections and operators.
-  * 
-  * Do not memoize this method.
-  * 
-  * @param atom      The atom to rewrite.
-  * @param rulesets  The rulesets to use, or `Set.empty` to use all enabled.
-  * @return  The rewritten atom, and true iff any rules were successfully
-  *          applied.
-  */
+   * Recursively rewrite the atom and its children.  This method understands
+   * atom collections and operators.
+   * 
+   * Do not memoize this method.
+   * 
+   * @param atom      The atom to rewrite.
+   * @param rulesets  The rulesets to use, or `Set.empty` to use all enabled.
+   * @return  The rewritten atom, and true iff any rules were successfully
+   *          applied.
+   */
   private def _rewriteChildren(atom: BasicAtom,
       rulesets: Set[String]): (BasicAtom, Boolean) = {
 
@@ -753,9 +690,9 @@ extends Fickle with Mutable {
   //======================================================================
 
   /**
-  * A map from ruleset names to integers indicating the rulesets position
-  * in the bitsets.
-  */
+   * A map from ruleset names to integers indicating the rulesets position
+   * in the bitsets.
+   */
   private val _rs2bit = MMap[String,Int]()
   
   /** Bit index of the next ruleset. */
@@ -771,14 +708,14 @@ extends Fickle with Mutable {
   enableRuleset("DEFAULT")
   
   /**
-  * Get the bit for a ruleset.
-  * 
-  * @param name	The ruleset name.
-  * @return	The bit for the ruleset.
-  * @throws	NoSuchRulesetException
-  * 					The ruleset has not been declared, and undeclared rulesets are
-  * 					not allowed.
-  */
+   * Get the bit for a ruleset.
+   * 
+   * @param name	The ruleset name.
+   * @return	The bit for the ruleset.
+   * @throws	NoSuchRulesetException
+   * 					The ruleset has not been declared, and undeclared rulesets are
+   * 					not allowed.
+   */
   private def getRulesetBit(name: String) =
     _rs2bit.getOrElseUpdate(name, (
       if (allowUndeclared) bump()
@@ -786,12 +723,12 @@ extends Fickle with Mutable {
         "The ruleset " + name + " has not been declared.")))
   
   /**
-  * Declare the ruleset.
-  * 
-  * @param name	The name of the new ruleset.
-  * @return	True if the ruleset was declared, and false if it was already
-  * 					(previously) declared.
-  */
+   * Declare the ruleset.
+   * 
+   * @param name	The name of the new ruleset.
+   * @return	True if the ruleset was declared, and false if it was already
+   * 					(previously) declared.
+   */
   def declareRuleset(name: String) = {
     actionList = DeclareRS(name) :: actionList
     
@@ -806,32 +743,32 @@ extends Fickle with Mutable {
   //======================================================================
   
   /**
-  * Make a ruleset reference.
-  * 
-  * @param name		The name of the ruleset.
-  */
+   * Make a ruleset reference.
+   * 
+   * @param name		The name of the ruleset.
+   */
   def apply(name: String): RulesetRef = new _RulesetRef(name)
   
   /**
-  * Make a ruleset reference.
-  * 
-  * @param name		The name of the ruleset.
-  */
+   * Make a ruleset reference.
+   * 
+   * @param name		The name of the ruleset.
+   */
   def makeRulesetRef(name: String): RulesetRef = new _RulesetRef(name)
   
   /**
-  * Implementation of ruleset references.
-  * 
-  * @param name		The name of the referenced ruleset.
-  */
+   * Implementation of ruleset references.
+   * 
+   * @param name		The name of the referenced ruleset.
+   */
   private class _RulesetRef(val name: String) extends RulesetRef {
     /** The bit for the referenced ruleset. */
     val bit = getRulesetBit(name)
     
     /**
-    * Apply this strategy. If any rule completes then the returned flag is
-    * true. Otherwise it is false.
-    */
+     * Apply this strategy. If any rule completes then the returned flag is
+     * true. Otherwise it is false.
+     */
     def doRewrite(atom: BasicAtom, hint: Option[Any]): (BasicAtom, Boolean) = {
 
       // Check the cache.
