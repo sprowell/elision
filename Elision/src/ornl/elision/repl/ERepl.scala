@@ -40,6 +40,7 @@ import ornl.elision.cli.Switch
 import ornl.elision.parse.Processor
 import ornl.elision.parse.ProcessorControl
 import ornl.elision.util.Loc
+import ornl.elision.context.RewriteEngine
 
 /**
  * Implement an interface to run the REPL from the prompt.
@@ -205,7 +206,7 @@ object ReplMain {
       case th: Throwable =>
         try {
           erepl.console.error("(" + th.getClass + ") " + th.getMessage())
-          if (erepl.getProperty[Boolean]("stacktrace")) th.printStackTrace()
+          if (erepl.context.getProperty("stacktrace")) th.printStackTrace()
         } catch {
           case _ =>
         }
@@ -325,10 +326,10 @@ extends Processor(state.settings) {
   // Initialize properties for the REPL.
   //======================================================================
   
-  declareProperty("showscala", "Show the Scala source for each atom.", false)
-  declareProperty("usepager",
+  context.declareProperty("showscala", "Show the Scala source for each atom.", false)
+  context.declareProperty("usepager",
       "Use the pager when output is longer than the screen.", true)
-  declareProperty("syntaxcolor", "Use syntax-based coloring of atoms where " +
+  context.declareProperty("syntaxcolor", "Use syntax-based coloring of atoms where " +
       "it is supported.", true)
   
   //======================================================================
@@ -342,7 +343,7 @@ extends Processor(state.settings) {
   //======================================================================
   
   def showatom(prefix: String, atom: BasicAtom) {
-    if (getProperty[Boolean]("showscala")) {
+    if (context.getProperty("showscala")) {
       // This is explicitly requested output, show show it regardless of the
       // quiet setting.
       console.sendln("Scala: " + prefix + atom.toString)
@@ -379,18 +380,18 @@ extends Processor(state.settings) {
     // atom.
     new Processor.Handler {
       override def init(exec: Executor) = {
-        declareProperty("showprior",
+        context.declareProperty("showprior",
             "Show each atom prior to rewriting with the context's bindings.",
             false)
-        declareProperty("applybinds",
+        context.declareProperty("applybinds",
             "Rewrite each atom with the context's bindings.", true)
         true
       }
       override def handleAtom(atom: BasicAtom) = {
-        if (getProperty[Boolean]("showprior")) {
+        if (context.getProperty("showprior")) {
           showatom("", atom)
         }
-        if (getProperty[Boolean]("applybinds")) {
+        if (context.getProperty("applybinds")) {
           val na = atom.rewrite(context.binds)
           Some(atom.rewrite(context.binds)._1)
         } else {
@@ -403,21 +404,21 @@ extends Processor(state.settings) {
     // is enabled) and stores rules.
     new Processor.Handler {
       override def init(exec: Executor) = {
-        declareProperty("autoop",
+        context.declareProperty("autoop",
             "If the current result is an operator, automatically declare it " +
             "in the operator library.", false)
-        declareProperty("autorule",
+        context.declareProperty("autorule",
             "If the current atom is a rewrite rule, automatically declare it " +
             "in the rule library.", false)
         true
       }
       override def handleAtom(atom: BasicAtom) = {
         atom match {
-          case op: Operator if getProperty[Boolean]("autoop") =>
+          case op: Operator if context.getProperty("autoop") =>
             context.operatorLibrary.add(op)
             console.emitln("Declared operator " + op.name + ".")
             None
-          case rule: RewriteRule if getProperty[Boolean]("autorule") =>
+          case rule: RewriteRule if context.getProperty("autorule") =>
             context.ruleLibrary.add(rule)
             console.emitln("Declared rule.")
             None
@@ -430,14 +431,14 @@ extends Processor(state.settings) {
     // Register a handler to perform automated rewriting of atoms.
     new Processor.Handler {
       override def init(exec: Executor) = {
-        declareProperty("autorewrite",
+        context.declareProperty("autorewrite",
             "Automatically apply rules in the active rulesets to each atom" +
             "as it is evaluated.", true)
         true
       }
       override def handleAtom(atom: BasicAtom) = {
-        if (getProperty[Boolean]("autorewrite")) {
-          Some(context.ruleLibrary.rewrite(atom)._1)
+        if (context.getProperty("autorewrite")) {
+          Some(new RewriteEngine(context)(atom)._1)
         } else {
           Some(atom)
         }
@@ -447,12 +448,12 @@ extends Processor(state.settings) {
     // Register a handler to perform round-trip testing of atoms.
     new Processor.Handler {
       override def init(exec: Executor) = {
-        declareProperty("roundtrip",
+        context.declareProperty("roundtrip",
             "Perform round-trip testing of atoms as they are entered.", true)
         true
       }
       override def result(atom: BasicAtom) {
-        if (!getProperty[Boolean]("roundtrip")) return
+        if (!context.getProperty[Boolean]("roundtrip")) return
         // Get the string.
         val string = atom.toParseString
         // Parse this string.
@@ -483,10 +484,10 @@ extends Processor(state.settings) {
     // should be near the end of the chain.
     new Processor.Handler {
       override def init(exec: Executor) = {
-        declareProperty("setreplbinds",
+        exec.context.declareProperty("setreplbinds",
             "Generate $_repl numbered bindings for each atom as it is " +
             "evaluated.", true)
-        declareProperty("setreplbinds.index",
+        exec.context.declareProperty("setreplbinds.index",
             "The index of the current $_repl numbered binding.", 0)
         true
       }
@@ -496,11 +497,11 @@ extends Processor(state.settings) {
       }
       override def result(atom: BasicAtom) = {
         // If we are binding atoms, bind it to a new REPL variable.
-        if (getProperty[Boolean]("setreplbinds")) {
+        if (context.getProperty[Boolean]("setreplbinds")) {
           // Get the current binding index.
           val index = "_repl" +
-              setProperty("setreplbinds.index",
-                  getProperty[Int]("setreplbinds.index")+1)
+              context.setProperty("setreplbinds.index",
+                  context.getProperty[Int]("setreplbinds.index")+1)
           // Commit the binding.
           context.bind(index, atom)
           showatom("$"+index+" = ", atom)
@@ -672,7 +673,7 @@ extends Processor(state.settings) {
           val line = cr.readLine(if (console.quiet > 0) p2 else p1)
           // Reset the terminal size now, if we can, and if the user wants to
           // use the pager.
-          if (getProperty[Boolean]("usepager")) {
+          if (context.getProperty("usepager")) {
             console.height_=(
                 scala.tools.jline.TerminalFactory.create().getHeight()-1)
             console.width_=(
@@ -731,7 +732,7 @@ extends Processor(state.settings) {
           
         case ex: Exception =>
           console.error("(" + ex.getClass + ") " + ex.getMessage())
-          if (getProperty[Boolean]("stacktrace")) ex.printStackTrace()
+          if (context.getProperty("stacktrace")) ex.printStackTrace()
 
         case oom: java.lang.OutOfMemoryError =>
           System.gc()
@@ -745,7 +746,7 @@ extends Processor(state.settings) {
         case th: Throwable =>
           try {
             console.error("(" + th.getClass + ") " + th.getMessage())
-            if (getProperty[Boolean]("stacktrace")) th.printStackTrace()
+            if (context.getProperty("stacktrace")) th.printStackTrace()
           } catch {
             case _ =>
           }

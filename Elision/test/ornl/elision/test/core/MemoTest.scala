@@ -40,7 +40,7 @@ import org.scalatest.junit.AssertionsForJUnit
 
 import ornl.elision.core.BasicAtom
 import ornl.elision.core.Lambda
-import ornl.elision.core.Memo
+import ornl.elision.context.Memo
 import ornl.elision.core.Variable
 import ornl.elision.core.strToLiteral
 
@@ -68,7 +68,7 @@ class MemoTest extends AssertionsForJUnit {
   @Test
   def testPut() {
     println("testPut (Single-threaded)")
-    val test = Memo
+    val test = new Memo(ornl.elision.core.knownExecutor.context)
     test.clear
     val bitset = new BitSet
     
@@ -108,7 +108,7 @@ class MemoTest extends AssertionsForJUnit {
     totalGetTime = System.currentTimeMillis - totalGetTime
     
     // print results
-    println(test.showStats)
+    println(test.showStats(ornl.elision.core.knownExecutor.console))
     println("Avg time to add: " + rt.reduceLeft(_ + _) / rt.length + "(ms) and total time was " + totalAddTime) 
     println("Avg time to get: " + gt.reduceLeft(_ + _) / gt.length + "(ms) and total time was " + totalGetTime) 
   }
@@ -121,7 +121,7 @@ class MemoTest extends AssertionsForJUnit {
     }
     
     println("testPutThreaded (" + numThreads + " threads)")
-    val test = Memo
+    val test = new Memo(ornl.elision.core.knownExecutor.context)
     test.clear
     val bitset = new BitSet
     
@@ -193,7 +193,7 @@ class MemoTest extends AssertionsForJUnit {
     totalGetTime = System.currentTimeMillis - totalGetTime
     
     // print results
-    println(test.showStats)
+    println(test.showStats(ornl.elision.core.knownExecutor.console))
     println("Avg time to add: " + rt.reduceLeft(_ + _) / rt.length + "(ms) and total time was " + totalAddTime)
     println("Avg time to get: " + gt.reduceLeft(_ + _) / gt.length + "(ms) and total time was " + totalGetTime)
   }

@@ -71,10 +71,6 @@ object ACMatcher {
    */
   def tryMatch(plist: AtomSeq, slist: AtomSeq, binds: Bindings,
                op: Option[OperatorRef]): Outcome = {
-    if (BasicAtom.rewriteTimedOut) {
-      return Fail("Timed out", plist, slist)
-    }
-
     // Check the length.
     if (plist.length > slist.length)
       return Fail("More patterns than subjects, so no match is possible.",
@@ -186,7 +182,7 @@ object ACMatcher {
 
         // Are we trying to aggresively fail ACMatching at the risk of not matching something
         // that could match?
-        if (knownExecutor.getProperty("rewrite_aggressive_fail")) {
+        if (knownExecutor.context.getProperty("rewrite_aggressive_fail")) {
           // If there is exactly one pattern then match it immediately. Note that there could
           // be other matches left in the unbindable matcher, which we are now skipping.
           if (pats.atoms.length == 1) {
@@ -362,13 +358,6 @@ object ACMatcher {
     @tailrec
     final protected def findNext {
       Debugger("matching", "AC Searching... ")
-
-      // Has rewriting timed out?
-      if (BasicAtom.rewriteTimedOut) {
-        _exhausted = true
-        return
-      }
-
       _current = null
       if (_local != null && _local.hasNext) _current = _local.next
       else {

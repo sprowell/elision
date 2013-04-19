@@ -66,12 +66,6 @@ object CMatcher {
    * @return	The match outcome.
    */
   def tryMatch(plist: AtomSeq, slist: AtomSeq, binds: Bindings): Outcome = {
-
-    // Has rewriting timed out?
-    if (BasicAtom.rewriteTimedOut) {
-      return Fail("Timed out", plist, slist)
-    }
-
     // Check the length.
     if (plist.length != slist.length)
       return Fail("Lists are different sizes, so no match is possible.",
@@ -171,13 +165,6 @@ object CMatcher {
     @tailrec
     final protected def findNext {
       Debugger("matching", "C Searching... ")
-
-      // Has rewriting timed out?
-      if (BasicAtom.rewriteTimedOut) {
-        _exhausted = true
-        return
-      }
-
       _current = null
       if (_local != null && _local.hasNext) {
         _current = _local.next

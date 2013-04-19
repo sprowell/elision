@@ -83,15 +83,9 @@ object SequenceMatcher {
       Debugger("matching", "    Subjects: " + subjects.mkParseString("",",",""))
       Debugger("matching", "    Bindings: " + binds.toParseString)
     }
-
-    // Has rewriting timed out?
-    if (BasicAtom.rewriteTimedOut) {
-      Fail("Timed out")
-    }
-    else if (patterns.length != subjects.length) {
+    if (patterns.length != subjects.length) {
       Fail("Sequences are not the same length.")
-    }
-    else {
+    } else {
       _tryMatch(patterns, subjects, binds, 0)
     }
   }

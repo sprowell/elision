@@ -62,6 +62,7 @@ import ornl.elision.util.Version.major
 import ornl.elision.util.Version.minor
 import ornl.elision.util.toQuotedString
 import ornl.elision.core.Dialect
+import ornl.elision.util.PropertyManager
 
 /**
  * A context provides access to operator libraries and rules, along with
@@ -82,8 +83,8 @@ import ornl.elision.core.Dialect
  *  - Rulesets.
  *  - "Automatic" rewriting of atoms using rules.
  */
-class Context extends Fickle with Mutable with Cache {
-
+class Context extends PropertyManager with Fickle with Mutable with Cache {
+  
   override def clone = {
     val clone = new Context
     clone.binds = this.binds.clone
@@ -91,6 +92,13 @@ class Context extends Fickle with Mutable with Cache {
     clone.ruleLibrary = this.ruleLibrary.clone
     clone
   }
+
+  //======================================================================
+  // Build a (transient) memoization cache for this context.
+  //======================================================================
+  
+  /** Memoization cache for this instance. */
+  val memo = new Memo(this)
 
   //======================================================================
   // Global bindings management.
@@ -185,7 +193,7 @@ class Context extends Fickle with Mutable with Cache {
    * @return	The current rule library.
    */
   def ruleLibrary = {
-    if (_rulelib == null) { _rulelib = new RuleLibrary() }
+    if (_rulelib == null) { _rulelib = new RuleLibrary(memo) }
     _rulelib
   }
 

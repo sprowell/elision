@@ -101,10 +101,11 @@ decl.{! disable($x: SYMBOL)
 decl.{! setlimit($limit: INTEGER)
 #handler=
 """
+  import ornl.elision.context.RewriteEngine
   args match {
     case Args(IntegerLiteral(_, count)) =>
       // Enable the specified ruleset.
-      context.ruleLibrary.setLimit(count)
+      RewriteEngine.limit = count
       emitln("Rewrite limit is now " + count + ".")
       _no_show
     case _ => _no_show
@@ -119,10 +120,11 @@ decl.{! setlimit($limit: INTEGER)
 decl.{! setdescend($enable: BOOLEAN)
 #handler=
 """
+  import ornl.elision.context.RewriteEngine
   args match {
     case Args(BooleanLiteral(_, flag)) =>
       // Set whether to descend.
-      context.ruleLibrary.setDescend(flag)
+      RewriteEngine.descend = flag
       emitln("Top-down rewriting is " + (if (flag) "ON." else "OFF."))
       _no_show
     case _ => _no_show

@@ -65,4 +65,53 @@
          extends ornl.elision.core.Dialect. -->
     <dialect name="elision" class="ornl.elision.dialects.ElisionDialect"/>
     <dialect name="scala" class="ornl.elision.dialects.ScalaDialect"/>
+    <!-- Property declarations are given here. -->
+    <property name="cache",
+        description="Whether to use the memoization cache or not."
+        type=boolean
+        default="true"/>
+    <property name="maxcachedepth",
+        description="The maximum depth of atoms to memoize."
+        type=integer
+        default="-1"/>
+    <property name="risky_equality_check"
+        description="Whether to do fast, but risky, equality checking of atoms."
+        type=boolean
+        default="true"/>
+    <property name="stacktrace"
+        description="Print a stack trace on all (non-Elision) exceptions."
+        type=boolean
+        default="false"/>
+    <property name="usepath"
+        description="Whether to use the search path to locate files."
+        type=boolean
+        default="true"/>
+    <property name="useclasspath"
+        description="Whether to use the class path to locate files."
+        type=boolean
+        default="true"/>
+    <property name="path"
+        description="The search path to use to locate files."
+        type=string
+        default="."/>
+    <property name="rewrite_timeout"
+        description="The maximum time to try rewriting atoms, in milliseconds."
+        type=integer
+        default="-1"/>
+    <property name="rewrite_aggressive_fail"
+        description="Whether to aggressively fail fast while rewriting.  If true some rewrites may not be applied."
+        type=boolean
+        default="false"/>
+    <property name="showscala"
+        description="Show the Scala source for each atom."
+        type=boolean
+        default=false/>
+    <property name="usepager"
+        description="Use the pager when output is longer than the screen."
+        type=boolean
+        default=true/>
+    <property name="syntaxcolor"
+        description="Use syntax-based coloring of atoms where it is supported."
+        type=boolean
+        default=true/>
 </configuration>

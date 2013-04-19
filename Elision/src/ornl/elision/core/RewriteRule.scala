@@ -461,7 +461,7 @@ class RewriteRule private (
     def checkGuards(candidate: Bindings): Boolean = {
       for (guard <- guards) {
         val (newguard, _) = guard.rewrite(candidate)
-        val (newguard1, _) = knownExecutor.context.ruleLibrary.rewrite(newguard)
+        val (newguard1, _) = applyGuardStrategy(newguard)
         if (!newguard1.isTrue) return false
       }
       true
@@ -519,7 +519,7 @@ class RewriteRule private (
     def checkGuards(candidate: Bindings): Boolean = {
       for (guard <- guards) {
         val (newguard, _) = guard.rewrite(candidate)
-        val (newguard1, _) = knownExecutor.context.ruleLibrary.rewrite(newguard)
+        val (newguard1, _) = applyGuardStrategy(newguard)
         if (!newguard1.isTrue) return false
       }
       true
@@ -544,17 +544,11 @@ class RewriteRule private (
     }
   }
   
-  	
   def doRewrite(atom: BasicAtom, hint: Option[Any]) =
     doRewrite(atom, Bindings(), hint)
   
   def doRewrite(atom: BasicAtom, binds: Bindings, hint: Option[Any]) = {
-    // Has rewriting timed out?
-    if (BasicAtom.rewriteTimedOut) {
-      (atom, true)
-    } else {
-      // Try to apply the rewrite rule.  Whatever we get back is the result.
-      _tryRewrite(atom, binds, hint)
-    }
+    // Try to apply the rewrite rule.  Whatever we get back is the result.
+    _tryRewrite(atom, binds, hint)
   }
 }

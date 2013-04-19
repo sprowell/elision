@@ -97,27 +97,27 @@ with TraceableParse
 with Timeable
 with HasHistory {
   // Set up the stacktrace property.
-  declareProperty("stacktrace",
+  context.declareProperty("stacktrace",
       "Print a stack trace on all (non-Elision) exceptions.", false)
   
   // Configure file search properties.
-  declareProperty("usepath",
+  context.declareProperty("usepath",
       "Whether to use the search path to locate files.", true)
-  declareProperty("useclasspath",
+  context.declareProperty("useclasspath",
       "Whether to use the class path to locate files.", true)
-  declareProperty("path",
+  context.declareProperty("path",
       "The search path to use to locate files.", FileResolver.defaultPath)
 
   // Atom rewrite timeout property used in BasicAtom. We need to make sure
   // that all executors know about this property, which is why we are declaring
   // the property here.
-  declareProperty("rewrite_timeout",
+  context.declareProperty("rewrite_timeout",
       "The maximum time to try rewriting an atom. In seconds.",
-      BigInt(0))
+      BigInt(-1))
 
   // This property is used in ACMatcher.scala to decide whether to quickly (and 
   // sometimes erroneously) terminate matching.
-  declareProperty("rewrite_aggressive_fail",
+  context.declareProperty("rewrite_aggressive_fail",
       "Whether to aggresively fail fast while rewriting. " +
       "If true, some rewrites may not be applied",
       false)
@@ -190,9 +190,9 @@ with HasHistory {
   def read(filename: String, quiet: Boolean): Boolean = {
     // Make a resolver from the properties.  Is this costly to do every time
     // we want to read a file?  Probably not.
-    val usePath = getProperty[Boolean]("usepath")
-    val useClassPath = getProperty[Boolean]("useclasspath")
-    val path = getProperty[String]("path")
+    val usePath = context.getProperty[Boolean]("usepath")
+    val useClassPath = context.getProperty[Boolean]("useclasspath")
+    val path = context.getProperty[String]("path")
     val resolver = FileResolver(usePath, useClassPath, Some(path))
     resolver.find(filename) match {
       case None =>
@@ -206,14 +206,14 @@ with HasHistory {
         // already in it.
         if(!path.contains(dir)) {
             val _prop = new scala.sys.SystemProperties
-            setProperty[String]("path", dir + _prop("path.separator") + path) 
+            context.setProperty[String]("path", dir + _prop("path.separator") + path) 
         }
         
         // Proceed with reading the file's stream.
         read(scala.io.Source.fromInputStream(reader), filename)
         
         // Restore our original path.
-        setProperty[String]("path", path)
+        context.setProperty[String]("path", path)
         Processor.fileReadStack.pop
         true
     }
@@ -325,7 +325,7 @@ with HasHistory {
       case ex: Exception =>
         console.error("(" + ex.getClass + ") " + ex.getMessage())
         val trace = ex.getStackTrace()
-        if (getProperty[Boolean]("stacktrace")) ex.printStackTrace()
+        if (context.getProperty[Boolean]("stacktrace")) ex.printStackTrace()
         else console.error("in: " + trace(0))
         
       case oom: java.lang.OutOfMemoryError =>
@@ -340,7 +340,7 @@ with HasHistory {
       case th: Throwable =>
         console.error("(" + th.getClass + ") " + th.getMessage())
         val trace = th.getStackTrace()
-        if (getProperty[Boolean]("stacktrace")) th.printStackTrace()
+        if (context.getProperty[Boolean]("stacktrace")) th.printStackTrace()
         else console.error("in: " + trace(0))
         coredump("Internal error.", Some(th))
     }

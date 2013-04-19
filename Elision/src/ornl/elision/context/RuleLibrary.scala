@@ -36,39 +36,33 @@
  ======================================================================*/
 package ornl.elision.context
 
-import scala.annotation.tailrec
-import scala.collection.mutable.{Map => MMap, BitSet, ListBuffer}
-import scala.collection.immutable.List
 import scala.collection.immutable.HashSet
-import scala.math.BigInt.int2bigInt
-import ornl.elision.core.AlgProp
+import scala.collection.immutable.List
+import scala.collection.mutable.BitSet
+import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.{Map => MMap}
+
 import ornl.elision.core.Apply
 import ornl.elision.core.AtomSeq
 import ornl.elision.core.BasicAtom
 import ornl.elision.core.Bindings
-import ornl.elision.core.Fickle
-import ornl.elision.core.Lambda
-import ornl.elision.core.Literal
-import ornl.elision.core.Memo
-import ornl.elision.core.Match
 import ornl.elision.core.Fail
+import ornl.elision.core.Fickle
+import ornl.elision.core.Literal
+import ornl.elision.core.Match
 import ornl.elision.core.Mutable
 import ornl.elision.core.NoProps
 import ornl.elision.core.Operator
 import ornl.elision.core.OperatorRef
-import ornl.elision.core.RulesetRef
-import ornl.elision.core.RSREF
 import ornl.elision.core.RewriteRule
-import ornl.elision.core.Rewriter
-import ornl.elision.core.SpecialForm
+import ornl.elision.core.RulesetRef
 import ornl.elision.core.SymbolicOperator
 import ornl.elision.core.Variable
 import ornl.elision.core.giveMkParseString
-import ornl.elision.util.ElisionException
-import ornl.elision.util.OmitSeq
-import ornl.elision.util.other_hashify
 import ornl.elision.util.Debugger
+import ornl.elision.util.ElisionException
 import ornl.elision.util.Loc
+import ornl.elision.util.OmitSeq
 
 /**
  * Indicate an attempt to use an undeclared ruleset.
@@ -126,9 +120,10 @@ extends ElisionException(loc, msg)
  * they can be used, and they can be enabled and disabled to better control
  * rewriting.
  * 
+ * @param memo            The memoization cache to use.
  * @param allowUndeclared	Iff true, allow the use of undeclared rulesets.
  */
-class RuleLibrary(val allowUndeclared:Boolean = false)
+class RuleLibrary(memo: Memo, val allowUndeclared:Boolean = false)
 extends Fickle with Mutable {
 
   // This is needed to correctly order operations when the Scala code for a
@@ -146,7 +141,7 @@ extends Fickle with Mutable {
    * @return  The clone.
    */
   override def clone: RuleLibrary = {
-    val clone = new RuleLibrary(allowUndeclared)
+    val clone = new RuleLibrary(memo, allowUndeclared)
     
     clone._kind2rules.clear
     for(mapping <- this._kind2rules) {
@@ -173,14 +168,11 @@ extends Fickle with Mutable {
     }
     
     clone._nextrs = this._nextrs
-    clone._descend = this._descend
-    clone._limit = this._limit & this._limit
-    
     clone
   }
   
   //======================================================================
-  // Control what can be rewritten.
+  // Control what rules can be added.
   //======================================================================
   
   /**
@@ -204,7 +196,7 @@ extends Fickle with Mutable {
    * Enable a ruleset.
    * 
    * @param name	The name of the ruleset to enable.
-   * @return	This context.
+   * @return	This library.
    */
   def enableRuleset(name: String) = {
     _active += getRulesetBit(name)
@@ -219,7 +211,7 @@ extends Fickle with Mutable {
    * Disable a ruleset.
    * 
    * @param name	The name of the ruleset to disable.
-  * @return	This context.
+  * @return	This library.
   */
   def disableRuleset(name: String) = {
     _active -= getRulesetBit(name)
@@ -229,464 +221,7 @@ extends Fickle with Mutable {
         _activeNames.mkString(", "))
     this
   }
-  
-  //======================================================================
-  // Controlling automatic rewriting.
-  //======================================================================
-
-  /** The rewrite limit.  Negative numbers mean *no* limit. */
-  private var _limit: BigInt = 10000000
-  
-  /** Whether to recursively rewrite children. */
-  private var _descend = true
-  
-  /**
-   * The method to use to rewrite a child.  This is set by the
-   * `setNormalizeChildren` method.
-   */
-  private var _rewritechild: (BasicAtom, Set[String]) => (BasicAtom, Boolean) =
-    rewrite _
-  
-  /**
-  * Set the limit for the number of rewrites.  Use a negative number
-  * to indicate no rewrites, and zero to turn off rewriting.
-  * 
-  * @param limit	The limit of the number of rewrites.
-  * @return	This rule library.
-  */
-  def setLimit(limit: BigInt) = {
-    Debugger("rule.library", "Set limit: " + limit)
-    _limit = limit
-    this
-  }
-  
-  /**
-  * Set whether to rewrite children recursively.
-  * 
-  * @param descend	Whether to rewrite children recursively.
-  * @return	This rule library.
-  */
-  def setDescend(descend: Boolean) = {
-    Debugger("rule.library", "Descent: " +
-        (if (descend) "enabled" else "disabled"))
-    _descend = descend
-    this
-  }
-  
-  /**
-   * Set whether to normalize children when rewriting.  The alternative is to
-   * rewrite children once, recursively, and then return to the top level to
-   * check it again.  The latter is a better strategy in general, but the
-   * former results in the normalized form of children being stored in the
-   * memoization cache.
-   * 
-   * Both should ultimately result in the same rewrite
-   * if everything works correctly, but can result in different rewrites
-   * under certain conditions.  Specifically, if an intermediate form of a
-   * child causes a higher-level rewrite to occur, whereas the normalized form
-   * of the child causes a different (or no) higher-level rewrite to occur,
-   * then you will get different results.  This is really a problem with the
-   * rules.
-   * 
-   * The default is to fully normalize children.
-   * 
-   * @param norm  Whether to normalize children.
-   * @return  This rule library.
-   */
-  def setNormalizeChildren(norm: Boolean) = {
-    Debugger("rule.library", "Normalize Children: " +
-        (if (norm) "enabled" else "disabled"))
-    if (norm) _rewritechild = rewrite _
-    else _rewritechild = rewriteOnce _
-    this
-  }
-  
-  //======================================================================
-  // Rewriting.
-  //======================================================================
-  
-  /**
-  * Rewrite the provided atom once, if possible.  Children may be rewritten,
-  * depending on whether descent is enabled.
-  * 
-  * Do not memoize this method.
-  * 
-  * @param atom      The atom to rewrite.
-  * @param rulesets  The rulesets to use, or `Set.empty` to use all enabled.
-  * @return  The rewritten atom, and true iff any rules were successfully
-  *          applied.
-  */
-  def rewriteOnce(atom: BasicAtom,
-      rulesets: Set[String]): (BasicAtom, Boolean) = {
-
-    // Has rewriting timed out?
-    if (BasicAtom.rewriteTimedOut) {
-      Debugger("rewrite", "Rewriting timed out: " + atom.toParseString)
-      return (atom, true)
-    }
-
-    var (newtop, appliedtop) = _rewriteTop(atom, rulesets)
-    if (_descend) {
-      var (newatom, applied) = _rewriteChildren(newtop, rulesets)     
-      (newatom, appliedtop || applied)
-    } else {
-      (newtop, appliedtop)
-    }
-  }
-  
-  /**
-  * Rewrite the atom at the top level, once.
-  * 
-  * Do not memoize this method.
-  * 
-  * @param atom      The atom to rewrite.
-  * @param rulesets  The rulesets to use, or `Set.empty` to use all enabled.
-  * @return  The rewritten atom, and true iff any rules were successfully
-  *          applied.
-  */
-  private def _rewriteTop(atom: BasicAtom,
-      rulesets: Set[String]): (BasicAtom, Boolean) = {
-
-    // Has rewriting timed out?
-    if (BasicAtom.rewriteTimedOut) {
-      Debugger("rewrite", "Rewriting timed out: " + atom.toParseString)
-      return (atom, true)
-    }
-
-    // Get the rules.
-    val rules = if (rulesets.isEmpty) getRules(atom)
-      else getRules(atom, rulesets)
-
     
-    // Now try every rule until one applies.
-    Debugger("rewrite", "Rewriting atom: " + atom.toParseString)
-    for (rule <- rules) {
-      Debugger("rewrite", "Trying rule: " + rule.toParseString)
-      val (newatom, applied) = rule.doRewrite(atom)
-      if (applied) {
-        // Return the rewrite result.
-        Debugger("rewrite", "Rewrote to: " + newatom.toParseString)
-        return (newatom, true)
-      }
-    } // Try all rules.
-
-    Debugger("rewrite", "No rule applied to: " + atom.toParseString)
-    return (atom, false)
-  }
-  
-  /**
-  * Recursively rewrite the atom and its children.  This method understands
-  * atom collections and operators.
-  * 
-  * Do not memoize this method.
-  * 
-  * @param atom      The atom to rewrite.
-  * @param rulesets  The rulesets to use, or `Set.empty` to use all enabled.
-  * @return  The rewritten atom, and true iff any rules were successfully
-  *          applied.
-  */
-  private def _rewriteChildren(atom: BasicAtom,
-      rulesets: Set[String]): (BasicAtom, Boolean) = {
-    if (BasicAtom.rewriteTimedOut) {
-      Debugger("rewrite", "Rewriting timed out: " + atom.toParseString)
-      return (atom, true)
-    } else {
-      atom match {
-        case AtomSeq(props, atoms) =>
-          var flag = false
-          // Rewrite the properties.  The result must still be a property spec.
-          // If not, we keep the same properties.
-          val newProps = _rewritechild(props, rulesets) match {
-            case (ap: AlgProp, true) => flag = true; ap
-            case _ => props
-          }
-          // Rewrite the atoms.
-          val newAtoms = atoms.map {
-            atom =>
-              val (newatom, applied) = _rewritechild(atom, rulesets)
-              flag ||= applied
-            newatom
-          }
-          // Return the result.
-          if (flag) (AtomSeq(newProps, newAtoms), true) else (atom, false)
-        
-        case Apply(lhs, rhs) =>
-          val newlhs = _rewritechild(lhs, rulesets)
-          val newrhs = _rewritechild(rhs, rulesets)
-          if (newlhs._2 || newrhs._2) {
-            (Apply(newlhs._1, newrhs._1), true)
-          } else {
-            (atom, false)
-          }
-        
-        case Lambda(param, body) =>
-          val newparam = _rewritechild(param, rulesets) match {
-            case (v: Variable, true) => (v, true)
-              case _ => (param, false)
-          }
-          val newbody = _rewritechild(body, rulesets)
-          if (newparam._2 || newbody._2) {
-            (Lambda(newparam._1, newbody._1), true)
-          } else {
-            (atom, false)
-          }
-
-        case SpecialForm(tag, content) =>
-          val newlhs = _rewritechild(tag, rulesets)
-          val newrhs = _rewritechild(content, rulesets)
-          if (newlhs._2 || newrhs._2) {
-            (SpecialForm(atom .loc, newlhs._1, newrhs._1), true)
-          } else {
-            (atom, false)
-          }
-
-        case _ =>
-          // Do nothing in this case.
-          (atom, false)
-      }
-    }
-  }
-
-  /**
-   * Rewrite the given atom, repeatedly applying the rules of the active
-   * rulesets.  This is limited by the rewrite limit.
-   * 
-   * This method uses the memoization cache, if enabled.
-   * 
-   * @param atom      The atom to rewrite.
-   * @return  The rewritten atom, and true iff any rules were successfully
-   *          applied.
-   */
-  def rewrite(atom: BasicAtom) = {
-
-    // Has this atom already been rewritten using (at least) the
-    // current rulesets?
-    atom.cleanRulesets match {
-      
-      // Yes it has been rewritten with the current rulesets.
-      case Some(priorRulesets) if (_active.subsetOf(priorRulesets)) => {
-        (atom, false)
-      }
-      
-      // It has never been rewritten.
-      case _ => {
-
-        // Actually try to rewrite.
-        if (BasicAtom.rewriteTimedOut) {
-          Debugger("rewrite", "Rewriting timed out: " +
-              atom.toParseString)
-          (atom, true)
-        } else if (atom.isInstanceOf[Literal[_]] && !_allowLiteralRules) {
-          (atom, false)
-        } else if (atom.isInstanceOf[Variable]) {
-          (atom, false)
-        } else {
-          // Check the cache.
-          var timedOut = false
-          val (newatom, flag) = Memo.get(atom, _active) match {
-            case None => {
-              
-              // Set the time at which rewriting the atom will time out, if we
-              // are timing rewrites out.
-              var pair: (ornl.elision.core.BasicAtom, Boolean) = null      
-              if (BasicAtom.timingOut) {
-                BasicAtom.timeoutTime.withValue(BasicAtom.computeTimeout) {
-                  pair = _doRewrite(atom, Set.empty)
-                  timedOut = BasicAtom.rewriteTimedOut
-                }
-              } else {
-                pair = _doRewrite(atom, Set.empty)
-                timedOut = false
-              }
-              atom.cleanRulesets match {
-                // The atom has now been rewritten with both the
-                // rulesets it was previosuly rewritten with and the new
-                // rulesets. Save that.
-                case Some(prior) => pair._1.cleanRulesets =
-                  Some(prior.union(_active.clone))
-                // The atom was not rewritten previosuly. Save the
-                // current rulesets used to rewrite the atom.
-                case _ => pair._1.cleanRulesets = Some(_active.clone)
-              }
-              Memo.put(atom, _active, pair._1, 0)
-              Memo.put(pair._1, _active, pair._1, 0)
-              pair
-            }
-            case Some(pair) => {
-              Debugger("rewrite", "Got cached rewrite: " +
-                  atom.toParseString + " to: " + pair._1.toParseString +
-                  " with rulesets: " + _activeNames.mkString(", "))
-              pair
-            }
-          }
-          
-          // Did rewriting this atom time out?
-          if (timedOut) {
-            // Return the original atom, with the rewrite flag set to true
-            // to indicate a timeout.
-            Debugger("rewrite", "Rewriting timed out: " +
-                atom.toParseString)
-            (atom, true)
-          }
-          
-          // No timeout.
-            else {
-              
-              // Return the rewrite results.
-              (newatom, flag)
-            }
-        }
-      }
-    }
-  }
-
-  /**
-   * Rewrite the given atom, repeatedly applying the rules of the specified
-   * rulesets.  This is limited by the rewrite limit.
-   * 
-   * Perform rewriting of an atom given a collection of rulesets.
-   * 
-   * This method uses the memoization cache, if enabled.
-   * 
-   * @param atom      The atom to rewrite.
-   * @param rulesets  The rulesets to use, or `Set.empty` to use all enabled.
-   * @return  The rewritten atom, and true iff any rules were successfully
-   *          applied.
-   */
-  def rewrite(atom: BasicAtom, rulesets: Set[String]) = {
-    // Get a bitset for the given set of rulesets.
-    val usedRulesetsBits = 
-      if (rulesets.isEmpty) _active 
-      else {
-        var r = new BitSet()
-        for (rs <- rulesets) r += getRulesetBit(rs)
-        r
-      }
-
-    // Has this atom already been rewritten using (at least) the
-    // current rulesets?
-    atom.cleanRulesets match {
-      
-      // Yes it has been rewritten with the current rulesets (and
-      // possibly other rulesets..
-      case Some(priorRulesets) if (usedRulesetsBits.subsetOf(priorRulesets)) => {
-        (atom, false)
-      }
-      
-      // It has never been rewritten.
-      case _ => {
-        // Has rewriting timed out?
-        if (BasicAtom.rewriteTimedOut) {
-          Debugger("rewrite", "Rewriting timed out: " +
-              atom.toParseString)
-          (atom, true)
-        } else if (atom.isInstanceOf[Literal[_]] && !_allowLiteralRules) {
-          (atom, false)
-        } else if (atom.isInstanceOf[Variable]) {
-          (atom, false)
-        } else {          
-          // Check the cache.
-          val usedRulesets = if (rulesets.isEmpty) _activeNames else rulesets
-          var timedOut = false
-          val (newatom, flag) = Memo.get(atom, usedRulesetsBits) match {
-            case None =>
-              
-              // Set the time at which rewriting the atom will time out, if we
-              // are timing rewrites out.
-              var pair: (ornl.elision.core.BasicAtom, Boolean) = null
-            if (BasicAtom.timingOut) {
-              BasicAtom.timeoutTime.withValue(BasicAtom.computeTimeout) {
-                pair = _doRewrite(atom, usedRulesets)
-                timedOut = BasicAtom.rewriteTimedOut
-              }
-            }
-            else {
-              pair = _doRewrite(atom, usedRulesets)
-              timedOut = false
-            }
-            atom.cleanRulesets match {
-              // The atom has now been rewritten with both the
-              // rulesets it was previosuly rewritten with and the new
-              // rulesets. Save that.
-              case Some(prior) => pair._1.cleanRulesets = Some(prior.union(usedRulesetsBits.clone))
-              // The atom was not rewritten previosuly. Save the
-              // current rulesets used to rewrite the atom.
-              case _ => pair._1.cleanRulesets = Some(usedRulesetsBits.clone)
-            }
-            Memo.put(atom, usedRulesetsBits, pair._1, 0)
-            Memo.put(pair._1, usedRulesetsBits, pair._1, 0)
-            pair
-            case Some(pair) => {
-              Debugger("rewrite", "Got cached rewrite: " +
-                  atom.toParseString + " to: " + pair._1.toParseString +
-                  " with rulesets: " + usedRulesets.mkString(", "))
-              pair
-            }
-          }
-          
-          // Did rewriting this atom time out?
-          if (timedOut) {
-            // Return the original atom, with the rewrite flag set to true
-            // to indicate a timeout.
-            Debugger("rewrite", "Rewriting timed out: " +
-                atom.toParseString)
-            (atom, true)
-          }
-          
-          // No timeout.
-            else {
-              
-              // Return the rewrite results.
-              (newatom, flag)
-            }
-        }
-      }
-    }
-  }
-
-  /**
-   * Rewrite the given atom, repeatedly applying the rules of the active
-   * rulesets.  This is limited by the rewrite limit.
-   * 
-   * This is the main method responsible for implementing systematic rewrite
-   * using rulesets and tracking the rewrite limit.  Do not memoize this
-   * method!
-   * 
-   * @param atom      The atom to rewrite.
-   * @param rulesets  The rulesets to use, or `Set.empty` to use all enabled.
-   * @param bool      Flag used for tracking whether any rules have succeeded.
-   * @param limit     The remaining rewrite limit.  Use a negative number for
-   *                  no limit.
-   * @return  The rewritten atom, and true iff any rules were successfully
-   *          applied.
-   */
-  @tailrec
-  private def _doRewrite(atom: BasicAtom,
-                        rulesets: Set[String] = Set.empty,
-                        bool: Boolean = false,
-                        limit: BigInt = _limit): (BasicAtom, Boolean) = {
-
-    // Has rewriting timed out?
-    if (BasicAtom.rewriteTimedOut) {
-      Debugger("rewrite", "Rewriting timed out: " + atom.toParseString)
-      return (atom, true)
-    }
-
-    if (limit == 0) return (atom, bool)
-    else rewriteOnce(atom, rulesets) match {
-      case (newatom, false) =>
-        return (newatom, bool)
-      case (newatom, true) => {
-        Debugger("rewrite", "Rewrote to: " + newatom.toParseString)
-        if (atom == newatom) {
-          return (newatom, true)
-        }
-        return _doRewrite(newatom, rulesets, true,
-                         if(limit > 0) limit-1 else limit)
-      }
-    }
-  }
-  
   //======================================================================
   // Ruleset management.
   //======================================================================
@@ -746,11 +281,20 @@ extends Fickle with Mutable {
   /**
    * Get the bit set for a collection of rulesets.
    * 
-   * @param names   The name of the rulesets to include.
-   * @return  The bits set for those rulesets.
+   * @param names   The names of the rulesets to include.
+   * @return  The bit set for those rulesets.
    */
   def getRulesetBits(names: Set[String]) = {
     names.foldLeft(new BitSet())(_ += getRulesetBit(_))
+  }
+  
+  /**
+   * Get the bit set for the currently active rulesets.
+   * 
+   * @return  The bit set for the currently active rulesets.
+   */
+  def getRulesetBits() = {
+    _active
   }
   
   /**
@@ -788,22 +332,21 @@ extends Fickle with Mutable {
   def makeRulesetRef(name: String): RulesetRef = new _RulesetRef(name)
   
   /**
-  * Implementation of ruleset references.
-  * 
-  * @param name		The name of the referenced ruleset.
-  */
+   * Implementation of ruleset references.
+   * 
+   * @param name		The name of the referenced ruleset.
+   */
   private class _RulesetRef(val name: String) extends RulesetRef {
     /** The bit for the referenced ruleset. */
     val bit = getRulesetBit(name)
     
     /**
-    * Apply this strategy. If any rule completes then the returned flag is
-    * true. Otherwise it is false.
-    */
+     * Apply this strategy. If any rule completes then the returned flag is
+     * true. Otherwise it is false.
+     */
     def doRewrite(atom: BasicAtom, hint: Option[Any]): (BasicAtom, Boolean) = {
-
       // Check the cache.
-      Memo.get(atom, _active) match {
+      memo.get(atom, _active) match {
         case None => {
           // We do not have a cached value for the current atom. We will
           // need to do the rewrites.
@@ -831,12 +374,6 @@ extends Fickle with Mutable {
 
       return (atom, false)
     }
-    
-    def tryMatchWithoutTypes(subject: BasicAtom, binds: Bindings, hints: Option[Any]) =
-      if (subject == this) Match(binds) else subject match {
-        case rr:RulesetRef if (rr.name == name) => Match(binds)
-        case _ => Fail("Ruleset reference does not match subject.", this, subject)
-      }
   }
 
   //======================================================================
@@ -866,7 +403,7 @@ extends Fickle with Mutable {
   private val _name2rules = MMap[String, List[RewriteRule]]()
 
   /**
-   * Add a rewrite rule to this context.
+   * Add a rewrite rule to this library.
    * 
    * @param rule	The rewrite rule to add.
    * @throws	NoSuchRulesetException
@@ -918,7 +455,7 @@ extends Fickle with Mutable {
   }
 
   /**
-   * Add a rewrite rule to this context.
+   * Add a rewrite rule to this library.
    * 
    * @param rule	The rewrite rule to add.
    * @throws	NoSuchRulesetException
@@ -947,7 +484,7 @@ extends Fickle with Mutable {
   }
   
   /**
-   * Remove a rewrite rule from this context.
+   * Remove a rewrite rule from this library.
    * 
    * @param rule  The rewrite rule to remove.
    * @throws  NoSuchRulesetException
@@ -1006,6 +543,19 @@ extends Fickle with Mutable {
     for ((bits, rule) <- getRuleList(atom); if (!(bits & rsbits).isEmpty))
       yield rule
   }
+  
+  /**
+   * Get the list of rules that apply to the given atom and which are in any
+   * of the specified rulesets.
+   * 
+   * @param atom  The atom to which to the rules may apply.
+   * @param name  The rulesets as a bitstring.
+   * @return  A list of rules.
+   */
+  def getRules(atom: BasicAtom, rsbits: BitSet) = {
+    for ((bits, rule) <- getRuleList(atom); if (!(bits & rsbits).isEmpty))
+      yield rule
+  }
 
   /**
    * Get all rules contained in the system, in the order they would be
@@ -1025,7 +575,7 @@ extends Fickle with Mutable {
 
   /**
    * Generate a newline-separated list of rules that can be parsed using the
-   * atom parser to reconstruct the set of rules in this context.
+   * atom parser to reconstruct the set of rules in this library.
    * 
    * @return	The parseable rule sets.
    */
@@ -1044,7 +594,7 @@ extends Fickle with Mutable {
 
   /**
    * Generate a newline-separated list of rules that can be parsed by Scala
-   * to reconstruct the set of rules in this context.
+   * to reconstruct the set of rules in this library.
    * 
    * @return	The parseable rule sets.
    */

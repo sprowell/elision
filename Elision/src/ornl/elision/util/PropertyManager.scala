@@ -60,7 +60,13 @@ trait PropertyManager {
    * C.isAssignableFrom(x)
    * }}}
    */
-  val clazzes: Set[_ <: Class[_]]
+  val clazzes: Set[_ <: Class[_]] = Set(
+    classOf[java.lang.Boolean],
+    classOf[Boolean],
+    classOf[java.lang.Integer],
+    classOf[BigInt],
+    classOf[String]
+  )
   
   /**
    * Declare a property.
@@ -115,6 +121,16 @@ trait PropertyManager {
       case Some(item) =>
         item.asInstanceOf[TYPE]
     }
+  }
+  
+  /**
+   * Determine if a specific property is available.
+   * 
+   * @param name    Name of the property.
+   * @return  True if the property's value is defined, false if not.
+   */
+  def hasProperty(name: String) = {
+    _prop2val.contains(name)
   }
   
   /**

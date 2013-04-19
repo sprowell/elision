@@ -79,6 +79,12 @@ abstract class RulesetRef extends BasicAtom with Rewriter {
       (atom, true)
   }
     
+  def tryMatchWithoutTypes(subject: BasicAtom, binds: Bindings, hints: Option[Any]) =
+    if (subject == this) Match(binds) else subject match {
+      case rr:RulesetRef if (rr.name == name) => Match(binds)
+      case _ => Fail("Ruleset reference does not match subject.", this, subject)
+    }
+    
   override def hashCode = 61*name.hashCode
   lazy val otherHashCode = (name.toString).foldLeft(BigInt(0))(other_hashify)+1
   

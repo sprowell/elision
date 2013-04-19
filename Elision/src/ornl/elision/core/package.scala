@@ -46,11 +46,23 @@ import ornl.elision.util.Debugger
 import ornl.elision.util.Loc
 import ornl.elision.context.Context
 import ornl.elision.context.Executor
+import ornl.elision.context.RewriteEngine
 
 /**
  * The core classes and definitions that make up the Elision runtime.
  * 
  * The purpose of this package is to define all basic atoms.
+ * 
+ * This package should be independent of other packages, except for
+ *  - [[ornl.elision.util]]
+ *  - [[ornl.elision.core.matcher]]
+ *  
+ * This is a challenge.  The [[ornl.elision.core.RewriteRule]] can have
+ * guards, and these must be rewritten in some more general context.  However
+ * a rule may be placed in more than one rule library, so the rule may not
+ * reference a rule library.  To avoid this issue the rewrite strategy for
+ * guards must be specified.  This is done at the package level by giving
+ * a distinguished [[ornl.elision.core.Rewriter]] instance to handle guards.
  * 
  * == Design Goals ==
  *  - Avoid global data and singletons.
@@ -77,6 +89,18 @@ package object core {
         "This default executor cannot parse text; override this with a full " +
         "executor implementation to properly support parsing from within " +
         "native operators.")
+  }
+  
+  /**
+   * Cause the default guard rewrite strategy to be applied to the given
+   * guard.  This is a stopgap measure until we have a better way to specify
+   * the guard strategy.
+   * 
+   * @param guard   The guard to rewrite.
+   * @return  The result of rewriting the guard.
+   */
+  def applyGuardStrategy(guard: BasicAtom) = {
+    new RewriteEngine(knownExecutor.context)(guard)
   }
 
   /**
@@ -152,7 +176,7 @@ package object core {
    * Declare the Elision property for setting whether to do risky
    * equality checking. 
    */
-  knownExecutor.declareProperty("risky_equality_check",
+  knownExecutor.context.declareProperty("risky_equality_check",
       "Whether to do fast, but risky, equality checking of atoms.",
       _riskyEqual,
       (pm: PropertyManager) => {

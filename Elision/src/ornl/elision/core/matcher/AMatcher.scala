@@ -72,12 +72,6 @@ object AMatcher {
    */
   def tryMatch(plist: AtomSeq, slist: AtomSeq, binds: Bindings,
                op: Option[OperatorRef]): Outcome = {
-
-    // Has rewriting timed out?
-    if (BasicAtom.rewriteTimedOut) {
-      return Fail("Timed out", plist, slist)
-    }
-
     // Check the length.
     if (plist.atoms.length > slist.atoms.length)
       return Fail("More patterns than subjects, so no match is possible.",
@@ -212,13 +206,6 @@ object AMatcher {
     @scala.annotation.tailrec
     final protected def findNext {
       Debugger("matching", "A Searching... ")
-
-      // Has rewriting timed out?
-      if (BasicAtom.rewriteTimedOut) {
-        _exhausted = true
-        return
-      }
-
       _current = null
       if (_local != null && _local.hasNext) {
         _current = _local.next

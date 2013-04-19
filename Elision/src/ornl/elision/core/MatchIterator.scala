@@ -89,6 +89,7 @@ abstract class MatchIterator extends Iterator[Bindings] {
     }
   
   import scala.annotation.tailrec
+  
   /**
    * Determine if there is a next match.
    * 
@@ -97,10 +98,6 @@ abstract class MatchIterator extends Iterator[Bindings] {
   final def hasNext: Boolean = {
     if (_exhausted) {
       // The iterator is exhausted.
-      return false
-    } else if (BasicAtom.rewriteTimedOut) {
-      // Rewriting timed out.
-      _exhausted = true
       return false
     } else if (_current != null) {
       // A current binding is available.

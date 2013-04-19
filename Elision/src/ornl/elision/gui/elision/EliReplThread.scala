@@ -112,7 +112,7 @@ class EliReplThread extends ReplThread {
 		ReplActor.history = myRepl
 		ReplActor.console = myRepl.console
 		ReplActor ! ("disableGUIComs", true)
-		myRepl.setProperty[Boolean]("syntaxcolor", false)
+		myRepl.context.setProperty[Boolean]("syntaxcolor", false)
 		ReplActor.start
     
 		myRepl.run()

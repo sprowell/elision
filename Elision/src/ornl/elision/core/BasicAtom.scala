@@ -37,13 +37,11 @@
 * */
 package ornl.elision.core
 
-import scala.collection.immutable.HashSet
-import scala.collection.mutable.{HashSet => MutableHashSet, BitSet}
-import scala.compat.Platform
-import scala.util.DynamicVariable
-import ornl.elision.util.PropertyManager
-import ornl.elision.util.HasOtherHash
+import scala.collection.mutable.BitSet
+import scala.collection.mutable.{HashSet => MutableHashSet}
+
 import ornl.elision.util.Debugger
+import ornl.elision.util.HasOtherHash
 import ornl.elision.util.Loc
 
 /**
@@ -199,7 +197,7 @@ abstract class BasicAtom(val loc: Loc = Loc.internal) extends HasOtherHash {
    * not None the atom has already been rewritten with some set of
    * rulesets. If None, the atom has never been rewritten.
    */
-  var cleanRulesets: Option[BitSet] = None
+  var cleanRulesets = new BitSet()
 
   /** The type for the atom. */
   val theType: BasicAtom
@@ -357,9 +355,7 @@ abstract class BasicAtom(val loc: Loc = Loc.internal) extends HasOtherHash {
    * @return	The matching outcome.
    */
   private def doMatch(subject: BasicAtom, binds: Bindings, hints: Option[Any]) =
-    if (BasicAtom.rewriteTimedOut) {
-      Fail("Timed out.", this, subject)
-    } else if (subject == ANY && !this.isBindable) {
+    if (subject == ANY && !this.isBindable) {
       // Any pattern is allowed to match the subject ANY.  In the matching
       // implementation for ANY, any subject is allowed to match ANY.
       // Thus ANY is a kind of wild card.  Note that no bindings are
@@ -512,55 +508,6 @@ object BasicAtom {
    * object instantiation.  Besides, it is just plain wrong.  BasicAtom
    * has no responsibilities with respect to rewriting.
    */
-
-  /** The clock time at which the current rewrite will time out.*/
-  var timeoutTime: DynamicVariable[Long] = new DynamicVariable[Long](-1L)
-
-  /**
-   * Compute the wall clock time at which the current rewrite will time
-   * out.
-   */
-  def computeTimeout = {
-    
-    // Are we timing rewrites out? Also, are we already trying to time
-    // out a rewrite?
-    //
-    // NOTE: We have to explicitly go out to the current executor to
-    // get the timeout value to make sure we are getting the value from 
-    // the correct executor.
-    val rewrite_timeout = knownExecutor.getProperty[BigInt]("rewrite_timeout").asInstanceOf[BigInt]
-    if ((rewrite_timeout > 0) && (timeoutTime.value <= -1)) {
-      // The time at which things time out is the current time plus
-      // the maximum amount of time to rewrite things.
-      Platform.currentTime + (rewrite_timeout.longValue * 1000)
-    } else if (timeoutTime.value > -1) {
-      // Return the previously computed timeout value.
-      timeoutTime.value
-    } else {
-      -1L
-    }
-  }
-
-  /**
-   * Check to see if we are timing out rewrites.
-   * @return  True if rewrite timeout is enabled (positive) or disabled
-   *          (non-positive).
-   */
-  def timingOut = {
-    knownExecutor.getProperty[BigInt]("rewrite_timeout").asInstanceOf[BigInt] > 0
-  }
-
-  /**
-   * Check to see if the current rewrite has timed out.
-   * @return  True iff the current rewrite should time out.
-   */
-  def rewriteTimedOut = {
-    if (timingOut && (timeoutTime.value > 0)) {
-      (Platform.currentTime >= timeoutTime.value)
-    } else {
-      false
-    }
-  }
 
   /** Whether or not to provide type information in toParseString(). */
   var printTypeInfo = false

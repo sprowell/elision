@@ -48,13 +48,13 @@ decl.{! setprop($name: STRING, $val)
       case Args(StringLiteral(_, name), value) =>
         value match {
           case StringLiteral(_, str) =>
-            exec.setProperty(name, str)
+            context.setProperty(name, str)
             _no_show
           case IntegerLiteral(_, value) =>
-            exec.setProperty(name, value)
+            context.setProperty(name, value)
             _no_show
           case BooleanLiteral(_, flag) =>
-            exec.setProperty(name, flag)
+            context.setProperty(name, flag)
             _no_show
           case _ =>
             console.error("Only STRING, INTEGER, and BOOLEAN values are allowed.")
@@ -75,7 +75,7 @@ decl.{! getprop($name: STRING)
   """
     args match {
       case Args(StringLiteral(_, name)) =>
-        val value = exec.getProperty[Any](name)
+        val value = context.getProperty[Any](name)
         value match {
           case str: String =>
             Literal(str)
@@ -102,7 +102,7 @@ decl.{! listprops()
   #handler=
   """
     val width = (scala.tools.jline.TerminalFactory.create().getWidth() max 5)
-    exec.writeProperties(console, width)
+    context.writeProperties(console, width)
     _no_show
   """
   #description="List all the known properties."
@@ -605,8 +605,8 @@ decl.{! history()
 
 decl.{! syntax_coloring($f)
   #handler="""
-    exec.setProperty[Boolean]("syntaxcolor",
-      !exec.getProperty[Boolean]("syntaxcolor"))
+    context.setProperty[Boolean]("syntaxcolor",
+      !context.getProperty[Boolean]("syntaxcolor"))
     _no_show
   """
   #description="Specify whether to use syntax coloring."
@@ -620,7 +620,7 @@ decl.{! syntax_coloring($f)
 
 decl.{! showtypes($a)
   #handler="""
-    val showscala = exec.getProperty[Boolean]("showscala")
+    val showscala = context.getProperty[Boolean]("showscala")
     var here = args(0)
     while (here != TypeUniverse) {
       if (showscala) {
@@ -704,7 +704,7 @@ decl.{! _declprop($name: STRING, $default, $description: STRING)
            case BooleanLiteral(_, flag) => flag
            case SymbolLiteral(_, sym) => sym
          }
-         exec.declareProperty(name, description, realval)
+         context.declareProperty(name, description, realval)
          console.emitln("Declared property "+toEString(name)+" with type "+
            realval.getClass.getName+".")
          _no_show

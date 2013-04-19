@@ -51,11 +51,8 @@ extends ElisionException(Loc.internal, msg)
  * This can be done by parsing the usual Elision representation of atoms, or
  * by some other means.
  * 
- * An executor also holds some other information.  Specifically it holds two
- * similar items.
+ * An executor also holds some other information.  Specifically it holds:
  * 
- *  - A set of __properties__ that hold user-configurable items to control
- *    Elision.  That is, these are user-visible and mutable.
  *  - The collection of __settings__ that were parsed from the command line,
  *    or left at their defaults.  These are (typically) regarded as immutable
  *    and are user-visible.  These are held for later reference.
@@ -65,23 +62,12 @@ extends ElisionException(Loc.internal, msg)
  * 
  * Note that the settings must be specified at construction time.
  */
-trait Executor extends PropertyManager {
+trait Executor {
   
   /**
    * The settings, from the command line parser.
    */
   val settings: Map[String,String]
-  
-  /**
-   * This property manager supports BigInts, Strings, and any BasicAtom.
-   */
-  val clazzes = Set(
-      classOf[java.lang.Boolean],
-      classOf[Boolean],
-      classOf[java.lang.Integer],
-      classOf[BigInt],
-      classOf[String],
-      classOf[BasicAtom])
   
   /**
    * Get a console native handlers can use.

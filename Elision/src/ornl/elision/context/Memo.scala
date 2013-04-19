@@ -27,22 +27,29 @@
  * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package ornl.elision.core
+package ornl.elision.context
 
 import java.util.HashMap
 import scala.collection.mutable.BitSet
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.Queue
 import ornl.elision.util.Debugger
+import ornl.elision.core.BasicAtom
+import ornl.elision.core.Literal
+import ornl.elision.core.Variable
+import scala.math.BigInt.int2bigInt
 import ornl.elision.util.PropertyManager
+import ornl.elision.util.Console
 
 /**
  * Provide an online and offline memoization system for rewriting.  There are
  * multiple ways this could be implemented; at present it is rather primitive.
  * Please see https://github.com/elision/elision/wiki/Memoization for some
  * details.
+ * 
+ * @param pm    A property manager.
  */
-object Memo {
+class Memo(pm: PropertyManager) {
 
   //======================================================================
   // Figure out where to read and store the persistent cache.  This will be
@@ -67,7 +74,7 @@ object Memo {
   private val _replacementPolicy = "LFU"
 
   /** Declare the Elision property for turning memoization on/off. */
-  knownExecutor.declareProperty("cache",
+  pm.declareProperty("cache",
       "Whether to use memoization caching or not.",
       _usingcache,
       (pm: PropertyManager) => {
@@ -75,7 +82,7 @@ object Memo {
       })
                                 
   /** Declare the Elision property for the maximum depth of atoms to memoize. */
-  knownExecutor.declareProperty("maxcachedepth",
+  pm.declareProperty("maxcachedepth",
       "The maximum depth of atoms to memoize.",
       _maxdepth,
       (pm: PropertyManager) => {
@@ -123,9 +130,11 @@ object Memo {
   
   /**
    * Print information about the Elision cache.
+   * 
+   * @param console   The console to get the message.
    */
-  def showStats {
-    knownExecutor.console.panicln("""
+  def showStats(console: Console) {
+    console.panicln("""
         |Elision Cache
         |=============
         |Hits:          %10d
@@ -141,6 +150,7 @@ object Memo {
   
   /** Number of cache levels.  Do not change this! */
   private val _LIMIT = 10
+  
   /** Cache size that triggers write.  Careful!  Low values are bad. */
   private val _SIZE = 10000
   
@@ -227,7 +237,7 @@ object Memo {
       get_old(atom,rulesets)
   }
   
-  def get_FIFO(atom: BasicAtom, rulesets: BitSet): Option[(BasicAtom, Boolean)] = {
+  private def get_FIFO(atom: BasicAtom, rulesets: BitSet): Option[(BasicAtom, Boolean)] = {
     // Return nothing if caching is turned off.
     if (! _usingcache) return None
    
@@ -280,7 +290,7 @@ object Memo {
     return r
   }
   
-  def get_LFU(atom: BasicAtom, rulesets: BitSet): Option[(BasicAtom, Boolean)] = {
+  private def get_LFU(atom: BasicAtom, rulesets: BitSet): Option[(BasicAtom, Boolean)] = {
     // Return nothing if caching is turned off.
     if (! _usingcache) return None
    
@@ -336,7 +346,7 @@ object Memo {
     return r
   }
   
-  def get_old(atom: BasicAtom, rulesets: BitSet): Option[(BasicAtom, Boolean)] = {
+  private def get_old(atom: BasicAtom, rulesets: BitSet): Option[(BasicAtom, Boolean)] = {
     // Return nothing if caching is turned off.
     if (! _usingcache) return None
    
@@ -406,7 +416,7 @@ object Memo {
       put_old(atom,rulesets,value,level)
   }
   
-  def put_FIFO(atom: BasicAtom, rulesets: BitSet, value: BasicAtom, level: Int) {
+  private def put_FIFO(atom: BasicAtom, rulesets: BitSet, value: BasicAtom, level: Int) {
     // Do nothing if caching is turned off.
     if (! _usingcache) return
     
@@ -438,7 +448,7 @@ object Memo {
     }
   }
  
-  def put_LFU(atom: BasicAtom, rulesets: BitSet, value: BasicAtom, level: Int) {
+  private def put_LFU(atom: BasicAtom, rulesets: BitSet, value: BasicAtom, level: Int) {
     // Do nothing if caching is turned off.
     if (! _usingcache) return
     
@@ -470,7 +480,7 @@ object Memo {
     }
   }
   
-  def put_old(atom: BasicAtom, rulesets: BitSet, value: BasicAtom, level: Int) {
+  private def put_old(atom: BasicAtom, rulesets: BitSet, value: BasicAtom, level: Int) {
     // Do nothing if caching is turned off.
     if (! _usingcache) return
     
@@ -498,7 +508,7 @@ object Memo {
   }
   
   /** Implementation of a replacement policy for _cache. */
-  def _replacementPolicyCache {
+  private def _replacementPolicyCache {
     if(_replacementPolicy.equals("LFU"))
       _replacementPolicyCacheLFU
     else if(_replacementPolicy.equals("LRU"))
@@ -507,7 +517,7 @@ object Memo {
       _replacementPolicyCacheFIFO
   }
   
-  def _replacementPolicyCacheFIFO {
+  private def _replacementPolicyCacheFIFO {
     if(_cache.size < _maxsize)
        return
     
@@ -518,7 +528,7 @@ object Memo {
     }
   }
   
-  def _replacementPolicyCacheLRU {
+  private def _replacementPolicyCacheLRU {
     if(_cache.size < _maxsize)
        return
        
@@ -553,7 +563,7 @@ object Memo {
     }
   }
   
-  def _replacementPolicyCacheLFU {
+  private def _replacementPolicyCacheLFU {
     if(_cache.size < _maxsize)
        return
     
@@ -596,7 +606,7 @@ object Memo {
   }
   
   /** Implementation of a replacement policy for _normal. */
-  def _replacementPolicyNormal {
+  private def _replacementPolicyNormal {
     if(_replacementPolicy.equals("LFU"))
       _replacementPolicyNormalLFU
     else if(_replacementPolicy.equals("LRU"))
@@ -605,7 +615,7 @@ object Memo {
       _replacementPolicyNormalFIFO
   }
   
-  def _replacementPolicyNormalFIFO {
+  private def _replacementPolicyNormalFIFO {
     if(_normal.size < _maxsize)
        return
     
@@ -616,7 +626,7 @@ object Memo {
     }
   }
   
-  def _replacementPolicyNormalLRU {
+  private def _replacementPolicyNormalLRU {
     if(_normal.size < _maxsize)
        return
        
@@ -652,7 +662,7 @@ object Memo {
     
   }
   
-  def _replacementPolicyNormalLFU {
+  private def _replacementPolicyNormalLFU {
     if(_normal.size < _maxsize)
        return
     
@@ -695,7 +705,7 @@ object Memo {
   }
   
   /** safely increments the counter for a key in _cacheCounter. */
-  def _incCacheCounter(key : ((Int,BigInt),BitSet)) {
+  private def _incCacheCounter(key : ((Int,BigInt),BitSet)) {
     val counterHasKey = _cacheCounter.containsKey(key)
     
     val curCount = if(counterHasKey) {
@@ -708,7 +718,7 @@ object Memo {
   }
   
   /** safely increments the counter for a key in _normalCounter. */
-  def _incNormalCounter(key : ((Int,BigInt),BitSet)) {
+  private def _incNormalCounter(key : ((Int,BigInt),BitSet)) {
     val counterHasKey = _normalCounter.containsKey(key)
     
     val curCount = if(counterHasKey) {
