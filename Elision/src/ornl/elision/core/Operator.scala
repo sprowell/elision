@@ -36,20 +36,19 @@
 ======================================================================*/
 package ornl.elision.core
 
-import scala.compat.Platform
-import scala.collection.immutable.HashMap
-import scala.collection.mutable.ListBuffer
-import scala.collection.mutable.{Set => MSet}
-import scala.collection.mutable.Stack
-import scala.collection.mutable.Queue
-import scala.tools.nsc.interpreter.Results
-import ornl.elision.context.NativeCompiler
+import scala.math.BigInt.int2bigInt
 import ornl.elision.context.Executor
-import ornl.elision.core.matcher.SequenceMatcher
+import ornl.elision.context.NativeCompiler
+import ornl.elision.matcher.Fail
+import ornl.elision.matcher.Many
+import ornl.elision.matcher.Match
+import ornl.elision.matcher.Matcher
+import ornl.elision.matcher.SequenceMatcher
 import ornl.elision.util.ElisionException
-import ornl.elision.util.OmitSeq
-import ornl.elision.util.Debugger
 import ornl.elision.util.Loc
+import ornl.elision.util.OmitSeq.fromIndexedSeq
+import ornl.elision.util.Timeable
+import ornl.elision.matcher.SequenceMatcher
 
 /**
  * An incorrect argument list was supplied to an operator.
@@ -152,14 +151,6 @@ abstract class Operator(
    * @return  The constructed atom.
    */
   def apply(atoms: BasicAtom*): BasicAtom
-  
-  /**
-   * Proxy to the parent match method, but turn this operator into an operator
-   * reference in the process.
-   */
-  override def tryMatchWithoutTypes(
-      subject: BasicAtom, binds: Bindings, hints: Option[Any]) =
-    super.tryMatchWithoutTypes(subject, binds, Some(OperatorRef(this)))
 }
 
 /**
@@ -236,16 +227,6 @@ class OperatorRef(val operator: Operator) extends BasicAtom with Applicable {
     case None => (this, false)
     case Some(atom) => (atom, true)
   }
-
-  def tryMatchWithoutTypes(subject: BasicAtom, binds: Bindings,
-      hints: Option[Any]) =
-    if (subject == this) {
-      Match(binds)
-    } else subject match {
-      case OperatorRef(oop) if (oop == operator) => Match(binds)
-      case oop: Operator if (oop == operator) => Match(binds)
-      case _ => Fail("Operator reference does not match subject.", this, subject)
-    }
 
   /**
    * Apply the referenced operator to a sequence of atoms.
@@ -841,7 +822,7 @@ protected class SymbolicOperator protected (sfh: SpecialFormHolder,
     // Any identity must match the parameter type.  We just try to match
     // the first parameter's type.
     if (params.props.identity.isDefined) {
-      params(0).theType.tryMatch(params.props.identity.get.theType) match {
+      Matcher(params(0).theType, params.props.identity.get.theType) match {
         case Fail(reason, index) =>
           throw new ArgumentListException(loc, "The operator " + toESymbol(name) +
             " has an identity whose type (" +
@@ -854,7 +835,7 @@ protected class SymbolicOperator protected (sfh: SpecialFormHolder,
     // Any absorber must match the parameter type.  We just try to match
     // the first parameter's type.
     if (params.props.absorber.isDefined) {
-      params(0).theType.tryMatch(params.props.absorber.get.theType) match {
+      Matcher(params(0).theType, params.props.absorber.get.theType) match {
         case Fail(reason, index) =>
           throw new ArgumentListException(loc, "The operator " + toESymbol(name) +
             " has an absorber whose type (" +
@@ -984,7 +965,7 @@ protected class SymbolicOperator protected (sfh: SpecialFormHolder,
             val atom = newseq(0)
             // Match the type of the atom against the type of the parameters.
             val param = params(0)
-            param.tryMatch(atom) match {
+            Matcher(param, atom) match {
               case Fail(reason, index) =>
                 // The argument is invalid.  Reject!
                 throw new ArgumentListException(atom.loc, "Incorrect argument " +
@@ -1039,7 +1020,7 @@ protected class SymbolicOperator protected (sfh: SpecialFormHolder,
           // arguments/formal parameters have the same type, matching
           // 1 formal parameter with 1 argument gives us all the
           // binding information needed to do type inference.
-          aParam.tryMatch(anArg) match {
+          Matcher(aParam, anArg) match {
             case Fail(reason, index) =>
               throw new ArgumentListException(anArg.loc,
                   "Incorrect argument for operator " + toESymbol(name) +

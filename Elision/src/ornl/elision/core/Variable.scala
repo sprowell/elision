@@ -40,6 +40,9 @@ package ornl.elision.core
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.OpenHashMap
 import ornl.elision.util.other_hashify
+import ornl.elision.matcher.Outcome
+import ornl.elision.matcher.Fail
+import ornl.elision.matcher.Match
 
 /**
  * Represent a variable.
@@ -168,37 +171,6 @@ class Variable(typ: BasicAtom, val name: String,
           else return Fail("Variable guard failed.  Is now: " +
               newterm.toParseString)
       }
-    }
-  }
-  
-  def tryMatchWithoutTypes(subject: BasicAtom, binds: Bindings,
-      hints: Option[Any]) = {
-    // if the variable allows binding, and it is not already bound to a
-    // different atom.  We also allow the variable to match ANY.
-    if (isBindable) binds.get(name) match {
-      case None =>
-        // This is tricky.  We bind if we match against ANY.  Are
-        // there unforseen consequences to this decision?  Otherwise we have
-        // to add a binding of the variable name to the subject.
-        bindMe(subject, binds)
-      case Some(ANY) =>
-        // We should re-bind this variable now.
-        bindMe(subject, binds)
-      case Some(atom) if subject == ANY || atom == subject =>
-        // The variable is already bound, and it is bound to the subject, so
-        // the match succeeds with the bindings as they are.
-        Match(binds)
-      case _ =>
-        // The variable is already bound and it is bound to an unequal subject,
-        // so the match fails.
-        Fail("Variable " + this.toParseString +
-          " is already bound to the term " + binds.get(name).get.toParseString +
-          ".", this, subject)
-    } else {
-      // Variables that are not bindable cannot be bound, and cannot match
-      // any subject.  This is to prevent allowing them to "match" a bindable
-      // variable of the same name and type, and having chaos ensue.
-      Fail("Variable is not bindable.", this, subject)
     }
   }
 	  

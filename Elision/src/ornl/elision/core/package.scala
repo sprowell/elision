@@ -55,7 +55,7 @@ import ornl.elision.context.RewriteEngine
  * 
  * This package should be independent of other packages, except for
  *  - [[ornl.elision.util]]
- *  - [[ornl.elision.core.matcher]]
+ *  - [[ornl.elision.matcher]]
  *  
  * This is a challenge.  The [[ornl.elision.core.RewriteRule]] can have
  * guards, and these must be rewritten in some more general context.  However

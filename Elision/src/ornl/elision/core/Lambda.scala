@@ -39,6 +39,10 @@ package ornl.elision.core
 
 import ornl.elision.util.ElisionException
 import ornl.elision.util.Loc
+import ornl.elision.matcher.Matcher
+import ornl.elision.matcher.Match
+import ornl.elision.matcher.Fail
+import ornl.elision.matcher.Many
 
 /* Notes on De Bruijn indices.
  * 
@@ -156,21 +160,6 @@ extends BasicAtom with Applicable {
    */
   lazy val isTerm = body.isTerm  
   lazy val depth = body.depth + 1
-    
-  def tryMatchWithoutTypes(subject: BasicAtom, binds: Bindings,
-      hints: Option[Any]) = subject match {
-	  case Lambda(olvar, obody) =>
-	    if (olvar == lvar) {
-        body.tryMatch(obody, binds, hints) match {
-          case fail: Fail =>
-            Fail("Lambda bodies do not match.", this, subject)
-          case mat: Match => mat
-          case mat: Many => mat
-        }
-  	  } else Fail("Lambda variables do not match.", this, subject)
-	  
-	  case _ => Fail("Lambdas only match other lambdas.", this, subject)
-	}
 
   def rewrite(binds: Bindings): (BasicAtom, Boolean) = {
     // We test for a special case here.  If the bindings specify that we
@@ -222,7 +211,7 @@ extends BasicAtom with Applicable {
 	    // Make it possible to check types by matching the variable against the
 	    // argument instead of just binding.  For pure binding without checking
 	    // types, use a bind.
-	    lvar.tryMatch(atom) match {
+      Matcher(lvar, atom, Bindings(), None) match {
 	      case fail:Fail =>
 	        throw new LambdaVariableMismatchException(atom.loc,
 	            "Lambda argument does not match parameter: " + fail.theReason)

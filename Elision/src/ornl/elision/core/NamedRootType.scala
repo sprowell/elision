@@ -74,17 +74,6 @@ extends SymbolLiteral(TypeUniverse, Symbol(name)) {
   // Save this instance in the registry.  This is essential so that the parser
   // can find root types.
   NamedRootType._set(this)
-  
-  /**
-	 * Try to match this type against the provided atom.  Note that root types
-	 * match only themselves, so the match works iff the subject is equal to this
-	 * pattern.
-	 */
-	override def tryMatchWithoutTypes(subject: BasicAtom, binds: Bindings,
-	    hints: Option[Any]) =
-	  // A root type matches only itself.
-	  if (this == subject) Match(binds)
-	  else Fail("This type matches only itself.", this, subject)
 
   /**
    * The root types cannot be rewritten, as they do not have children.
@@ -198,17 +187,9 @@ object BINDING extends NamedRootType("BINDING")
 /**
  * The unusual type ANY that matches anything (even NONE).
  */
-object ANY extends NamedRootType("ANY") {
-  override def tryMatch(subject: BasicAtom, binds: Bindings = Bindings(),
-      hints: Option[Any] = None) = Match(binds)
-}
+object ANY extends NamedRootType("ANY")
 
 /**
  * The unusual type NONE that matches just itself and ANY.
  */
-object NONE extends NamedRootType("NONE") {
-  override def tryMatch(subject: BasicAtom, binds: Bindings = Bindings(),
-      hints: Option[Any] = None) =
-    if (subject == NONE || subject == ANY) Match(binds)
-    else Fail("NONE only matches itself and ANY.")
-}
+object NONE extends NamedRootType("NONE")

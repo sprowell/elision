@@ -34,22 +34,5 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ======================================================================*/
-package ornl.elision.core
+package ornl.elision.matcher
 
-/** 
- * Provide implementations of specific forms of matching.
- * 
- * There are several basic matching algorithms.
- * 
- *  - [[ornl.elision.core.matching.SequenceMatcher]] handles non-associative,
- *    non-commutative matching.
- *  - [[ornl.elision.core.matching.CMatcher]] handles commutative,
- *    non-associative matching.
- *  - [[ornl.elision.core.matching.AMatcher]] handles associative,
- *    non-commutative matching.
- *  - [[ornl.elision.core.matching.ACMatcher]] handles associative, commutative
- *    matching.
- * 
- * There are also supporting classes that handle parts of the matching process.
- */
-package object matcher

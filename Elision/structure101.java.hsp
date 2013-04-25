@@ -4,10 +4,10 @@
   <property name="show-needs-to-compile" value="false" />
   <property name="root-file" value="/Users/ysp/workspace" />
   <property name="detail-mode" value="true" />
-  <property name="project-excluded" value="" />
+  <property name="project-excluded" value="/Users/ysp/workspace/fx/bin" />
   <property name="project-type" value="eclipse_workspace" />
-  <property name="action-set-mod" value="10" />
   <property name="resolve-name-clashes" value="true" />
+  <property name="action-set-mod" value="10" />
   <property name="hide-deprecated" value="false" />
   <property name="parse-archive-in-archive" value="false" />
   <classpath relativeto="/Users/ysp/workspace/Elision">
@@ -16,7 +16,6 @@
   <pom-root-files />
   <excludes>
     <exclude expression="*._*" active="true" />
-    <exclude expression="ornl.elision.generators*" active="true" />
     <exclude expression="ornl.elision.core.*&amp;" active="true" />
   </excludes>
   <transformations>
@@ -27,7 +26,8 @@
     <set version="2" name="List 1" hiview="Codemap" active="true" todo="false" />
   </restructuring>
   <sourcepaths>
-    <pathentry type="file" path="/Users/ysp/workspace/Elision/src" />
+    <pathentry type="file" path="/Users/ysp/workspace/Elision/test" />
+    <pathentry type="file" path="/Users/ysp/workspace/fx/test" />
   </sourcepaths>
 </local-project>
 

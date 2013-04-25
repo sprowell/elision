@@ -122,11 +122,6 @@ trait Applicable {
  *  - Specify the type of the object.  To do this add `val theType = `(a basic
  *    atom).
  *    
- *  - Implement `tryMatchWithoutTypes`.  You can safely assume this method is
- *    not invoked until ''after'' the types have been matched successfully.  You
- *    can also assume this may be invoked multiple times if there are many
- *    potential matches for the types.
- *    
  *  - Implement `rewrite`.
  *  
  *  - Visit [[ornl.elision.core.ElisionGenerator]] and add code to create a
@@ -294,115 +289,6 @@ abstract class BasicAtom(val loc: Loc = Loc.internal) extends HasOtherHash {
   def getOperators(opNames : MutableHashSet[String]) : Option[MutableHashSet[BasicAtom]] = {
     return None
   }
-  
-  /**
-   * Attempt to match this atom, as a pattern, against the subject atom,
-   * observing the bindings, if any.  The type is checked prior to trying
-   * any matching.
-   * 
-   * @param subject	The subject atom to match.
-   * @param binds		Any bindings that must be observed.  This is optional.
-   * @param hints		Optional hints.
-   * @return	The matching outcome.
-   */
-  def tryMatch(subject: BasicAtom, binds: Bindings = Bindings(),
-      hints: Option[Any] = None) = {
-    var what = 0L
-    Debugger("matching") {
-      // We compute a hash code for this match.  This is used in the output to
-      // associate lines referring to the match, since matches can be nested and
-      // (potentially) interleaved.
-      what = this.hashCode * 31 + subject.hashCode
-    
-      // The match attempt is starting.  Write out information about the
-      // attempted match.
-      Debugger.debugf("matching",
-          "TRYING  (%x) in %s:\n", what, this.getClass.toString)
-      Debugger("matching", "  pattern: " + this.toParseString + "\n  subject: " +
-          subject.toParseString + "\n  with: " + binds.toParseString)
-    }
-        
-    // Perform the match.
-    val outcome = doMatch(subject, binds, hints)
-    
-    Debugger("matching") {
-      // Write out information about the result of the match attempt.
-      outcome match {
-        case fail:Fail =>
-        	Debugger.debugf("matching", "FAILURE (%x): ", what)
-          Debugger("matching", fail)
-        case Match(bnd) =>
-      		Debugger.debugf("matching", "SUCCESS (%x): ", what)
-          Debugger("matching", bnd.toParseString)
-        case many:Many =>
-        	Debugger.debugf("matching", "SUCCESS (%x): ", what)
-          Debugger("matching", "  Many Matches")
-      }
-    }
-    
-    // The value is the outcome of the match.
-    outcome
-  }
-
-  /**
-   * Attempt to match this atom, as a pattern, against the subject atom,
-   * observing the bindings, if any.  The type is checked prior to trying
-   * any matching.
-   * 
-   * @param subject	The subject atom to match.
-   * @param binds		Any bindings that must be observed.
-   * @param hints		Optional hints.
-   * @return	The matching outcome.
-   */
-  private def doMatch(subject: BasicAtom, binds: Bindings, hints: Option[Any]) =
-    if (subject == ANY && !this.isBindable) {
-      // Any pattern is allowed to match the subject ANY.  In the matching
-      // implementation for ANY, any subject is allowed to match ANY.
-      // Thus ANY is a kind of wild card.  Note that no bindings are
-      // applied - anything can match ANY.
-      //
-      // Of course, if this atom is bindable, we might want to bind to ANY,
-      // so we exempt that case.
-      Match(binds)
-    } else if (depth > subject.depth) {
-    	// If this pattern has greater depth than the subject, reject immediately.
-      Fail("Depth of pattern greater than depth of subject.", this, subject)
-    } else if (isConstant && this == subject) {
-	    // Don't bother to try to match equal atoms that are constant.  The
-	    // constancy check is required; otherwise we might "match" $x against
-	    // $x, but not bind.  This leaves us free to bind $x to something
-      // different later, invalidating the original "match".  Matching is
-      // tricky.
-      Match(binds)
-    } else {
-      // We didn't find a fast way to match, so we need to actually perform
-      // the match.  First we try to match the types.  If this succeeds, then
-      // we invoke the implementation of tryMatchWithoutTypes.
-      matchTypes(subject, binds, hints) match {
-	      case fail: Fail => 
-	        fail
-	        
-	      case mat: Match =>
-	        tryMatchWithoutTypes(subject, mat.binds, hints)
-	        
-	      case Many(submatches) =>
-	        Many(MatchIterator(tryMatchWithoutTypes(subject, _, hints),
-	          submatches))
-	    }
-    }
-
-  /**
-   * Try to match this atom, as a pattern, against the given subject.  Do not
-   * do type matching for this atom, but use [[BasicAtom.tryMatch]] for any
-   * children, so their types are correctly matched.
-   *
-   * @param subject	The subject atom to match.
-   * @param binds		Any bindings that must be observed.
-   * @param hints		Optional hints.
-   * @return	The matching outcome.
-   */
-  def tryMatchWithoutTypes(subject: BasicAtom, binds: Bindings,
-      hints: Option[Any]): Outcome
 
   /**
    * Rewrite this atom with the specified bindings.  If types are involved, it
@@ -468,28 +354,6 @@ abstract class BasicAtom(val loc: Loc = Loc.internal) extends HasOtherHash {
    */
   override def toString =
     Dialect.serialize('scala, new StringBuffer(), this).toString
-
-  
-  /**
-   * Recursively match the types.  This is unbounded recursion; it is expected
-   * that a class (a type universe) will override this method to create a basis
-   * case.
-   *
-   * NOTE: When strategies are finally implemented, this is where the selection
-   * of type matching strategies may be done.
-   *
-   * @param subject	The atom to match.
-   * @param binds		The bindings to observe.
-   * @param hints		Optional hints.
-   * @return	The outcome of the match.
-   */
-  protected def matchTypes(subject: BasicAtom, binds: Bindings,
-      hints: Option[Any]): Outcome =
-    this.theType.tryMatch(subject.theType, binds, hints) match {
-      case mat: Match => mat
-      case many: Many => many
-      case fail: Fail => Fail("Types do not match.", this, subject, Some(fail))
-    }
 }
 
 /**

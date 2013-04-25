@@ -38,6 +38,10 @@
 package ornl.elision.core
 
 import ornl.elision.util.Loc
+import ornl.elision.matcher.Matcher
+import ornl.elision.matcher.Match
+import ornl.elision.matcher.Fail
+import ornl.elision.matcher.Many
 
 /**
  * Encapsulate a simple atom to perform basic matching.
@@ -87,7 +91,7 @@ extends SpecialForm(sfh.loc, sfh.tag, sfh.content) with Applicable {
     }
     
     // Try to match the given atom against the pattern.
-    pattern.tryMatch(subject, binds) match {
+    Matcher(pattern, subject, binds, None) match {
       case fail:Fail => return None
       case Match(newbinds) =>
         // We got a match.  Check the guards.

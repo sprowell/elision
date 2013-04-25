@@ -354,7 +354,7 @@ extends Processor(state.settings) {
       ReplActor.waitForGUI("formatting on")
     }
     
-    if(getProperty[Boolean]("syntaxcolor")) {
+    if(context.getProperty[Boolean]("syntaxcolor")) {
       // color-format the atom's parseString and print it.
       val formatCols = console.width
       val formatRows = console.height

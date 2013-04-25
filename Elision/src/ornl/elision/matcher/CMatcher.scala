@@ -35,21 +35,16 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ======================================================================
 * */
-package ornl.elision.core.matcher
+package ornl.elision.matcher
 
 import scala.annotation.tailrec
-
 import ornl.elision.core.AtomSeq
 import ornl.elision.core.BasicAtom
 import ornl.elision.core.Bindings
-import ornl.elision.core.Fail
-import ornl.elision.core.Many
-import ornl.elision.core.Match
-import ornl.elision.core.MatchIterator
-import ornl.elision.core.Outcome
 import ornl.elision.util.Debugger
 import ornl.elision.util.OmitSeq
 import ornl.elision.util.OmitSeq.fromIndexedSeq
+import scala.annotation.tailrec
 
 /**
  * Match two sequences whose elements can be re-ordered.  That is, the lists are

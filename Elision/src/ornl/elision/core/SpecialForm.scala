@@ -276,18 +276,6 @@ extends BasicAtom(loc) {
     case _ =>
       false
   }
-
-  def tryMatchWithoutTypes(subject: BasicAtom, binds: Bindings,
-      hints: Option[Any]): Outcome = subject match {
-    case sf:SpecialForm =>
-      tag.tryMatch(sf.tag) match {
-        case fail:Fail => Fail("Tags do not match.", tag, sf.tag, Some(fail))
-        case Match(newbinds) => content.tryMatch(sf.content, newbinds, hints)
-        case Many(matches) =>
-          Many(MatchIterator(content.tryMatch(sf.content, _, hints), matches))
-      }
-    case _ => Fail("Special forms match only special forms.", this, subject)
-  }
 	
   def rewrite(binds: Bindings) = {
     val newtag = tag.rewrite(binds)

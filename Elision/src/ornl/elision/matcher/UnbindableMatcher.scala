@@ -35,14 +35,10 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ======================================================================
 * */
-package ornl.elision.core.matcher
+package ornl.elision.matcher
 
 import ornl.elision.core.BasicAtom
 import ornl.elision.core.Bindings
-import ornl.elision.core.Fail
-import ornl.elision.core.Many
-import ornl.elision.core.Match
-import ornl.elision.core.MatchIterator
 import ornl.elision.util.OmitSeq
 import ornl.elision.util.OmitSeq.fromIndexedSeq
 
@@ -150,7 +146,7 @@ class UnbindableMatcher(patterns: OmitSeq[BasicAtom],
     }
     
     // Try to match the subject and the pattern.
-    val iterator = patterns(_patindex).tryMatch(subjects(subindex), binds) match {
+    val iterator = Matcher(patterns(_patindex), subjects(subindex), binds) match {
       case fail:Fail =>
         // The match failed, but we can try to keep searching.  The thing to
         // do is look at the next subject index.

@@ -39,6 +39,7 @@ import ornl.elision.cli.CLI.CLIState
 import ornl.elision.parse.Processor._
 import ornl.elision.core.BasicAtom
 import ornl.elision.core.Dialect
+import ornl.elision.context.RewriteEngine
 /**
  * @author fxuser
  *
@@ -71,7 +72,7 @@ trait ProcessorUtil {
     case Dialect.Success(atoms) =>
       val lib = repl.context.ruleLibrary
       val firstnode = atoms.head
-      val ra = lib.rewrite(firstnode)._1
+      val ra = RewriteEngine(firstnode, repl.context)._1
       success(ra)
     case _ =>
       failure("Round trip testing failed for atom:\n")

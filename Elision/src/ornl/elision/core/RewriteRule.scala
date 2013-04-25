@@ -41,6 +41,10 @@ import ornl.elision.context.Context
 import ornl.elision.util.OmitSeq
 import ornl.elision.util.Debugger
 import ornl.elision.util.Loc
+import ornl.elision.matcher.Matcher
+import ornl.elision.matcher.Match
+import ornl.elision.matcher.Fail
+import ornl.elision.matcher.Many
 
 /**
  * The ruleset strategy.
@@ -477,7 +481,7 @@ class RewriteRule private (
     
     // First we try to match the given atom against the pattern.
     Debugger("rulematch", "Trying rule: " + this.toParseString)
-    pattern.tryMatch(subject, binds, hint) match {
+    Matcher(pattern, subject, binds, hint) match {
       case fail:Fail =>
         Debugger("rulematch", "Rule does not match subject: " + fail)
         return (subject, false)
@@ -526,7 +530,7 @@ class RewriteRule private (
     }
     
     // First we try to match the given atom against the pattern.
-    pattern.tryMatch(subject, binds, hint) match {
+    Matcher(pattern, subject, binds, hint) match {
       case fail:Fail => { 
         return false
       }

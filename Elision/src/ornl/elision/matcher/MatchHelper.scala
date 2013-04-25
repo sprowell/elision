@@ -35,11 +35,10 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ======================================================================
 * */
-package ornl.elision.core.matcher
+package ornl.elision.matcher
 
 import ornl.elision.core.AtomSeq
 import ornl.elision.core.BasicAtom
-import ornl.elision.core.Fail
 import ornl.elision.core.giveMkParseString
 import ornl.elision.util.Debugger
 import ornl.elision.util.OmitSeq

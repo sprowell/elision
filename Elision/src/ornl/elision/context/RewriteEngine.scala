@@ -56,6 +56,18 @@ object RewriteEngine {
   
   /** Whether to normalize children completely during rewriting. */
   var normalizeChildren = true
+  
+  /**
+   * Normalize the given atom, repeatedly applying the rules of the active
+   * rulesets.  This is limited by the rewrite limit and timeout, if set.
+   * 
+   * @param atom      The atom to rewrite.
+   * @param con       The context providing the rule library, console, and
+   *                  memoization cache.
+   * @return  The rewritten atom, and true iff any rules were successfully
+   *          applied.
+   */
+  def apply(atom: BasicAtom, con: Context) = new RewriteEngine(con)(atom)
 }
 
 /**

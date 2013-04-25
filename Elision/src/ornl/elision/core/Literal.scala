@@ -123,12 +123,6 @@ extends BasicAtom {
   /** The value stored in this literal. */
   val value:TYPE
   
-  def tryMatchWithoutTypes(subject: BasicAtom, binds: Bindings,
-      hints: Option[Any]) = subject match {
-    case lit: Literal[_] if value == lit.value => Match(binds)
-    case _ => Fail("Literal pattern does not match subject.", this, subject)
-  }
-  
   /**
    * The hash code is computed from the type and the value.
    */

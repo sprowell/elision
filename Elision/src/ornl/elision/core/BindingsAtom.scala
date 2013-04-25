@@ -41,7 +41,7 @@ import scala.collection.immutable.HashMap
 import scala.collection.mutable.ListBuffer
 import ornl.elision.util.OmitSeq
 import ornl.elision.util.other_hashify
-import ornl.elision.core.matcher.SequenceMatcher
+import ornl.elision.matcher.SequenceMatcher
 
 /**
  * Encapsulate a set of bindings as an atom.
@@ -81,34 +81,6 @@ case class BindingsAtom(mybinds: Bindings) extends BasicAtom with Applicable {
   lazy val isTerm = mybinds.values.forall(_.isTerm)
   lazy val deBruijnIndex = mybinds.values.foldLeft(0)(_ max _.deBruijnIndex)
   lazy val depth = mybinds.values.foldLeft(0)(_ max _.depth) + 1
-    
-  /**
-   * Match this bindings atom against the provided atom.
-   * 
-   * Two binding atoms match iff they bind the same variables to terms that
-   * can be matched.  The variables that are bound cannot be matched against
-   * variables, but the bindings can be.
-   */
-  def tryMatchWithoutTypes(subject: BasicAtom, binds: Bindings,
-      hints: Option[Any]) = subject match {
-    case BindingsAtom(obinds) =>
-      // The bindings must bind the same variables.  Check that first.
-      if (mybinds.keySet != obinds.keySet) {
-        Fail("Bindings bind different variables.", this, subject)
-      } else {
-	      // Now iterate over the keys.  The ordering does not matter.  This
-	      // creates two lists of atoms that we then match using the sequence
-        // matcher.
-	      var mine = OmitSeq[BasicAtom]()
-	      var theirs = OmitSeq[BasicAtom]()
-	      for ((key, value) <- mybinds) {
-	        mine :+= value
-	        theirs :+= obinds(key)
-	      } // Build lists of atoms.
-	      SequenceMatcher.tryMatch(mine, theirs, binds)
-      }
-    case _ => Fail("Bindings can only match other bindings.", this, subject)
-  }
 	
   def rewrite(binds: Bindings) = {
     var changed = false

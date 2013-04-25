@@ -56,28 +56,6 @@ object TypeUniverse extends SymbolLiteral(null, Symbol("^TYPE")) {
   override val theType = this
 
   /**
-   * Type universe matching is a special case, and the basis case, for matching
-   * types.
-   * 
-   * @param subject	The subject to match.
-   * @param binds		The bindings to honor.
-   * @return	The outcome of the match.
-   */
-  override protected def matchTypes(subject: BasicAtom, binds: Bindings,
-      hints: Option[Any]) = tryMatchWithoutTypes(subject, binds, hints)
-    
-  /**
-   * Try to match this type against the provided atom.  Note that root types
-   * match only themselves, so the match works iff the subject is equal to this
-   * pattern.
-   */
-  override def tryMatchWithoutTypes(subject: BasicAtom, binds: Bindings,
-      hints: Option[Any]) =
-    // A root type matches only itself.
-    if (this == subject) Match(binds)
-    else Fail("This type matches only itself.", this, subject)
-
-  /**
    * The root types cannot be rewritten, as they do not have children.
    */
   override def rewrite(binds: Bindings) = (this, false)

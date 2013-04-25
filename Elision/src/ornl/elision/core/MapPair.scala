@@ -37,7 +37,11 @@
 * */
 package ornl.elision.core
 
-import ornl.elision.core.matcher.SequenceMatcher
+import ornl.elision.matcher.SequenceMatcher
+import ornl.elision.matcher.Matcher
+import ornl.elision.matcher.Match
+import ornl.elision.matcher.Fail
+import ornl.elision.matcher.Many
 
 object MapPair {
   /**
@@ -84,16 +88,6 @@ with Rewriter {
 
   override lazy val hashCode = left.hashCode * 31 + right.hashCode
   lazy val otherHashCode = left.otherHashCode + 8191*right.otherHashCode
-
-  def tryMatchWithoutTypes(subject: BasicAtom, binds: Bindings,
-      hints: Option[Any]): Outcome = subject match {
-    case MapPair(oleft, oright) =>
-      SequenceMatcher.tryMatch(Vector(left, right),
-          Vector(oleft, oright), binds)
-                               
-    case _ =>
-      Fail("Subject of match is not a pair.", this, subject)
-  }
 	
   def rewrite(binds: Bindings): (BasicAtom, Boolean) = {
     val newleft = left.rewrite(binds)
@@ -126,7 +120,7 @@ with Rewriter {
    * The first match with the left-hand side is used to rewrite the right.
    */
   def doRewrite(atom: BasicAtom, hint: Option[Any]) = {
-		left.tryMatch(atom, Bindings(), hint) match {
+    Matcher(left, atom, Bindings(), hint) match {
 			case file:Fail => 
         (atom, false)
         

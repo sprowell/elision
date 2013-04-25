@@ -35,7 +35,9 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ======================================================================
 * */
-package ornl.elision.core
+package ornl.elision.matcher
+
+import ornl.elision.core.Bindings
 
 /**
  * Provide an iterator over multiple matches.

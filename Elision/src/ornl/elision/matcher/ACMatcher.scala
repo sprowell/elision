@@ -35,23 +35,18 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ======================================================================
 * */
-package ornl.elision.core.matcher
+package ornl.elision.matcher
 
 import scala.annotation.tailrec
-
-import ornl.elision.core.knownExecutor
 import ornl.elision.core.Apply
 import ornl.elision.core.AtomSeq
 import ornl.elision.core.BasicAtom
 import ornl.elision.core.Bindings
-import ornl.elision.core.Fail
-import ornl.elision.core.Many
-import ornl.elision.core.Match
-import ornl.elision.core.MatchIterator
 import ornl.elision.core.OperatorRef
-import ornl.elision.core.Outcome
 import ornl.elision.core.Variable
+import ornl.elision.core.knownExecutor
 import ornl.elision.util.Debugger
+import scala.annotation.tailrec
 
 /**
  * Match two sequences whose elements can be re-ordered or re-grouped.  That is,
@@ -95,7 +90,7 @@ object ACMatcher {
     if (plist.length == 1) {
       // If there is an operator, apply it to the subjects, then try to match
       // the single pattern against the result.
-      return plist.atoms(0).tryMatch(op match {
+      return Matcher(plist.atoms(0), op match {
         case Some(opref) =>
           Apply(opref, slist)
         case None =>
@@ -138,7 +133,7 @@ object ACMatcher {
       var _sindex = 0
       var _matched = false
       while ((!_matched) && (_sindex < slist.length)) {
-        plist(_pindex).tryMatch(slist(_sindex), binds) match {
+        Matcher(plist(_pindex), slist(_sindex), binds) match {
           case fail:Fail =>
           case m1:Match => _matched = true
           case m2:Many => _matched = true
@@ -186,7 +181,7 @@ object ACMatcher {
           // If there is exactly one pattern then match it immediately. Note that there could
           // be other matches left in the unbindable matcher, which we are now skipping.
           if (pats.atoms.length == 1) {
-            return pats.atoms(0).tryMatch(op match {
+            Matcher(pats.atoms(0), op match {
               case Some(opref) =>
                 Apply(opref, subs)
               case None =>

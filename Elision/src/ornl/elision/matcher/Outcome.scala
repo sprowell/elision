@@ -35,7 +35,10 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ======================================================================
 * */
-package ornl.elision.core
+package ornl.elision.matcher
+
+import ornl.elision.core.Bindings
+import ornl.elision.core.BasicAtom
 
 /**
  * An outcome reports the result of attempting a match.

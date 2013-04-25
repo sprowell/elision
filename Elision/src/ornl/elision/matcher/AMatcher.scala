@@ -35,22 +35,16 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ======================================================================
 * */
-package ornl.elision.core.matcher
+package ornl.elision.matcher
 
 import scala.annotation.tailrec
-
 import ornl.elision.core.Apply
-import ornl.elision.core.AtomSeq
-import ornl.elision.core.BasicAtom
 import ornl.elision.core.Bindings
-import ornl.elision.core.Fail
-import ornl.elision.core.Many
-import ornl.elision.core.Match
-import ornl.elision.core.MatchIterator
 import ornl.elision.core.OperatorRef
-import ornl.elision.core.Outcome
 import ornl.elision.util.Debugger
 import ornl.elision.util.OmitSeq.fromIndexedSeq
+import scala.annotation.tailrec
+import ornl.elision.core.AtomSeq
 
 /**
  * Match two sequences, where the elements of the second sequence can be
@@ -97,7 +91,7 @@ object AMatcher {
     if (plist.atoms.length == 1) {
       // If there is an operator, apply it to the subjects, then try to match
       // the single pattern against the result.
-      return plist.atoms(0).tryMatch(op match {
+      return Matcher(plist.atoms(0), op match {
         case Some(opref) =>
           Apply(opref, slist)
         case None =>

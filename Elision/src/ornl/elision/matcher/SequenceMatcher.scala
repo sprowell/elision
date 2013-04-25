@@ -35,15 +35,10 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  ======================================================================
  * */
-package ornl.elision.core.matcher
+package ornl.elision.matcher
 
 import ornl.elision.core.BasicAtom
 import ornl.elision.core.Bindings
-import ornl.elision.core.Fail
-import ornl.elision.core.Many
-import ornl.elision.core.Match
-import ornl.elision.core.MatchIterator
-import ornl.elision.core.Outcome
 import ornl.elision.core.giveMkParseString
 import ornl.elision.core.wrapBindingsAtom
 import ornl.elision.util.Debugger
@@ -131,7 +126,7 @@ object SequenceMatcher {
     // Try to match the heads of the list.  This generates one of three
     // possible outcomes, and we figure out what to do based on the particular
     // outcome.
-    patterns.head.tryMatch(subjects.head, binds, None) match {
+    Matcher(patterns.head, subjects.head, binds, None) match {
       case fail:Fail =>
         // The atoms do not match.  There is nothing further to try; the
         // entire match can be rejected at this point, so return failure.

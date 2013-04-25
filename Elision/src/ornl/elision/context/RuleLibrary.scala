@@ -45,11 +45,8 @@ import scala.collection.mutable.{Map => MMap}
 import ornl.elision.core.Apply
 import ornl.elision.core.AtomSeq
 import ornl.elision.core.BasicAtom
-import ornl.elision.core.Bindings
-import ornl.elision.core.Fail
 import ornl.elision.core.Fickle
 import ornl.elision.core.Literal
-import ornl.elision.core.Match
 import ornl.elision.core.Mutable
 import ornl.elision.core.NoProps
 import ornl.elision.core.Operator
