@@ -32,7 +32,6 @@ package ornl.elision.repl
 import java.io.File
 import ornl.elision.actors.ReplActor
 import ornl.elision.context.Context
-import ornl.elision.context.Executor
 import ornl.elision.cli.ArgSwitch
 import ornl.elision.cli.Setting
 import ornl.elision.cli.CLI
@@ -40,7 +39,9 @@ import ornl.elision.cli.Switch
 import ornl.elision.parse.Processor
 import ornl.elision.parse.ProcessorControl
 import ornl.elision.util.Loc
-import ornl.elision.context.RewriteEngine
+import ornl.elision.rewrite.RewriteEngine
+import ornl.elision.context.ApplyData
+import scala.io.Source
 
 /**
  * Implement an interface to run the REPL from the prompt.
@@ -125,9 +126,17 @@ object ReplMain {
           new File(env.get("USERPROFILE"), "Local Settings"),
           "Application Data").getAbsolutePath()
     }, "elision").getAbsolutePath()
+  } else if (CLI.ismac) {
+    // On Darwin the settings should live under the Library/Preferences.
+    // We need to make these folders if they do not exist.
+    val env = System.getenv("HOME")
+    new File(env, "Library/Preferences/elision").getAbsolutePath()
+  } else if (CLI.islin) {
+    // On Linux preferences should live under .config.
+    new File(System.getenv("HOME"), ".config/elision").getAbsolutePath()
   } else {
-    // On a non-Windows platform the settings should live under the user's
-    // `$`HOME folder.
+    // Everywhere else just punt and make a .elision folder in the home
+    // folder.  This is the behavior, for instance, on AIX and Solaris.
     new File(System.getenv("HOME"), ".elision").getAbsolutePath()
   })
 
@@ -198,17 +207,17 @@ object ReplMain {
     
     ReplActor.start
     ReplActor.history = erepl
-    ReplActor.console = erepl.console
+    ReplActor.console = erepl.context.console
     ReplActor ! ("disableGUIComs", true)
     try {
       erepl.run()
     } catch {
       case th: Throwable =>
         try {
-          erepl.console.error("(" + th.getClass + ") " + th.getMessage())
+          erepl.context.console.error("(" + th.getClass + ") " + th.getMessage())
           if (erepl.context.getProperty("stacktrace")) th.printStackTrace()
         } catch {
-          case _ =>
+          case _: Throwable =>
         }
         erepl.coredump("Internal error.", Some(th))
     }
@@ -292,7 +301,7 @@ extends Processor(state.settings) {
             case x:Any => Some(x.toString)
         }
     } catch {
-        case _ => None
+        case _: Throwable => None
     }
   }
   
@@ -306,7 +315,7 @@ extends Processor(state.settings) {
             case x:Any => Some(x.toString)
         }
     } catch {
-        case _ => None
+        case _: Throwable => None
     }
   }
   
@@ -318,7 +327,7 @@ extends Processor(state.settings) {
             case x:Any => Some(x.toString)
         }
     } catch {
-        case _ => None
+        case _: Throwable => None
     }
   }
   
@@ -346,7 +355,7 @@ extends Processor(state.settings) {
     if (context.getProperty("showscala")) {
       // This is explicitly requested output, show show it regardless of the
       // quiet setting.
-      console.sendln("Scala: " + prefix + atom.toString)
+      context.console.sendln("Scala: " + prefix + atom.toString)
     }
     
     if(ReplActor.guiActor != null) {
@@ -356,17 +365,17 @@ extends Processor(state.settings) {
     
     if(context.getProperty[Boolean]("syntaxcolor")) {
       // color-format the atom's parseString and print it.
-      val formatCols = console.width
-      val formatRows = console.height
+      val formatCols = context.console.width
+      val formatRows = context.console.height
       val atomParseString = ConsoleStringFormatter.format(
           prefix + atom.toParseString, formatCols)
       ornl.elision.util.AnsiPrintConsole.width = formatCols
       ornl.elision.util.AnsiPrintConsole.height = formatRows
-      ornl.elision.util.AnsiPrintConsole.quiet = console.quiet
+      ornl.elision.util.AnsiPrintConsole.quiet = context.console.quiet
       ornl.elision.util.AnsiPrintConsole.emitln(atomParseString)
     } else {
       // use the standard printing console and print without syntax coloring.
-      console.emitln(prefix + atom.toParseString)
+      context.console.emitln(prefix + atom.toParseString)
     }
     
     if(ReplActor.guiActor != null) {
@@ -379,7 +388,7 @@ extends Processor(state.settings) {
     // Register a basic handler that applies the context bindings to the
     // atom.
     new Processor.Handler {
-      override def init(exec: Executor) = {
+      override def init(exec: Processor) = {
         context.declareProperty("showprior",
             "Show each atom prior to rewriting with the context's bindings.",
             false)
@@ -403,7 +412,7 @@ extends Processor(state.settings) {
     // Register a handler that automatically defines operators (if that
     // is enabled) and stores rules.
     new Processor.Handler {
-      override def init(exec: Executor) = {
+      override def init(exec: Processor) = {
         context.declareProperty("autoop",
             "If the current result is an operator, automatically declare it " +
             "in the operator library.", false)
@@ -416,11 +425,11 @@ extends Processor(state.settings) {
         atom match {
           case op: Operator if context.getProperty("autoop") =>
             context.operatorLibrary.add(op)
-            console.emitln("Declared operator " + op.name + ".")
+            context.console.emitln("Declared operator " + op.name + ".")
             None
           case rule: RewriteRule if context.getProperty("autorule") =>
             context.ruleLibrary.add(rule)
-            console.emitln("Declared rule.")
+            context.console.emitln("Declared rule.")
             None
           case _ =>
             Some(atom)
@@ -430,7 +439,7 @@ extends Processor(state.settings) {
     
     // Register a handler to perform automated rewriting of atoms.
     new Processor.Handler {
-      override def init(exec: Executor) = {
+      override def init(exec: Processor) = {
         context.declareProperty("autorewrite",
             "Automatically apply rules in the active rulesets to each atom" +
             "as it is evaluated.", true)
@@ -447,7 +456,7 @@ extends Processor(state.settings) {
     
     // Register a handler to perform round-trip testing of atoms.
     new Processor.Handler {
-      override def init(exec: Executor) = {
+      override def init(exec: Processor) = {
         context.declareProperty("roundtrip",
             "Perform round-trip testing of atoms as they are entered.", true)
         true
@@ -457,20 +466,21 @@ extends Processor(state.settings) {
         // Get the string.
         val string = atom.toParseString
         // Parse this string.
-        parse("", string) match {
-          case Dialect.Failure(Loc.internal, msg) =>
-            console.error("Round trip testing failed for atom:\n  " + string +
-                "\nParsing terminated with an error:\n  " + msg + "\n")
+        Dialect.parse('elision, "", Source.fromString(string)) match {
+          case Dialect.Failure(loc, msg) =>
+            context.console.error(loc, "Round trip testing failed for atom:\n  " +
+                string + "\nParsing terminated with an error:\n  " + msg + "\n")
+                
           case Dialect.Success(atoms) =>
             if (atoms.length < 1) {
-              console.error("Round trip testing failed for atom:\n  " + string +
+              context.console.error("Round trip testing failed for atom:\n  " + string +
                   "\nParsing returned no atoms.")
             } else if (atoms.length > 1) {
-              console.error("Round trip testing failed for atom:\n  " + string +
+              context.console.error("Round trip testing failed for atom:\n  " + string +
                   "\nParsing returned more than one atom:\n" +
                   atoms.mkParseString("  ","\n","\n"))
             } else if (atoms(0) != atom) {
-              console.error("Round trip testing failed for atom:\n  " + string +
+              context.console.error("Round trip testing failed for atom:\n  " + string +
                   "\nAtom returned by parser not equal to original:\n  " +
                   atoms(0).toParseString)
             }
@@ -483,7 +493,7 @@ extends Processor(state.settings) {
     // bind if that is enabled.  Because this displays the results, it
     // should be near the end of the chain.
     new Processor.Handler {
-      override def init(exec: Executor) = {
+      override def init(exec: Processor) = {
         exec.context.declareProperty("setreplbinds",
             "Generate $_repl numbered bindings for each atom as it is " +
             "evaluated.", true)
@@ -537,15 +547,15 @@ extends Processor(state.settings) {
     if (! ProcessorControl.bootstrap) return true
     
     // Save the prior quiet value so we can restore it later.
-    val priorquiet = console.quiet
-    console.reset
-    console.quiet = quiet
+    val priorquiet = context.console.quiet
+    context.console.reset
+    context.console.quiet = quiet
     
     // Bootstrap!
     val retval = _bootstrap()
     
     // Done.  Restore quiet level.
-    console.quiet = priorquiet
+    context.console.quiet = priorquiet
     return retval
   }
   
@@ -560,19 +570,19 @@ extends Processor(state.settings) {
     // Load all the startup definitions, etc.
     if (!read(bootstrapFile, false)) {
       // Failed to find bootstrap file.  Stop.
-      console.error("Unable to load " + bootstrapFile + ".  Cannot continue.")
+      context.console.error("Unable to load " + bootstrapFile + ".  Cannot continue.")
       return false
     }
-    if (console.errors > 0) {
-      console.error("Errors were detected during bootstrap.  Cannot continue.")
+    if (context.console.errors > 0) {
+      context.console.error("Errors were detected during bootstrap.  Cannot continue.")
       return false
     }
     
     // User stuff.
-    console.emitln("Reading " + _rc + " if present...")
+    context.console.emitln("Reading " + _rc + " if present...")
     if (read(_rc, true)) {
-      if (console.errors > 0) {
-        console.error("Errors were detected processing " + _rc +
+      if (context.console.errors > 0) {
+        context.console.error("Errors were detected processing " + _rc +
             ".  Cannot continue.")
         return false
       }
@@ -605,32 +615,33 @@ extends Processor(state.settings) {
     // bootstrapping so the files are read even if we tell the system not to
     // perform bootstrapping.
     for (filename <- list) {
-      console.emitln("Reading " + filename + "...")
-      val priorquiet = console.quiet
-      console.quiet = 1
+      context.console.emitln("Reading " + filename + "...")
+      val priorquiet = context.console.quiet
+      context.console.quiet = 1
       val result = read(filename, true)
-      console.quiet = priorquiet
+      context.console.quiet = priorquiet
       if (result) {
-        if (console.errors > 0) {
-          console.error("Errors were detected processing " + filename +
+        if (context.console.errors > 0) {
+          context.console.error("Errors were detected processing " + filename +
               ".  Cannot continue.")
           return
         }
       }
     } // Read the files specified on the command line.
     
-    // Report startup time.
+    // Report startup time.  It no longer makes sense to report native
+    // compilation time at this point, since many compilations may be
+    // deferred.
     stopTimer
-    console.emitf("Startup Time: " + getLastTimeString + "\n")
-    SymbolicOperator.reportTime
+    context.console.emitf("Startup Time: " + getLastTimeString + "\n")
     
     // If a compilable context is desired, generate it and stop. */
     ReplMain._wantCompile match {
       case None =>
       case Some(fn) =>
-        console.emitln("Writing compilable context as: " + fn)
+        context.console.emitln("Writing compilable context as: " + fn)
         ContextGenerator.generate(fn, context)
-        console.emitln("Done.")
+        context.console.emitln("Done.")
         return
     }
   
@@ -667,20 +678,20 @@ extends Processor(state.settings) {
 
         segment = if (ReplActor.guiActor != null) {  
           // Get input from the GUI.            
-          ReplActor.readLine(if (console.quiet > 0) p2 else p1)
+          ReplActor.readLine(if (context.console.quiet > 0) p2 else p1)
         } else {
           // Get input directly from the console. 
-          val line = cr.readLine(if (console.quiet > 0) p2 else p1)
+          val line = cr.readLine(if (context.console.quiet > 0) p2 else p1)
           // Reset the terminal size now, if we can, and if the user wants to
           // use the pager.
           if (context.getProperty("usepager")) {
-            console.height_=(
+            context.console.height_=(
                 scala.tools.jline.TerminalFactory.create().getHeight()-1)
-            console.width_=(
+            context.console.width_=(
                 scala.tools.jline.TerminalFactory.create().getWidth())
           } else {
-            console.height_=(0)
-            console.width_=(0)
+            context.console.height_=(0)
+            context.console.width_=(0)
           }
           line
         } 
@@ -705,9 +716,9 @@ extends Processor(state.settings) {
       if (!fetchline("e> ", "q> ")) {
         // Read any additional segments.  Everything happens in the while loop,
         // but the loop needs a body, so that's the zero.
-        while (!fetchline(" > ", " > ") && blanks < 3) 0
+        while (!fetchline(" > ", " > ") && blanks < 3) {}
         if (blanks >= 3) {
-          console.emitln("Entry terminated by three blank lines.")
+          context.console.emitln("Entry terminated by three blank lines.")
           line = ""
         }
       }
@@ -728,27 +739,27 @@ extends Processor(state.settings) {
         execute("(console)", line)
       } catch {
         case ornl.elision.util.ElisionException(loc, msg) =>
-          console.error(loc, msg)
+          context.console.error(loc, msg)
           
         case ex: Exception =>
-          console.error("(" + ex.getClass + ") " + ex.getMessage())
+          context.console.error("(" + ex.getClass + ") " + ex.getMessage())
           if (context.getProperty("stacktrace")) ex.printStackTrace()
 
         case oom: java.lang.OutOfMemoryError =>
           System.gc()
-          console.error("Memory exhausted.  Trying to recover...")
+          context.console.error("Memory exhausted.  Trying to recover...")
           val rt = Runtime.getRuntime()
           val mem = rt.totalMemory()
           val free = rt.freeMemory()
           val perc = free.toDouble / mem.toDouble * 100
-          console.emitln("Free memory: %d/%d (%4.1f%%)".format(free, mem, perc))
+          context.console.emitln("Free memory: %d/%d (%4.1f%%)".format(free, mem, perc))
 
         case th: Throwable =>
           try {
-            console.error("(" + th.getClass + ") " + th.getMessage())
+            context.console.error("(" + th.getClass + ") " + th.getMessage())
             if (context.getProperty("stacktrace")) th.printStackTrace()
           } catch {
-            case _ =>
+            case _: Throwable =>
           }
           coredump("Internal error.", Some(th))
       }
@@ -756,7 +767,7 @@ extends Processor(state.settings) {
   }
   
   def clean() {
-    console.emitln("")
+    context.console.emitln("")
     addHistoryLine("// Ended normally: " + new java.util.Date)
     val cfile = new java.io.FileWriter(_lastcontext)
     if (cfile != null) {
@@ -764,7 +775,7 @@ extends Processor(state.settings) {
       cfile.flush()
       cfile.close()
     } else {
-      console.warn("Unable to save context.")
+      context.console.warn("Unable to save context.")
     }
   }
 }

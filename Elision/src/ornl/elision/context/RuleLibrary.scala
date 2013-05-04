@@ -52,7 +52,6 @@ import ornl.elision.core.NoProps
 import ornl.elision.core.Operator
 import ornl.elision.core.OperatorRef
 import ornl.elision.core.RewriteRule
-import ornl.elision.core.RulesetRef
 import ornl.elision.core.SymbolicOperator
 import ornl.elision.core.Variable
 import ornl.elision.core.giveMkParseString
@@ -117,18 +116,10 @@ extends ElisionException(loc, msg)
  * they can be used, and they can be enabled and disabled to better control
  * rewriting.
  * 
- * @param memo            The memoization cache to use.
- * @param allowUndeclared	Iff true, allow the use of undeclared rulesets.
+ * @param memo      The memoization cache to use.
+ * @param context   The context needed to build atoms.
  */
-class RuleLibrary(memo: Memo, val allowUndeclared:Boolean = false)
-extends Fickle with Mutable {
-
-  // This is needed to correctly order operations when the Scala code for a
-  // rule library is being created.  Note that we prepend to the list for
-  // performance, so be sure to use a reverseIterator to get the items in
-  // order.  Contains rule additions and ruleset operations such as enabling,
-  // disabling, and declaration.
-  private var actionList = List[Action]()
+class RuleLibrary(memo: Memo, context: Context) extends Fickle with Mutable {
   
   /**
    * Create a shallow clone of this rule library.  This returns a new rule
@@ -138,7 +129,7 @@ extends Fickle with Mutable {
    * @return  The clone.
    */
   override def clone: RuleLibrary = {
-    val clone = new RuleLibrary(memo, allowUndeclared)
+    val clone = new RuleLibrary(memo, context)
     
     clone._kind2rules.clear
     for(mapping <- this._kind2rules) {
@@ -270,10 +261,9 @@ extends Fickle with Mutable {
   * 					not allowed.
   */
   private def getRulesetBit(name: String) =
-    _rs2bit.getOrElseUpdate(name, (
-      if (allowUndeclared) bump()
-      else throw new NoSuchRulesetException(Loc.internal,
-        "The ruleset " + name + " has not been declared.")))
+    _rs2bit.getOrElseUpdate(name,
+        throw new NoSuchRulesetException(Loc.internal,
+            "The ruleset " + name + " has not been declared."))
   
   /**
    * Get the bit set for a collection of rulesets.
@@ -302,74 +292,9 @@ extends Fickle with Mutable {
   * 					(previously) declared.
   */
   def declareRuleset(name: String) = {
-    actionList = DeclareRS(name) :: actionList
-    
     _rs2bit.get(name) match {
       case None => _rs2bit += (name -> bump()) ; true
       case _ => false
-    }
-  }
-  
-  //======================================================================
-  // Ruleset reference.
-  //======================================================================
-  
-  /**
-  * Make a ruleset reference.
-  * 
-  * @param name		The name of the ruleset.
-  */
-  def apply(name: String): RulesetRef = new _RulesetRef(name)
-  
-  /**
-  * Make a ruleset reference.
-  * 
-  * @param name		The name of the ruleset.
-  */
-  def makeRulesetRef(name: String): RulesetRef = new _RulesetRef(name)
-  
-  /**
-   * Implementation of ruleset references.
-   * 
-   * @param name		The name of the referenced ruleset.
-   */
-  private class _RulesetRef(val name: String) extends RulesetRef {
-    /** The bit for the referenced ruleset. */
-    val bit = getRulesetBit(name)
-    
-    /**
-     * Apply this strategy. If any rule completes then the returned flag is
-     * true. Otherwise it is false.
-     */
-    def doRewrite(atom: BasicAtom, hint: Option[Any]): (BasicAtom, Boolean) = {
-      // Check the cache.
-      memo.get(atom, _active) match {
-        case None => {
-          // We do not have a cached value for the current atom. We will
-          // need to do the rewrites.
-        }
-        case Some(pair) => {
-          // We have a cached value for this atom. Use it.
-          Debugger("rewrite", "Got cached rewrite: " +
-              atom.toParseString + " to: " + pair._1.toParseString +
-              " with rulesets: " + _activeNames.mkString(", "))
-          return pair
-        }
-      }
-
-      // Get the rules.
-      val rules = getRules(atom, Set(name))
-      // Now try every rule until one applies.
-      for (rule <- rules) {
-      	val (newatom, applied) = rule.doRewrite(atom, hint)
-      	if (applied) {
-
-          // Return the rewrite result.
-          return (newatom, applied)
-        }
-      } // Try every rule until one applies.
-
-      return (atom, false)
     }
   }
 
@@ -408,9 +333,6 @@ extends Fickle with Mutable {
    * 					and undeclared rulesets are not allowed.
    */
   def add(rule: RewriteRule) = {
-    // add to action list
-    actionList = AddRule(rule) :: actionList
-
     // A rule whose left-hand side is either bindable is not allowed.
     if (rule.pattern.isBindable) {
       throw new BindablePatternException(rule.loc,
@@ -426,7 +348,7 @@ extends Fickle with Mutable {
     }
     
     // Complete the rule.
-    val rules = Completor.complete(rule)
+    val rules = Completor.complete(rule, context)
     
     // Rules can have names, and adding a rule with the same name as a
     // previously-added rule replaces the prior rule.  This is a novel
@@ -565,91 +487,6 @@ extends Fickle with Mutable {
     for ((_, list) <- _kind2rules ++ _op2rules; (_, rule) <- list) all :+= rule
     all
   }
-
-  //======================================================================
-  // Strings.
-  //======================================================================
-
-  /**
-   * Generate a newline-separated list of rules that can be parsed using the
-   * atom parser to reconstruct the set of rules in this library.
-   * 
-   * @return	The parseable rule sets.
-   */
-  def toParseString = {
-    val buf = new StringBuilder
-    for ((kind,list) <- _kind2rules) {
-      buf append ("// Rules for " + kind.toString + ".\n")
-      buf append list.map(_._2).mkParseString("","\n","\n")
-    } // Add all the rules stored by kind.
-    for ((name,list) <- _op2rules) {
-      buf append ("// Rules for operator " + name + ".\n")
-      buf append list.map(_._2).mkParseString("","\n","\n")
-    } // Add all the rules stored by name.
-    buf.toString()
-  }
-
-  /**
-   * Generate a newline-separated list of rules that can be parsed by Scala
-   * to reconstruct the set of rules in this library.
-   * 
-   * @return	The parseable rule sets.
-   */
-  override def toString = {
-    val buf = new StringBuilder
-
-    // make the master Rules
-    buf append "object Rules {\n  import ornl.elision.core.Context\n"
-
-    // add apply
-    buf append "  def apply(context: Context):Unit = {\n"
-    for(k <- 0 until actionList.length/5000+1) {
-      buf append "    Rules"+k+"(context)\n"
-    }
-    buf append "  }\n}\n\n"
-    
-    // add ruleLibrary actions to Rule* classes
-    var start = 0
-    var end = 0
-    var runNum = 0
-    var needBrace = false
-    actionList.reverseIterator.zipWithIndex.foreach { case (v,i) =>  {
-      // update end so we can get the range right for the apply()
-      end = i
-      
-      if(i%5000==0 && needBrace) {
-        buf append "\n  def apply(context: Context):Unit = {\n"
-        for(j <- start to end)
-          buf append "    rule"+j+"(context)\n"
-        buf append "  }\n}\n"
-        needBrace = false
-      }
-      if(i%5000==0) {
-        start = i
-        buf append "object Rules"+runNum+" {\n  import ornl.elision.core._\n"
-        runNum = runNum + 1 
-        needBrace = true
-      }      
-      
-      buf append "  def rule"+i+"(context: Context):Unit = " +
-      (v match {
-        case AddRule(rule) => "context.ruleLibrary.add("+ rule +")\n"
-        case DeclareRS(ruleSet) => "context.ruleLibrary.declareRuleset(\""+ ruleSet +"\")\n"
-      })
-      
-    }}
-    if(needBrace) {
-        buf append "  def apply(context: Context):Unit = {\n"
-        for(j <- start to end)
-          buf append "    rule"+j+"(context)\n"
-        for (rsname <- _activeNames) {
-          buf append "    context.ruleLibrary.enableRuleset(\""+ rsname +"\")\n"
-        } // Enable rulesets.
-        buf append "  }\n}\n"      
-    }
-    
-    buf.toString()  
-  }
 }
 
 
@@ -694,12 +531,15 @@ private object Completor {
    * Perform partial completion for the given rule by generating the necessary
    * synthetic rules.
    * 
-   * @param rule  The provided rule.
+   * @param rule    The provided rule.
+   * @param op      The operator.
+   * @param as      The atom sequence.
+   * @param context The context needed to build atoms.
    * @return  A list of rules, including the original rule and any synthetic
    *          rules.
    */
-  private def _complete(rule: RewriteRule, op: Operator, as: AtomSeq):
-      List[RewriteRule] = {
+  private def _complete(rule: RewriteRule, op: Operator, as: AtomSeq,
+      context: Context): List[RewriteRule] = {
     // Make the list
     var list = List[RewriteRule](rule)
     
@@ -725,8 +565,8 @@ private object Completor {
     var newpatternlist = as.atoms :+ right
     var newrewritelist = OmitSeq[BasicAtom](rewrite) :+ right
     val newRule = RewriteRule(rule.loc,
-        Apply(op, AtomSeq(props, newpatternlist)),
-        Apply(op, AtomSeq(props, newrewritelist)),
+        ApplyHandler(op, AtomSeq(props, newpatternlist), context),
+        ApplyHandler(op, AtomSeq(props, newrewritelist), context),
         rule.guards,
         rule.rulesets,
         true)
@@ -745,15 +585,17 @@ private object Completor {
     var left = Variable(as(0).theType, "::L")
     newpatternlist = left +: as.atoms
     newrewritelist = left +: OmitSeq[BasicAtom](rewrite)
-    list :+= RewriteRule(rule.loc, Apply(op, AtomSeq(props, newpatternlist)),
-        Apply(op, AtomSeq(props, newrewritelist)),
+    list :+= RewriteRule(rule.loc,
+        ApplyHandler(op, AtomSeq(props, newpatternlist), context),
+        ApplyHandler(op, AtomSeq(props, newrewritelist), context),
         rule.guards, rule.rulesets, true)
         
     // And again add the argument on the right-hand side.
     newpatternlist = newpatternlist :+ right
     newrewritelist = newrewritelist :+ right
-    list :+= RewriteRule(rule.loc, Apply(op, AtomSeq(props, newpatternlist)),
-        Apply(op, AtomSeq(props, newrewritelist)),
+    list :+= RewriteRule(rule.loc,
+        ApplyHandler(op, AtomSeq(props, newpatternlist), context),
+        ApplyHandler(op, AtomSeq(props, newrewritelist), context),
         rule.guards, rule.rulesets, true)
         
     // Done.
@@ -769,34 +611,18 @@ private object Completor {
    * synthetic rules.
    * 
    * @param rule	The provided rule.
+   * @param context The context needed to build atoms.
    * @return	A list of rules, including the original rule and any synthetic
    * 					rules.
    */
-  def complete(rule: RewriteRule): List[RewriteRule] = {
+  def complete(rule: RewriteRule, context: Context): List[RewriteRule] = {
     rule.pattern match {
       case Apply(op: OperatorRef, as: AtomSeq) =>
-        _complete(rule, op.operator, as)
+        _complete(rule, op.operator, as, context)
       case Apply(op: Operator, as: AtomSeq) =>
-        _complete(rule, op, as)
+        _complete(rule, op, as, context)
       case _ =>
         List[RewriteRule](rule)
     }
   }
-}
-
-abstract class Action
-case class AddRule(rule: RewriteRule) extends Action {
-//  def apply(rl: RuleLibrary, action: Action): String = "rl.add(rule)"
-}
-case class EnableRS(ruleSet: String) extends Action {
-//  def apply(rl: RuleLibrary) = rl.enableRuleset(ruleSet)
-}
-case class DisableRS(ruleSet: String) extends Action {
-//  def apply(rl: RuleLibrary) = rl.disableRuleset(ruleSet)
-}
-case class DeclareRS(ruleSet: String) extends Action {
-//  def apply(rl: RuleLibrary) = rl.declareRuleset(ruleSet)
-}
-case class NopAction() extends Action {
-//  def apply(rl: RuleLibrary) = ()
 }

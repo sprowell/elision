@@ -108,9 +108,9 @@ class EliReplThread extends ReplThread {
 		myRepl = new ornl.elision.repl.ERepl(state)
 		ornl.elision.core.knownExecutor = myRepl
 		
-		myRepl.console = mainGUI.consolePanel.console
+		myRepl.context.console = mainGUI.consolePanel.console
 		ReplActor.history = myRepl
-		ReplActor.console = myRepl.console
+		ReplActor.console = myRepl.context.console
 		ReplActor ! ("disableGUIComs", true)
 		myRepl.context.setProperty[Boolean]("syntaxcolor", false)
 		ReplActor.start

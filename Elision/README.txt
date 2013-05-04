@@ -63,15 +63,10 @@ Elision contains JLine, a Java library for command line interaction.  See the
 end of this file for license details.  For more information, visit:
 http://jline.sourceforge.net/
 
-Elision contains sg-cdb, a pure Java implementation of D.J. Bernstein's 
-constant database (cdb) package.  See the end of this file for license
-details.  For more information, visit:
-http://www.strangegizmo.com/products/sg-cdb/
-
 
 Prerequisites
 =============
-Elision requires Scala 2.9.2 or later to build.  Be careful with later versions
+Elision requires Scala 2.10.1 or later to build.  Be careful with later versions
 of Scala, as things do tend to change.  Java 7 or later is also a prerequisite,
 as is Apache Ant 1.8 or later.
 
@@ -85,7 +80,7 @@ as is Apache Ant 1.8 or later.
     of your Scala installation (the folder that contains the bin and lib
     folders).
 
-4.) Install Apache.  Visit http://ant.apache.org/ to download the Ant
+4.) Install Apache Ant.  Visit http://ant.apache.org/ to download the Ant
     distribution.
 
 
@@ -103,8 +98,9 @@ the following:
 Running the REPL
 ================
 Elision comes with a REPL (Read Evaluate Print Loop).  You can start it a number
-of ways.  The simplest is to use the script:
-  elision.sh
+of ways.  The simplest is to use one of the scripts:
+  elision.sh (for Linux and Mac)
+  elision.bat (for Windows)
 
 The script runs the REPL out of the bin folder, and does not require the jar to
 be built.

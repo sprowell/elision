@@ -129,50 +129,6 @@ class Variable(typ: BasicAtom, val name: String,
     r.add(this)
     return Some(r)
   }
-
-  /**
-   * Attempt to bind the variable.  The potential variable binding is added
-   * to the provided bindings, and the variable guard is rewritten.  If the
-   * guard is true, then the new bindings are returned.  If it is false, then
-   * a [[ornl.elision.core.Fail]] instance is returned.
-   * 
-   * @param subject		The atom to which the variable is to be bound.
-   * @param binds			Other bindings that must be honored.
-   */
-  def bindMe(subject: BasicAtom, binds: Bindings): Outcome = {
-    // If this is a by-name variable, reject immediately if the subject is not
-    // a variable of the same name.
-    if (byName) {
-      subject match {
-        case Variable(_, nm, _, _, _) if nm == name =>
-        case _ => return Fail("By-name variable does not match.")
-      }
-    }
-    // Check any guard.
-    if (guard.isTrue) return Match(binds + (name -> subject))
-    else {
-      guard match {
-        case rew: Rewriter =>
-          // Rewrite the atom.
-          val (newatom, flag) = rew.doRewrite(subject)
-          if (flag) {
-            return Match(binds + (name -> newatom))
-          } else {
-            return Fail("Variable guard rewriter returned false after rewrite.")
-          }
-        case app: Applicable =>
-          // Apply and return.
-          return Match(binds + (name -> app.doApply(subject)))
-        case _ =>
-          // Compute the bindings and check the guard.
-          val newbinds = binds + (name -> subject)
-          val newterm = guard.rewrite(newbinds)._1
-          if (newterm.isTrue) return Match(newbinds)
-          else return Fail("Variable guard failed.  Is now: " +
-              newterm.toParseString)
-      }
-    }
-  }
 	  
   def rewrite(binds: Bindings) = {
     // If we have no bindings, don't rewrite the variable.

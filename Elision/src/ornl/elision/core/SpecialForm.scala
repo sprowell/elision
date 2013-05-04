@@ -318,11 +318,10 @@ object SpecialForm {
    * @param content		The content.
    * @return	The constructed special form.
    */
-  def apply(loc: Loc, tag: BasicAtom, content: BasicAtom) = {
+  def apply(loc: Loc, tag: BasicAtom, content: BasicAtom): BasicAtom = {
     val sfh = new SpecialFormHolder(loc, tag, content)
     tag match {
 	    case sl:SymbolLiteral => sl.value match {
-	      case 'map => MapStrategy(sfh)
 	      case 'binds => BindingsAtom(sfh)
 	      case 'rule => RewriteRule(sfh)
 	      case 'match => MatchAtom(sfh)

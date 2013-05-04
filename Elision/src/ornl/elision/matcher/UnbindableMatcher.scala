@@ -41,6 +41,7 @@ import ornl.elision.core.BasicAtom
 import ornl.elision.core.Bindings
 import ornl.elision.util.OmitSeq
 import ornl.elision.util.OmitSeq.fromIndexedSeq
+import ornl.elision.context.Context
 
 /**
  * Match unbindable atoms in a sequence of patterns to the unbindable atoms
@@ -82,10 +83,12 @@ import ornl.elision.util.OmitSeq.fromIndexedSeq
  * 
  * @param patterns	The patterns to match.
  * @param subjects	The subjects to match.
+ * @param context   The context required to build atoms.
  * @param binds			Bindings to honor in any match.
  */
 class UnbindableMatcher(patterns: OmitSeq[BasicAtom],
-    subjects: OmitSeq[BasicAtom], binds: Bindings) extends MatchIterator {
+    subjects: OmitSeq[BasicAtom], context: Context,
+    binds: Bindings) extends MatchIterator {
   /**
    * Next index to start looking for a subject to match.
    */
@@ -146,17 +149,20 @@ class UnbindableMatcher(patterns: OmitSeq[BasicAtom],
     }
     
     // Try to match the subject and the pattern.
-    val iterator = Matcher(patterns(_patindex), subjects(subindex), binds) match {
+    val iterator = Matcher(patterns(_patindex), subjects(subindex), context,
+        binds) match {
       case fail:Fail =>
         // The match failed, but we can try to keep searching.  The thing to
         // do is look at the next subject index.
         findNext
         return
+        
       case Match(binds1) =>
         // The pattern and subject match.  This binding is the basis for the
         // continued match. Make sure to honor the original bindings we were given.
         MatchIterator((binds1 ++ binds).set(binds1.patterns.getOrElse(patterns),
                                             binds1.subjects.getOrElse(subjects)))
+                                            
       case Many(iter) =>
         // The pattern and subject match in many ways.  We use this to build
         // a new iterator for the next pattern.
@@ -181,12 +187,11 @@ class UnbindableMatcher(patterns: OmitSeq[BasicAtom],
             _exhausted = true
           }
         }
-      }
-
-      else {
+      } else {
         new UnbindableMatcher(
           patterns.omit(_patindex), 
           subjects.omit(subindex), 
+          context,
           bindings ++ binds)
       })
   }

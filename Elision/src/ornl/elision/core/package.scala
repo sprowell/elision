@@ -45,8 +45,7 @@ import ornl.elision.util.PropertyManager
 import ornl.elision.util.Debugger
 import ornl.elision.util.Loc
 import ornl.elision.context.Context
-import ornl.elision.context.Executor
-import ornl.elision.context.RewriteEngine
+import ornl.elision.parse.Processor
 
 /**
  * The core classes and definitions that make up the Elision runtime.
@@ -79,29 +78,7 @@ package object core {
    * throws an exception when invoked from a native handler, so you must
    * replace this with something rational as soon as reasonable.
    */
-  implicit var knownExecutor: Executor = new Executor {
-    val console = PrintConsole 
-    val context = new Context()
-    val settings = Map[String,String]()
-    override def parse(name: String, text: String): Dialect.Result =
-      Dialect.Failure(
-        Loc.internal,
-        "This default executor cannot parse text; override this with a full " +
-        "executor implementation to properly support parsing from within " +
-        "native operators.")
-  }
-  
-  /**
-   * Cause the default guard rewrite strategy to be applied to the given
-   * guard.  This is a stopgap measure until we have a better way to specify
-   * the guard strategy.
-   * 
-   * @param guard   The guard to rewrite.
-   * @return  The result of rewriting the guard.
-   */
-  def applyGuardStrategy(guard: BasicAtom) = {
-    new RewriteEngine(knownExecutor.context)(guard)
-  }
+  implicit var knownExecutor: Processor = new Processor(Map(), new Context())
 
   /**
    * Turn a string into a properly-escaped symbol.  Symbols must start with a

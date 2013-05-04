@@ -78,11 +78,6 @@ extends HashMap[String, BasicAtom] with Mutable {
   def ++(other: Bindings): Bindings = new Bindings(self ++ other.self)
   override def -(key: String): Bindings = new Bindings(self - key)
 
-  // @@@ JUST FOR DEBUGGING!!!
-  var rewrites: MutableHashMap[BasicAtom, (BasicAtom, Boolean)] =
-    new MutableHashMap[BasicAtom, (BasicAtom, Boolean)]()
-    with SynchronizedMap[BasicAtom, (BasicAtom, Boolean)];
-
   /** This is a cache used during associative / commutative matching. */
   private var _patcache: OmitSeq[BasicAtom] = null
   
@@ -178,11 +173,4 @@ object Bindings {
   def apply(pairs: (String,BasicAtom)*) =
     if (pairs.length == 0) EmptyBinds
     else new Bindings(HashMap(pairs:_*))
-  
-//  /**
-//   * Get an empty bindings object.  This helps enforce the "don't create
-//   * bindings objects unnecessarily" rule, and just returns the
-//   * `EmptyBinds`.
-//   */
-//  def apply() = EmptyBinds
 }

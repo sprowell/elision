@@ -89,11 +89,12 @@ extends ElisionException(loc, msg)
  * Handlers for native operators come here to register themselves.  Pass a
  * closure of the proper form (see `register`).
  * 
+ * @param context           The context needed to build atoms.
  * @param allowRedefinition	If true, allow redefinition of operators (madness)
  * 													as described above.  A warning is always generated!
  * 													This is true by default.
  */
-class OperatorLibrary(val allowRedefinition: Boolean = true)
+class OperatorLibrary(context: Context, val allowRedefinition: Boolean = true)
 extends Fickle with Mutable {
   
   /**
@@ -108,25 +109,14 @@ extends Fickle with Mutable {
  	
   /** Makes a copy of this operator library. */
   override def clone : OperatorLibrary = {
-    val clone = new OperatorLibrary(this.allowRedefinition)
-    
+    val clone = new OperatorLibrary(context, allowRedefinition)
     clone._nameToOperator.clear
     for(mapping <- this._nameToOperator) {
         clone._nameToOperator += mapping
     }
-
     clone._opRefList = _opRefList
     clone
   }
-    
- 	/**
- 	 * Turn the operator library into a sequence of newline-terminated strings
- 	 * that are parseable by AtomParser.
- 	 * 
- 	 * @return	A parseable version of this instance.
- 	 */
- 	def toParseString =
- 	  _nameToOperator.values.map(_.operator.toParseString).mkString("","\n","\n")
  	
  	/**
  	 * Get the named operator, if it is defined.  If not already defined, and
@@ -179,9 +169,9 @@ extends Fickle with Mutable {
  	  if (_nameToOperator.contains(name))
  	    if (allowRedefinition) {
  	      val oldop = _nameToOperator(name).operator
- 	      knownExecutor.console.warn(op.loc,
+ 	      context.console.warn(op.loc,
  	          "Redefining operator " + op.name + ".")
- 	      knownExecutor.console.warn(oldop.loc,
+ 	      context.console.warn(oldop.loc,
  	          "Prior definition: " + oldop.toParseString)
  	    } else {
  	    	// Reject this!  The operator is already defined.

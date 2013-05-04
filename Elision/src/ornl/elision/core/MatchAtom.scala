@@ -72,54 +72,6 @@ extends SpecialForm(sfh.loc, sfh.tag, sfh.content) with Applicable {
   /** The type of this atom. */
   override val theType = SymbolicOperator.MAP(ANY, BINDING)
   
-  /**
-   * Perform the matching.
-   * 
-   * @param subject		The subject to match.
-   * @param binds			Bindings to honor.
-   * @return	Some bindings if the match was successful, and `None` if not.
-   */
-  private def _doMatching(subject: BasicAtom,
-      binds: Bindings = Bindings()): Option[Bindings] = {
-    // Local function to check the guards.
-    def checkGuards(candidate: Bindings): Boolean = {
-      for (guard <- guards) {
-        val (newguard, _) = guard.rewrite(candidate)
-        if (!newguard.isTrue) return false
-      }
-      true
-    }
-    
-    // Try to match the given atom against the pattern.
-    Matcher(pattern, subject, binds, None) match {
-      case fail:Fail => return None
-      case Match(newbinds) =>
-        // We got a match.  Check the guards.
-        if (checkGuards(newbinds ++ binds)) Some(newbinds ++ binds) else return None
-      case Many(iter) =>
-        // We might have many matches.  We search through them until we find
-        // one that satisfies the guards, or until we run out of candidates.
-        for (newbinds <- iter) {
-          if (checkGuards(newbinds ++ binds)) return Some(newbinds ++ binds)
-        }
-        return None
-    }
-  }
-
-  /**
-   * Apply this match atom to the given atom.  This performs the match
-   * and returns either the bindings of the first match, or `NONE` if
-   * it does not match.
-   * 
-   * @param subject	The subject to match.
-   * @param bypass	Whether to bypass native handlers.
-   * @return	Bindings, or Nothing.
-   */
-  def doApply(subject: BasicAtom, bypass: Boolean) = _doMatching(subject) match {
-    case None => NONE
-    case Some(binds) => BindingsAtom(binds)
-  }
-  
   override def equals(other: Any) = other match {
     case oma: MatchAtom =>
       feq(oma, this, oma.pattern == pattern && oma.guards == guards)

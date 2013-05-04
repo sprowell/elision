@@ -38,8 +38,16 @@ import ornl.elision.util.toQuotedString
  */
 object CLI {
   
-  /** Whether this is the platform Windows. */
-  val iswin = System.getProperty("os.name").toLowerCase().indexOf("win") >= 0
+  /** Determine what platform this is. */
+  val (iswin, ismac, islin) = {
+    val os = System.getProperty("os.name").toLowerCase()
+    (os.indexOf("win") >= 0,
+        os.indexOf("mac") >= 0,
+        os.indexOf("nux") >= 0)
+  }
+  
+  /** If the platform is not Windows, Mac, or Linux, then it is "other." */
+  val isoth = !(iswin || ismac || islin)
   
   /**
    * Print out an error message about the command line, highlighting the

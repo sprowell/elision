@@ -10,7 +10,7 @@ for a link to the group.
 
 Compilable Context
 ------------------
-* First Priority *
+* First Priority * COMPLETE
 Big systems like Hyperion create huge contexts that cannot be loaded after
 compilation because methods are too large.  This means that the system must
 break these into multiple objects to enable loading.  One method may be to

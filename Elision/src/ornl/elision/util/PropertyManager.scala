@@ -82,7 +82,7 @@ trait PropertyManager {
    * @return  The default value.
    */
   def declareProperty[TYPE](name: String, description: String, default: TYPE,
-      onchange: (PropertyManager => Unit) = null) {
+      onchange: (PropertyManager => Unit) = null) = {
     val defclass = default.getClass
     if (!clazzes.exists(defclass.isAssignableFrom(_))) {
       

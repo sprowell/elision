@@ -30,41 +30,43 @@
 package ornl.elision.parse
 
 import ornl.elision.context.Context
-import ornl.elision.core.BasicAtom
-import ornl.elision.core.MapPair
-import ornl.elision.core.AlgProp
-import ornl.elision.core.Absorber
-import ornl.elision.core.Identity
-import ornl.elision.core.Associative
-import ornl.elision.core.Commutative
-import ornl.elision.core.Idempotent
-import ornl.elision.core.Variable
-import ornl.elision.core.MetaVariable
-import ornl.elision.core.Lambda
-import ornl.elision.core.SpecialForm
-import ornl.elision.core.Apply
 import ornl.elision.core.ANY
+import ornl.elision.core.Absorber
+import ornl.elision.core.AlgProp
+import ornl.elision.core.Apply
+import ornl.elision.core.Associative
 import ornl.elision.core.AtomSeq
-import ornl.elision.core.NoProps
-import ornl.elision.core.BindingsAtom
+import ornl.elision.core.BITSTRING
+import ornl.elision.core.BOOLEAN
+import ornl.elision.core.BasicAtom
 import ornl.elision.core.Bindings
-import ornl.elision.core.Literal
-import ornl.elision.core.OperatorRef
-import ornl.elision.core.RulesetRef
-import ornl.elision.core.TypeUniverse
-import ornl.elision.core.SymbolLiteral
-import ornl.elision.core.StringLiteral
-import ornl.elision.core.SYMBOL
-import ornl.elision.core.STRING
-import ornl.elision.core.IntegerLiteral
+import ornl.elision.core.BindingsAtom
+import ornl.elision.core.BitStringLiteral
+import ornl.elision.core.Commutative
+import ornl.elision.core.FLOAT
 import ornl.elision.core.FloatLiteral
 import ornl.elision.core.INTEGER
-import ornl.elision.core.FLOAT
+import ornl.elision.core.Idempotent
+import ornl.elision.core.Identity
+import ornl.elision.core.IntegerLiteral
+import ornl.elision.core.Lambda
+import ornl.elision.core.Literal
+import ornl.elision.core.MapPair
+import ornl.elision.core.MetaVariable
 import ornl.elision.core.NamedRootType
-import ornl.elision.core.BOOLEAN
-import ornl.elision.core.BITSTRING
-import ornl.elision.core.BitStringLiteral
+import ornl.elision.core.NoProps
+import ornl.elision.core.OperatorRef
+import ornl.elision.core.STRING
+import ornl.elision.core.SYMBOL
+import ornl.elision.core.SpecialForm
+import ornl.elision.core.StringLiteral
+import ornl.elision.core.SymbolLiteral
+import ornl.elision.core.TypeUniverse
+import ornl.elision.core.Variable
+import ornl.elision.core.boolToLiteral
+import ornl.elision.core.wrapBindingsAtom
 import ornl.elision.util.Loc
+import ornl.elision.context.ApplyHandler
 
 
 /**
@@ -276,7 +278,7 @@ object AST {
           
         case value: Any => value
       }
-      Apply(op, right.interpret(context))
+      ApplyHandler(op, right.interpret(context), context)
     }
   }
   
@@ -427,15 +429,5 @@ object AST {
    */
   def opref(name: String) = new AST[OperatorRef] {
     def interpret(context: Context) = context.operatorLibrary(name)
-  }
-  
-  /**
-   * Construct a ruleset reference AST.
-   * 
-   * @param name    The ruleset name.
-   * @return  The new AST.
-   */
-  def rsref(name: String) = new AST[RulesetRef] {
-    def interpret(context: Context) = context.ruleLibrary(name)
   }
 }

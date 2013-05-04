@@ -44,7 +44,6 @@ import ornl.elision.core.Fickle
 import ornl.elision.core.Operator
 import ornl.elision.core.OperatorRef
 import ornl.elision.core.RewriteRule
-import ornl.elision.core.RulesetRef
 import ornl.elision.core.SymbolicOperator
 import ornl.elision.core.TypedSymbolicOperator
 import ornl.elision.core.AtomWalker
@@ -63,15 +62,33 @@ import ornl.elision.util.Version.minor
 import ornl.elision.util.toQuotedString
 import ornl.elision.core.Dialect
 import ornl.elision.util.PropertyManager
+import ornl.elision.util.Console
+import ornl.elision.util.PrintConsole
+import ornl.elision.util.ElisionException
+import ornl.elision.util.Loc
+
+/**
+ * A requested setting is not present.
+ * 
+ * @param msg A human-readable message describing the error.
+ */
+class MissingSettingException(msg: String)
+extends ElisionException(Loc.internal, msg)
 
 /**
  * A context provides access to operator libraries and rules, along with
  * the global set of bindings in force at any time.
  * 
- * Additionally the context maintains a cache for use during runtime.  This
- * cache is reflected through an `Executor`, but is actually maintained here.
- *
- * '''This class is likely to change.'''
+ * The context maintains a cache for use during runtime, and also maintains
+ * the following items.
+ *  
+ *  - The collection of __settings__ that were parsed from the command line,
+ *    or left at their defaults.  These are (typically) regarded as immutable
+ *    and are user-visible.  These are held for later reference.
+ *    
+ *  - The __console__ that should get output.
+ * 
+ * Note that the settings must be specified at construction time.
  *
  * == Use ==
  * In general it is not necessary to make an instance; one is typically
@@ -92,7 +109,45 @@ class Context extends PropertyManager with Fickle with Mutable with Cache {
     clone.ruleLibrary = this.ruleLibrary.clone
     clone
   }
+  
+  //======================================================================
+  // The settings.
+  //======================================================================
+  
+  /**
+   * The settings, from the command line parser.
+   */
+  val settings: Map[String,String]
 
+  /**
+   * Get the value of a setting, which must be defined.  If the setting is
+   * not present a [[ornl.elision.context.MissingSettingException]] exception
+   * is thrown.
+   * 
+   * @param name    The name of the setting.
+   * @return  The value of the setting.
+   */
+  def getSetting(name: String) = settings.get(name) match {
+    case None =>
+      throw new MissingSettingException("The setting "+
+          ornl.elision.util.toQuotedString(name)+
+          " is required by Elision, but is not defined.  The current " +
+          "operation cannot continue.")
+    case Some(value) =>
+      value
+  }
+
+  //======================================================================
+  // The console.
+  //======================================================================
+
+  /**
+   * Get a console native handlers can use.  By default this is a simple
+   * console that just prints to standard output.  Replace this with a
+   * "real" console if you have one.
+   */
+  var console: Console = PrintConsole
+  
   //======================================================================
   // Build a (transient) memoization cache for this context.
   //======================================================================
@@ -163,7 +218,7 @@ class Context extends PropertyManager with Fickle with Mutable with Cache {
    * @return	The current operator library.
    */
   def operatorLibrary = {
-    if (_oplib == null) { _oplib = new OperatorLibrary() }
+    if (_oplib == null) { _oplib = new OperatorLibrary(this) }
     _oplib
   }
 
@@ -193,7 +248,7 @@ class Context extends PropertyManager with Fickle with Mutable with Cache {
    * @return	The current rule library.
    */
   def ruleLibrary = {
-    if (_rulelib == null) { _rulelib = new RuleLibrary(memo) }
+    if (_rulelib == null) { _rulelib = new RuleLibrary(memo, this) }
     _rulelib
   }
 
@@ -250,10 +305,6 @@ class Context extends PropertyManager with Fickle with Mutable with Cache {
       operatorLibrary.add(op)
       op
       
-    case SymbolLiteral(_, sym) =>
-      ruleLibrary.declareRuleset(sym.name)
-      RulesetRef(this, sym.name)
-      
     case rule: RewriteRule =>
       ruleLibrary.add(rule)
       rule
@@ -293,7 +344,8 @@ class Context extends PropertyManager with Fickle with Mutable with Cache {
     
     // Any remaining rulesets can be written now.
     for (ruleset <- ruleLibrary.getAllRulesets) {
-      known = traverse(app, RulesetRef(ruleLibrary, ruleset), known, 'scala)
+      app.append("context.ruleLibrary.declareRuleset(%s)\n".format(
+          toQuotedString(ruleset)))
     } // Add any missed rulesets.
     
     // Enable those rulesets that need to be enabled.
@@ -324,21 +376,18 @@ class Context extends PropertyManager with Fickle with Mutable with Cache {
    * immutable
    * 
    * @param operators The set of known operators.
-   * @param rulesets  The set of known rulesets.
    */
-  case class Known(operators: Set[Operator] = Set(),
-      rulesets: Set[RulesetRef] = Set()) {
+  case class Known(operators: Set[Operator] = Set()) {
     
     /**
-     * Test whether an atom (an operator or ruleset) is known.
+     * Test whether an operator is known.
      * 
-     * @param atom    Can be any atom, but only operators and rulesets have
+     * @param atom    Can be any atom, but only operators have
      *                the potential to be "known."
      * @return  True iff the atom is known.
      */
     def apply(atom: BasicAtom) = atom match {
       case op: Operator if operators.contains(op) => true
-      case rs: RulesetRef if rulesets.contains(rs) => true
       case _ => false
     }
     
@@ -350,10 +399,10 @@ class Context extends PropertyManager with Fickle with Mutable with Cache {
      */
     def +(atom: BasicAtom) = atom match {
       case op: Operator =>
-        Known(operators + op, rulesets)
+        Known(operators + op)
         
-      case rs: RulesetRef =>
-        Known(operators, rulesets + rs)
+      case _ =>
+        this
     }
   }
   
@@ -413,26 +462,10 @@ class Context extends PropertyManager with Fickle with Mutable with Cache {
       app.append(pre(kind))
       kind match {
         case 'scala =>
-          // Ruleset references are unusual.  We need to process them as symbols.
-          // The reason for this is that there is no corresponding atom to
-          // convert them into, like there is for operator references.  See
-          // the declare method for how this is handled.
-          val what = target match {
-            case rr: RulesetRef => Literal(Symbol(rr.name))
-            case x => x
-          }
-          Dialect.serialize('scala, app, what)
+          Dialect.serialize('scala, app, target)
           
         case _ =>
-          // Ruleset references are unusual.  We need to process them as symbols.
-          // The reason for this is that there is no corresponding atom to
-          // convert them into, like there is for operator references.  See
-          // the declare method for how this is handled.
-          val what = target match {
-            case rr: RulesetRef => Literal(Symbol(rr.name))
-            case x => x
-          }
-          Dialect.serialize('elision, app, what)
+          Dialect.serialize('elision, app, target)
       }
       app.append(post(kind)).append('\n')
     } // Write all atoms, in order.
@@ -508,13 +541,6 @@ class Context extends PropertyManager with Fickle with Mutable with Cache {
               newlist = pair._2
             }
               
-          case rs: RulesetRef =>
-            if (! known(rs)) {
-              val pair = collect(rs, newknown, newlist)
-              newknown = pair._1
-              newlist = pair._2
-            }
-              
           case rule: RewriteRule =>
               val pair = collect(rule, newknown, newlist)
               newknown = pair._1
@@ -532,9 +558,6 @@ class Context extends PropertyManager with Fickle with Mutable with Cache {
         AtomWalker(opref.operator, visitor, true)
         
       case rule: RewriteRule =>
-        for (rsname <- rule.rulesets) {
-          AtomWalker(RulesetRef(this.ruleLibrary, rsname), visitor, true)
-        } // Explore all the referenced rulesets.
         AtomWalker(target, visitor, true)
         
       case _ =>
@@ -548,7 +571,6 @@ class Context extends PropertyManager with Fickle with Mutable with Cache {
     return (target match {
       case op: Operator => newknown + op
       case opref: OperatorRef => newknown + opref.operator
-      case rs: RulesetRef => newknown + rs
       case _ => newknown
     }, newlist)
   }
@@ -584,7 +606,8 @@ class Context extends PropertyManager with Fickle with Mutable with Cache {
     
     // Any remaining rulesets can be written now.
     for (ruleset <- ruleLibrary.getAllRulesets) {
-      known = traverse(app, RulesetRef(ruleLibrary, ruleset), known, 'elision)
+      app.append("{!_()#handler=\"\"\"context.ruleLibrary."+
+          "declareRuleset(%s);_no_show\"\"\"}.%%()\n" format (toEString(ruleset)))
     } // Add any missed rulesets.
     
     // Enable those rulesets that need to be enabled.

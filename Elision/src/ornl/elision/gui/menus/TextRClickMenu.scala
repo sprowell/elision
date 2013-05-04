@@ -105,7 +105,7 @@ object EvaClipboard extends ClipboardOwner {
             }
         }
         catch {
-            case _ => // Pokemon exception: gotta catch 'em all!
+            case _: Throwable => // Pokemon exception: gotta catch 'em all!
                 ""
         }
     }

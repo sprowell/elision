@@ -84,24 +84,6 @@ import ornl.elision.matcher.Many
  */
 
 /**
- * A lambda variable does not match the argument.
- * 
- * @param loc   Location of the bad lambda body.
- * @param msg   Human-readable message.
- */
-class LambdaVariableMismatchException(loc: Loc, msg: String)
-extends ElisionException(loc, msg)
-
-/**
- * A lambda application results in unbounded recursion.
- * 
- * @param loc   Location of the bad lambda argument.
- * @param msg   Human-readable message.
-*  */
-class LambdaUnboundedRecursionException(loc: Loc, msg: String)
-extends ElisionException(loc, msg)
-
-/**
  * A lambda creates an operator that binds a single variable in a term.
  * 
  * To create an instance (or to match an instance) use the methods in the
@@ -201,33 +183,6 @@ extends BasicAtom with Applicable {
       
     case _ =>
       false
-  }
-  
-  def doApply(atom: BasicAtom, bypass: Boolean) = {
-    // Lambdas are very general; their application can lead to a stack overflow
-    // because it is possible to model unbounded recursion.  Catch the stack
-    // overflow here, and bail out.
-    try {
-	    // Make it possible to check types by matching the variable against the
-	    // argument instead of just binding.  For pure binding without checking
-	    // types, use a bind.
-      Matcher(lvar, atom, Bindings(), None) match {
-	      case fail:Fail =>
-	        throw new LambdaVariableMismatchException(atom.loc,
-	            "Lambda argument does not match parameter: " + fail.theReason)
-	      case Match(binds) =>
-	        // Great!  Now rewrite the body with the bindings.
-		      body.rewrite(binds)._1
-	      case Many(iter) =>
-	        body.rewrite(iter.next)._1
-	    }
-    } catch {
-      case ex:java.lang.StackOverflowError =>
-        // Trapped unbounded recursion.
-        throw new LambdaUnboundedRecursionException(atom.loc,
-            "Lambda application results in unbounded recursion: (" +
-            this.toParseString + ").(" + atom.toParseString + ")")
-    }
   }
 }
 

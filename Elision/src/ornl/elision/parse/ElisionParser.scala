@@ -64,7 +64,6 @@ import AST.mappair
 import AST.noprops
 import AST.number
 import AST.opref
-import AST.rsref
 import AST.special
 import AST.string
 import AST.sym
@@ -222,7 +221,7 @@ extends Parser with AbstractParser {
    *             | "{" ESymbol Atom* ("#" ESymbol ("=" Atom | ParsedAtomSeq))* "}"
    *             | "%" ParsedAlgProp ("(" ParsedRawAtomSeq ")")?
    *             | ESymbol ( "(" ParsedRawAtomSeq ")"
-   *                       | ":" ("OPREF" | "RSREF" | FirstAtom)
+   *                       | ":" ("OPREF" | FirstAtom)
    *                       )?
    * }}}
    */
@@ -301,7 +300,6 @@ extends Parser with AbstractParser {
             } |
             ": " ~ (
                 "OPREF " ~ push(('opref, any)) |
-                "RSREF " ~ push(('rsref, any)) |
                 FirstAtom ~~> {
                   ('typed, _)
                 }
@@ -313,7 +311,6 @@ extends Parser with AbstractParser {
             data._1 match {
               case 'apply => apply(opref(name), data._2)
               case 'opref => opref(name)
-              case 'rsref => rsref(name)
               case 'typed => sym(name, data._2)
               case 'plain => sym(name)
             }

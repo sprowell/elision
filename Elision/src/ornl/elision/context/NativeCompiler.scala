@@ -38,11 +38,9 @@ import scala.tools.nsc.Settings
 import ornl.elision.util.Debugger
 import ornl.elision.util.Loc
 import ornl.elision.core.BasicAtom
-import ornl.elision.core.ApplyData
 import ornl.elision.core.knownExecutor
 import ornl.elision.core.toEString
 import ornl.elision.core.toESymbol
-import ornl.elision.core.NativeHandlerException
 
 /**
  * Trait for all handlers.
@@ -51,6 +49,9 @@ trait HandlerClass {
   def handler(_data: ApplyData): BasicAtom
 }
 
+/**
+ * Manage an in-memory cache (a "stash") for the native compiler.
+ */
 object NativeCompiler {
   /**
    * Store local overrides.  The compiler checks here before it checks the
@@ -59,8 +60,8 @@ object NativeCompiler {
   private var _override = Map[String, HandlerClass]()
   
   /**
-   * Stash a handler.  The compiler checks here before it checks the cache,
-   * so this can provide an "override" with an in-memory cache.
+   * Stash a handler.  The compiler checks the stash before it checks the cache,
+   * so this can provide an "override" to the disk-based cache.
    * 
    * @param source    The source file.
    * @param operator  The operator name.
@@ -72,7 +73,6 @@ object NativeCompiler {
     // Compute the key and store the object.
     val key = getKey(source, operator, handler)
     _override += (key -> obj)
-    key
   }
   
   /**
@@ -91,7 +91,8 @@ object NativeCompiler {
     val key = getKey(source, operator, handler)
     // Write the prelude.
     app.append(makeObject(source, operator, key, makeMethod(handler)))
-    app.append("ornl.elision.context.NativeCompiler.stash(%s, %s, %s, %s)\n" format (
+    app.append(
+        "ornl.elision.context.NativeCompiler.stash(%s, %s, %s, %s)\n" format (
         toEString(source), toEString(operator), toEString(handler),
         key))
   }
@@ -151,7 +152,6 @@ object NativeCompiler {
        |}
        |""".stripMargin format (operator, source,
            (new java.util.Date).toString, key, method)
-
 }
 
 /**
@@ -159,12 +159,14 @@ object NativeCompiler {
  * 
  * The location of the native cache is obtained from the executor instance,
  * which must specify the configuration option `elision.cache`.
+ * 
+ * @param context   The context needed to build atoms.
  */
-class NativeCompiler {
+class NativeCompiler(context: Context) {
   import NativeCompiler.{getKey, makeObject, makeMethod}
   
   /** Location of the native cache. */
-  private val _cache = new File(knownExecutor.getSetting("elision.cache"))
+  private val _cache = new File(context.getSetting("elision.cache"))
   if (!_cache.exists) {
     _cache.mkdir
   }
@@ -182,7 +184,7 @@ class NativeCompiler {
   private lazy val _classpath = (_urls.map(_.getPath)).mkString(_ps)
   
   // Build the settings, reporter, and compiler to use later on.
-  private val _settings = new Settings(knownExecutor.console.emitln _)
+  private val _settings = new Settings(context.console.emitln _)
   _settings.deprecation.value = true
   _settings.unchecked.value = true
   _settings.outdir.value = _cache.getAbsolutePath

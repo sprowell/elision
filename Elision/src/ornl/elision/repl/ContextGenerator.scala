@@ -32,11 +32,11 @@ package ornl.elision.repl
 import ornl.elision.context.Context
 import java.io.FileWriter
 import ornl.elision.core.BasicAtom
-import ornl.elision.core.RulesetRef
 import ornl.elision.core.TypedSymbolicOperator
 import ornl.elision.context.NativeCompiler
 import ornl.elision.core.Literal
 import ornl.elision.dialects.ScalaGenerator
+import ornl.elision.util.toQuotedString
 
 /**
  * Generate compilable Scala source files for a context.
@@ -166,13 +166,11 @@ object ContextGenerator {
       thelist = pair._2
     } // Collect all rules and their dependencies.
     
-    // Any remaining rulesets can be collected now.
-    for (ruleset <- context.ruleLibrary.getAllRulesets) {
-      val pair = context.collect(RulesetRef(context.ruleLibrary, ruleset),
-          known, thelist)
-      known = pair._1
-      thelist = pair._2
-    } // Collect any missed rulesets.
+    // Write all ruleset declarations now.
+    for (name <- context.ruleLibrary.getAllRulesets) {
+      file.append("context.ruleLibrary.declareRuleset("+
+          toQuotedString(name)+")\n")
+    } // Write all ruleset declarations.
     
     // Write the pieces now.
     val width = 10 // How many items per stage?
@@ -212,11 +210,7 @@ object ContextGenerator {
       // The reason for this is that there is no corresponding atom to
       // convert them into, like there is for operator references.  See
       // the declare method for how this is handled.
-      val what = item match {
-        case rr: RulesetRef => Literal(Symbol(rr.name))
-        case x => x
-      }
-      ScalaGenerator(what, file)
+      ScalaGenerator(item, file)
       file.append(post).append('\n')
       // Count the item.
       size += 1
@@ -236,7 +230,6 @@ object ContextGenerator {
     file.append("  private def _complete(context: Context) {\n")
     
     // Enable those rulesets that need to be enabled.
-    import ornl.elision.util.toQuotedString
     for (ruleset <- context.ruleLibrary.getActiveRulesets) {
       file.append("context.ruleLibrary.enableRuleset(%s)\n".format(
           toQuotedString(ruleset)))

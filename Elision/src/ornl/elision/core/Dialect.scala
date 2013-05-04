@@ -141,9 +141,6 @@ object Dialect extends Fickle with Mutable {
       } catch {
         case ex: Exception =>
           // Not a dialect; misconfigured!
-          knownExecutor.console.error("ERROR: Elision is mis-configured.  " +
-              "The class "+pair._2.getClass.toString+" for dialect " +
-              pair._1.name + " is not a subclass of Dialect.")
           throw new ElisionException(Loc.internal,
               "ERROR: Elision is mis-configured.  The class for " +
               "dialect " + pair._1.name + " is not a subclass of Dialect.")

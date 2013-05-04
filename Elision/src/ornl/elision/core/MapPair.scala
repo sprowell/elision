@@ -77,8 +77,8 @@ object MapPair {
  * of the left hand side is used immediately and unconditionally.  (Variable
  * guards are, of course, honored.)
  */
-class MapPair(val left: BasicAtom, val right: BasicAtom) extends BasicAtom
-with Rewriter {
+class MapPair(val left: BasicAtom, val right: BasicAtom)
+extends BasicAtom with Strategy {
 	/** A map pair is actually a strategy. */
   val theType = STRATEGY
   lazy val isConstant = left.isConstant && right.isConstant
@@ -113,23 +113,6 @@ with Rewriter {
           (this, false)
         }
     }
-  }
-  
-  /**
-   * Apply this map pair to the given atom, yielding a potentially new atom.
-   * The first match with the left-hand side is used to rewrite the right.
-   */
-  def doRewrite(atom: BasicAtom, hint: Option[Any]) = {
-    Matcher(left, atom, Bindings(), hint) match {
-			case file:Fail => 
-        (atom, false)
-        
-			case Match(binds) =>
-				(right.rewrite(binds)._1, true)
-				
-			case Many(iter) =>
-				(right.rewrite(iter.next)._1, true)
-	  }
   }
   
   override def equals(other: Any) = other match {

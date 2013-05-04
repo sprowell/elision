@@ -45,6 +45,7 @@ import ornl.elision.util.Debugger
 import ornl.elision.util.OmitSeq
 import ornl.elision.util.OmitSeq.fromIndexedSeq
 import scala.annotation.tailrec
+import ornl.elision.context.Context
 
 /**
  * Match two sequences whose elements can be re-ordered.  That is, the lists are
@@ -55,12 +56,14 @@ object CMatcher {
   /**
    * Attempt to match two lists.  The second list can be re-ordered arbitrarily.
    * 
-   * @param plist	The pattern list.
-   * @param slist	The subject list.
-   * @param binds	Bindings that must be honored in any match.
+   * @param plist	  The pattern list.
+   * @param slist	  The subject list.
+   * @param context The context needed to build atoms.
+   * @param binds	  Bindings that must be honored in any match.
    * @return	The match outcome.
    */
-  def tryMatch(plist: AtomSeq, slist: AtomSeq, binds: Bindings): Outcome = {
+  def tryMatch(plist: AtomSeq, slist: AtomSeq, context: Context,
+      binds: Bindings): Outcome = {
     // Check the length.
     if (plist.length != slist.length)
       return Fail("Lists are different sizes, so no match is possible.",
@@ -81,7 +84,7 @@ object CMatcher {
     // atoms that are not variables, and so their matching is much more
     // restrictive.  We obtain an iterator over these, and then combine it
     // with the iterator for the reorderings to get the entire match iterator.
-    val um = new UnbindableMatcher(patterns, subjects, binds)
+    val um = new UnbindableMatcher(patterns, subjects, context, binds)
     
     // Step three is to re-order the subjects and match until we succeed, or we
     // exhaust the search space.  We have to do this with a match iterator, but
@@ -102,10 +105,7 @@ object CMatcher {
             _exhausted = true
           }
         }
-      }
-
-      else {
-
+      } else {
         // Get the patterns and subjects that remain.
         val pats = bindings.patterns.getOrElse(patterns)
         val subs = bindings.subjects.getOrElse(subjects)
@@ -116,9 +116,8 @@ object CMatcher {
         if (pats.length == 0) {
           MatchIterator((bindings ++ binds).set(pats, subs))
         } else {
-          new CMatchIterator(pats, 
-                             subs, 
-                             (bindings ++ binds).set(pats, subs))
+          new CMatchIterator(pats, subs, context,
+              (bindings ++ binds).set(pats, subs))
         }
       }
     })
@@ -144,10 +143,12 @@ object CMatcher {
    * 
    * @param patterns	The patterns.
    * @param subjects	The subjects.
+   * @param context   The context needed to build atoms.
    * @param binds			Bindings to honor.
    */
   private class CMatchIterator(patterns: OmitSeq[BasicAtom],
-      subjects: OmitSeq[BasicAtom], binds: Bindings) extends MatchIterator {
+      subjects: OmitSeq[BasicAtom], context: Context,
+      binds: Bindings) extends MatchIterator {
     /** An iterator over all permutations of the subjects. */
     private val _perms = subjects.permutations
     
@@ -166,16 +167,19 @@ object CMatcher {
       } else {
         _local = null
         if (_perms.hasNext) {
-          SequenceMatcher.tryMatch(patterns, _perms.next, binds) match {
+          SequenceMatcher.tryMatch(patterns, _perms.next, context,
+              binds) match {
             case fail:Fail =>
               // We ignore this case.  We only fail if we exhaust all attempts.
               Debugger("matching", fail.toString)
               findNext
+              
             case Match(binds1) =>
               // This case we care about.  Save the bindings as the current match.
               _current = (binds ++ binds1).set(binds1.patterns.getOrElse(patterns),
                   binds1.subjects.getOrElse(subjects))
               Debugger("matching", "C Found.")
+              
             case Many(iter) =>
               // We've potentially found many matches.  We save this as a local
               // iterator and then use it in the future.

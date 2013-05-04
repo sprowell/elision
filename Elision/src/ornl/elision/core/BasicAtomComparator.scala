@@ -56,8 +56,7 @@ object BasicAtomComparator extends Ordering[BasicAtom] {
     case x: MapPair => 8
     case x: MatchAtom => 9
     case x: SpecialForm => 10
-    case x: RulesetRef => 11
-    case x: OperatorRef => 12
+    case x: OperatorRef => 11
     case _ => -1
   }
   
@@ -281,11 +280,6 @@ object BasicAtomComparator extends Ordering[BasicAtom] {
         return compare(lsf.content, rsf.content)
         
       case 11 =>
-        // Comparing two ruleset references.  They sort by name.
-        return left.asInstanceOf[RulesetRef].name.compare(
-            right.asInstanceOf[RulesetRef].name)
-        
-      case 12 =>
         // Comparing two operator references.  They sort by name.
         return left.asInstanceOf[OperatorRef].name.compare(
             right.asInstanceOf[OperatorRef].name)

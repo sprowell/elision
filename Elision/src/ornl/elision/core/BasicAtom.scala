@@ -60,55 +60,17 @@ trait Mutable
 trait Fickle
 
 /**
- * A ''rewriter'' is an atom that can be applied to some other atom to generate
- * a potentially new atom.  It also needs to report its ''success'' via a flag.
+ * Marker trait for atoms that can be applied to other atoms.
  */
-trait Rewriter {
-  /**
-   * Apply this rewriter to the given atom, yielding a potentially new atom.
-   * The rewriter must also provide a flag indicating whether it "succeeded"
-   * in some appropriate sense.
-   * 
-   * The specific sense of "success" is dependent on the rewriter, and does
-   * not necessarily mean that the rewritten atom is different from the
-   * original atom.
-   * 
-   * Atoms that have this trait can be placed on the left-hand side of the
-   * applicative dot.  This method will get invoked when that happens, with
-   * the right-hand side passed as the atom.
-   * 
-   * @param atom	The atom to rewrite.
-   * @param hint	An optional hint to pass along during matching.
-   * @return	A pair consisting of a potentially new atom and a flag indicating
-   * 					success or failure.
-   */
-  def doRewrite(atom: BasicAtom, hint: Option[Any] = None): (BasicAtom, Boolean)
-}
+trait Applicable
 
 /**
- * An ''applicable'' is an atom that can be applied to some other atom to
- * generate a potentially new atom.
- */
-trait Applicable {
-  /**
-   * Apply this object, whatever it is, to the given atom with the provided
-   * bindings.
-   * 
-   * Atoms that have this trait can be placed on the left-hand side of the
-   * applicative dot.  This method will get invoked when that happens, with
-   * the right-hand side passed as the atom.
-   * 
-   * An applicable such as an operator might have a native handler registered.
-   * To control when these are applied, a `bypass` flag is provided.  If 
-   * `true` then no native handler should be invoked.  By default the flag
-   * is `false`.
-   * 
-   * @param rhs			The atom to apply this to.
-   * @param bypass	Whether to bypass native handlers.
-   * @return	A potentially new atom.
-   */
-  def doApply(rhs: BasicAtom, bypass: Boolean = false): BasicAtom
-}
+ * Marker trait for atoms that implement a strategy.  These atoms are expected
+ * to yield a binding when applied in the operator position to another atom.
+ * The binding must have the form `atom->`_atom_ `flag->`_boolean_, where the
+ * _atom_ is a potentially different atom, and the _boolean_ is a literal.
+ */ 
+trait Strategy extends Applicable
 
 /**
  * The root of all atoms manipulated by the rewriter.
@@ -363,15 +325,6 @@ abstract class BasicAtom(val loc: Loc = Loc.internal) extends HasOtherHash {
  * compute the constant pool for an atom.
  */
 object BasicAtom {
-  
-  /*
-   * FIXME  Eliminate all timeout stuff from this object.
-   * 
-   * This breaks the architecture.  The BasicAtom must not depend on
-   * the Executor, as it creates a cycle, and can cause problems with
-   * object instantiation.  Besides, it is just plain wrong.  BasicAtom
-   * has no responsibilities with respect to rewriting.
-   */
 
   /** Whether or not to provide type information in toParseString(). */
   var printTypeInfo = false

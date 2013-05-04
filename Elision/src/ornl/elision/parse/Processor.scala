@@ -31,7 +31,6 @@ package ornl.elision.parse
 
 import ornl.elision.actors.ReplActor
 import ornl.elision.context.Context
-import ornl.elision.context.Executor
 import ornl.elision.core.BasicAtom
 import ornl.elision.util.Console
 import ornl.elision.util.PrintConsole
@@ -43,13 +42,12 @@ import ornl.elision.util.ElisionException
 import ornl.elision.util.Version
 import ornl.elision.util.Loc
 import ornl.elision.core.Dialect
+import ornl.elision.matcher.ACMatcher
 
 /**
  * Manage the default parser kind to use.
  */
 object ProcessorControl {
-  /** The default parser to use. */
-  var parserKind = 'new
   /** Whether to bootstrap. */
   var bootstrap = true
 }
@@ -92,8 +90,7 @@ trait TraceableParse {
  */
 class Processor(val settings: Map[String, String],
     var context: Context = new Context)
-extends Executor
-with TraceableParse
+extends TraceableParse
 with Timeable
 with HasHistory {
   // Set up the stacktrace property.
@@ -120,7 +117,10 @@ with HasHistory {
   context.declareProperty("rewrite_aggressive_fail",
       "Whether to aggresively fail fast while rewriting. " +
       "If true, some rewrites may not be applied",
-      false)
+      false,
+      (prop) =>
+        ACMatcher.exhaustiveDefault =
+          prop.getProperty("rewrite_aggressive_fail"))
       
   /** Whether to trace the parser. */
   private var _trace = false
@@ -128,9 +128,6 @@ with HasHistory {
   /** The queue of handlers, in order. */
   private var _queue = List[Processor.Handler]()
 
-  /** Specify the console.  We don't know the number of lines. */
-  var console : Console = PrintConsole
-  
   /** The list of context checkpoints */
   val checkpoints = new collection.mutable.ArrayBuffer[(java.util.Date, Context)]
   
@@ -143,7 +140,7 @@ with HasHistory {
    */
   def banner(history: Boolean = true) {
     import ornl.elision.util.Version._
-    console.emitln(
+    context.console.emitln(
         """|      _ _     _
 					 |  ___| (_)___(_) ___  _ __
 					 | / _ \ | / __| |/ _ \| '_ \
@@ -156,17 +153,17 @@ with HasHistory {
       if (history)
         addHistoryLine("// New Session: " + new java.util.Date +
             " Running: " + major + "." + minor + ", build " + build)
-    	console.emitln("Version " + major + "." + minor + ", build " + build)
-    	console.emitln("Web " + web)
+    	context.console.emitln("Version " + major + "." + minor + ", build " + build)
+    	context.console.emitln("Web " + web)
     } else {
       if (history)
         addHistoryLine("// New Session: " + new java.util.Date)
-      console.emitln("Failed to load version information.")
+      context.console.emitln("Failed to load version information.")
     }
   }
   
   def reportElapsed {
-    console.sendln("elapsed: " + getLastTimeString + "\n")
+    context.console.sendln("elapsed: " + getLastTimeString + "\n")
   }
   
   /**
@@ -196,7 +193,7 @@ with HasHistory {
     val resolver = FileResolver(usePath, useClassPath, Some(path))
     resolver.find(filename) match {
       case None =>
-        if (!quiet) console.error("File not found: " + filename)
+        if (!quiet) context.console.error("File not found: " + filename)
         false
         
       case Some((reader, dir)) =>
@@ -269,11 +266,11 @@ with HasHistory {
       val num = lline.substring(1).trim.toInt
       val prior = getHistoryEntry(num)
       if (prior == None) {
-        console.error("No such history entry: " + lline)
+        context.console.error("No such history entry: " + lline)
         return
       }
       lline = prior.get
-      console.emitln(lline)
+      context.console.emitln(lline)
     }
     _execute(_makeParser(name).parseAtoms(lline))
   }
@@ -292,12 +289,12 @@ with HasHistory {
     try {
     	result match {
   			case Failure(err) =>
-  			  console.error(err)
+  			  context.console.error(err)
   			  
   			case Success(nodes) =>
   			  // We assume that there is at least one handler; otherwise not much
   			  // will happen.  Process each node.
-  			  console.reset
+  			  context.console.reset
   			  for (node <- nodes) {
   			    _handleNode(node) match {
   			      case None =>
@@ -312,7 +309,7 @@ with HasHistory {
   			        }
   			    }
   			    // Watch for errors.  If we are stopping on errors, stop.
-  			    if (stoponerror && console.errors > 0) {
+  			    if (stoponerror && context.console.errors > 0) {
   			      throw new ElisionException(Loc.internal, "Stopping due to errors.")
   			    }
   			  } // Process all the nodes.
@@ -320,28 +317,28 @@ with HasHistory {
     } catch {
       case ee: ElisionException =>
         // An error is encountered, but we only skip the rest of execution at this level.
-        console.error(ee.loc, ee.msg)
+        context.console.error(ee.loc, ee.msg)
         
       case ex: Exception =>
-        console.error("(" + ex.getClass + ") " + ex.getMessage())
+        context.console.error("(" + ex.getClass + ") " + ex.getMessage())
         val trace = ex.getStackTrace()
         if (context.getProperty[Boolean]("stacktrace")) ex.printStackTrace()
-        else console.error("in: " + trace(0))
+        else context.console.error("in: " + trace(0))
         
       case oom: java.lang.OutOfMemoryError =>
         System.gc()
-        console.error("Memory exhausted.  Trying to recover...")
+        context.console.error("Memory exhausted.  Trying to recover...")
         val rt = Runtime.getRuntime()
         val mem = rt.totalMemory()
         val free = rt.freeMemory()
         val perc = free.toDouble / mem.toDouble * 100
-        console.emitln("Free memory: %d/%d (%4.1f%%)".format(free, mem, perc))
+        context.console.emitln("Free memory: %d/%d (%4.1f%%)".format(free, mem, perc))
         
       case th: Throwable =>
-        console.error("(" + th.getClass + ") " + th.getMessage())
+        context.console.error("(" + th.getClass + ") " + th.getMessage())
         val trace = th.getStackTrace()
         if (context.getProperty[Boolean]("stacktrace")) th.printStackTrace()
-        else console.error("in: " + trace(0))
+        else context.console.error("in: " + trace(0))
         coredump("Internal error.", Some(th))
     }
     stopTimer
@@ -487,9 +484,9 @@ with HasHistory {
         //cfile.write(new scala.xml.PrettyPrinter(80, 2).format(all))
         cfile.flush()
         cfile.close()
-        console.emitln("Wrote core dump to elision.core.")
+        context.console.emitln("Wrote core dump to elision.core.")
       } else {
-        console.warn("Unable to save core dump.")
+        context.console.warn("Unable to save core dump.")
       }
     } catch {
       case th: Throwable =>
@@ -516,60 +513,60 @@ with HasHistory {
       // Display information about the machine where the core dump was
       // created.
       val info = coreXML \ "platform"
-      console.emitln("Creation platform:")
-      console.emitln("  Created on ...... "+info \ "@date")
-      console.emitln("  Java Vendor ..... "+info \ "@java.vendor")
-      console.emitln("  Java Version .... "+info \ "@java.version")
-      console.emitln("  OS Name ......... "+info \ "@os.name")
-      console.emitln("  OS Version ...... "+info \ "@os.version")
-      console.emitln("  OS Architecture . "+info \ "@os.arch")
-      console.emitln("  Elision Version . "+info \ "@version")
-      console.emitln("  Elision Build ... "+info \ "@build")
-      console.emitln("  Scala Version ... "+info \ "@scala.version")
-      console.emitln("")
+      context.console.emitln("Creation platform:")
+      context.console.emitln("  Created on ...... "+info \ "@date")
+      context.console.emitln("  Java Vendor ..... "+info \ "@java.vendor")
+      context.console.emitln("  Java Version .... "+info \ "@java.version")
+      context.console.emitln("  OS Name ......... "+info \ "@os.name")
+      context.console.emitln("  OS Version ...... "+info \ "@os.version")
+      context.console.emitln("  OS Architecture . "+info \ "@os.arch")
+      context.console.emitln("  Elision Version . "+info \ "@version")
+      context.console.emitln("  Elision Build ... "+info \ "@build")
+      context.console.emitln("  Scala Version ... "+info \ "@scala.version")
+      context.console.emitln("")
 
       // Display the core dump's error information
       val err = coreXML \ "error"
       val errMsg = err \ "@message"
-      console.emitln("Core dump error message:")
-      console.emitln("  %s" format errMsg)
-      console.emitln("")
+      context.console.emitln("Core dump error message:")
+      context.console.emitln("  %s" format errMsg)
+      context.console.emitln("")
       
       // Re-create the context.
-      console.emitln("Reloading context...")
+      context.console.emitln("Reloading context...")
       val cont = (coreXML \ "context").text
       new ElisionParser(corePath).parseAtoms(cont) match {
         case Failure(err) =>
-          console.error(err)
-          console.emitln("Context cannot be reloaded.")
+          context.console.error(err)
+          context.console.emitln("Context cannot be reloaded.")
           
         case success: Success =>
-          console.emitln("Successfully reloaded context.")
-          console.emitln("Rebuilding context...")
+          context.console.emitln("Successfully reloaded context.")
+          context.console.emitln("Rebuilding context...")
           context = new Context()
-          val prior = console.quiet
-          console.quiet = 1
+          val prior = context.console.quiet
+          context.console.quiet = 1
           _execute(success)
-          console.quiet = prior
-          console.emitln("Context rebuilt.")
+          context.console.quiet = prior
+          context.console.emitln("Context rebuilt.")
       }
 
       // Reload the history (caution: this will change the contents of your
       // elision history file.)
-      console.emitln("Reloading history...")
+      context.console.emitln("Reloading history...")
       val hist = (coreXML \ "history").text
       val histTokens = hist.split("\n")
       for(token <- histTokens) {
         val histLine = token.drop(token.indexOf(':') + 2)
         addHistoryLine(histLine)
       } // Load all history lines.
-      console.emitln("Successfully reloaded history.")
+      context.console.emitln("Successfully reloaded history.")
     } catch {
       case fnfe : FileNotFoundException =>
-        console.warn("Unable to open core dump at " + corePath)
+        context.console.warn("Unable to open core dump at " + corePath)
         
       case exception: ElisionException =>
-        console.error(exception.loc, exception.msg)
+        context.console.error(exception.loc, exception.msg)
         
       case exception: Throwable =>
         exception.printStackTrace()
@@ -592,18 +589,18 @@ with HasHistory {
       context = checkpt._2
       true
     } catch {
-      case _ => false
+      case _: Throwable => false
     }
   }
 
   /** Displays the list of saved checkpoints. */
   def displayCheckPts : Unit = {
-    console.emitln("Saved checkpoints: ")
+    context.console.emitln("Saved checkpoints: ")
     for (i <- 0 until checkpoints.size) {
       val (date, checkpt) = checkpoints(i)
-      console.emitln(i + " saved at " + date)
+      context.console.emitln(i + " saved at " + date)
     }
-    if (checkpoints.isEmpty) console.emitln("None")
+    if (checkpoints.isEmpty) context.console.emitln("None")
   }   
 }
 
@@ -631,15 +628,15 @@ object Processor {
      * use is to set up the values of properties that are important to the
      * handler.
      * 
-     * The executor is passed along, so properties can be set.  The return
+     * The processor is passed along, so properties can be set.  The return
      * value is used to determine if setup was successful or not.
      * 
-     * @param exec    The executor.
+     * @param exec    The processor.
      * @return  True if success, and false if failure.  When false is
      *          returned, the handler is discarded and registration does
      *          not continue.
      */
-    def init(exec: Executor): Boolean = true
+    def init(exec: Processor): Boolean = true
 
     /**
      * Handle a parsed abstract syntax tree node.  The default return value

@@ -42,6 +42,8 @@ import ornl.elision.core.BasicAtom
 import ornl.elision.core.OperatorRef
 import ornl.elision.util.OmitSeq
 import ornl.elision.util.OmitSeq.fromIndexedSeq
+import ornl.elision.context.ApplyHandler
+import ornl.elision.context.Context
 
 /**
  * Iterate over all associative groupings of items.
@@ -72,9 +74,10 @@ import ornl.elision.util.OmitSeq.fromIndexedSeq
  * 
  * @param patterns	The patterns.
  * @param subjects	The subjects.
+ * @param context   The context needed to build atoms.
  * @param op				The operator, if known.
  */
-class GroupingIterator(patterns: AtomSeq, subjects: AtomSeq,
+class GroupingIterator(patterns: AtomSeq, subjects: AtomSeq, context: Context,
     op: Option[OperatorRef]) extends Iterator[OmitSeq[BasicAtom]] {
   
   /* How this class works.
@@ -259,7 +262,11 @@ class GroupingIterator(patterns: AtomSeq, subjects: AtomSeq,
 		      	val list = AtomSeq(subjects.props, slice)
 		      
 			      // If we have an operator, apply it now.
-		      	if (operator != null) Apply(operator, list) else list
+		      	if (operator != null) {
+		      	  ApplyHandler(operator, list, context)
+		      	} else {
+		      	  list
+		      	}
 	        } else {
 	        	slice(0)
 	        })

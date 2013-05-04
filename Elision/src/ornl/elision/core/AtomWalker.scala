@@ -357,10 +357,6 @@ class AtomWalker(withtypes: Boolean) {
         apply(left, visitor, false) &&
         apply(right, visitor, false)
         
-      case RulesetRef(name) =>
-        visitor(atom, typ) &&
-        _gotype(atom, visitor)
-        
       case mvari: MetaVariable =>
         visitor(atom, typ) &&
         _gotype(atom, visitor) &&

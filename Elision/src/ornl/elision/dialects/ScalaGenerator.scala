@@ -65,10 +65,8 @@ import ornl.elision.core.NamedRootType
 import ornl.elision.core.NoProps
 import ornl.elision.core.OPREF
 import ornl.elision.core.OperatorRef
-import ornl.elision.core.RSREF
 import ornl.elision.core.RULETYPE
 import ornl.elision.core.RewriteRule
-import ornl.elision.core.RulesetRef
 import ornl.elision.core.STRATEGY
 import ornl.elision.core.STRING
 import ornl.elision.core.SYMBOL
@@ -114,7 +112,6 @@ object ScalaGenerator {
         case INTEGER => buf.append("INTEGER")
         case NONE => buf.append("NONE")
         case OPREF => buf.append("OPREF")
-        case RSREF => buf.append("RSREF")
         case RULETYPE => buf.append("RULETYPE")
         case STRATEGY => buf.append("STRATEGY")
         case STRING => buf.append("STRING")
@@ -355,12 +352,6 @@ object ScalaGenerator {
         buf.append("MapPair(")
         gen(left, context, buf).append(",")
         gen(right, context, buf).append(")")
-        
-      case RulesetRef(name) =>
-        buf.append("RulesetRef(")
-        buf.append("context,")
-        buf.append(toEString(name))
-        buf.append(")")
         
       case mvari: MetaVariable =>
         buf.append("MetaVariable(")

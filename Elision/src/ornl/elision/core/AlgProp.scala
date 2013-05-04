@@ -101,7 +101,7 @@ extends ElisionException(loc, msg)
  * @param absorber			Optional absorber.  Default is none.
  * @param identity			Optional identity.  Default is none.
  */
-class AlgProp(
+class AlgProp protected[core] (
     loc: Loc,
     val associative: Option[BasicAtom] = None,
     val commutative: Option[BasicAtom] = None,
@@ -110,6 +110,12 @@ class AlgProp(
     val identity: Option[BasicAtom] = None)
     extends BasicAtom(loc) with Applicable {
   
+  /**
+   * Provide a hash code for an optional atom.
+   * 
+   * @param atom    The optional atom.
+   * @return  The hash code.
+   */
   private def _codify(atom: Option[BasicAtom]) = atom match {
     case None => None.hashCode
     case Some(atom) => atom.hashCode
@@ -248,26 +254,6 @@ class AlgProp(
   def getD(default: BasicAtom) = absorber match {
     case Some(atom) => atom
     case _ => default
-  }
-	
-  /**
-   * Apply this property specification to the given atom.  If the provided
-   * atom is an atom sequence, then this will override the properties of the
-   * atom sequence.
-   */
-  def doApply(rhs: BasicAtom, bypass: Boolean) = {
-  	rhs match {
-  		/* A Note to Maintainers
-  		 * Remember that for the "and" method the properties of the second
-  		 * override those of the first.
-  		 */
-  		case ap: AlgProp =>
-  		  (ap and this)
-  		case as: AtomSeq => 
-  			AtomSeq(as.props and this, as.atoms)
-  		case _ => 
-  			SimpleApply(this, rhs)
-  	}
   }
   
   def rewrite(binds: Bindings): (AlgProp, Boolean) = {

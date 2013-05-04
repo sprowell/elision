@@ -45,6 +45,8 @@ import ornl.elision.util.Debugger
 import ornl.elision.util.OmitSeq.fromIndexedSeq
 import scala.annotation.tailrec
 import ornl.elision.core.AtomSeq
+import ornl.elision.context.Context
+import ornl.elision.context.ApplyHandler
 
 /**
  * Match two sequences, where the elements of the second sequence can be
@@ -58,14 +60,15 @@ object AMatcher {
    * provides better performance and results in more obvious (and expected)
    * matching in many cases.
    * 
-   * @param plist	The pattern list.
-   * @param slist	The subject list.
-   * @param binds	Bindings that must be honored in any match.
-   * @param op		An optional operator to apply to sublists.
+   * @param plist	  The pattern list.
+   * @param slist	  The subject list.
+   * @param context The context needed to build atoms.
+   * @param binds	  Bindings that must be honored in any match.
+   * @param op		  An optional operator to apply to sublists.
    * @return	The match outcome.
    */
-  def tryMatch(plist: AtomSeq, slist: AtomSeq, binds: Bindings,
-               op: Option[OperatorRef]): Outcome = {
+  def tryMatch(plist: AtomSeq, slist: AtomSeq, context: Context,
+      binds: Bindings, op: Option[OperatorRef]): Outcome = {
     // Check the length.
     if (plist.atoms.length > slist.atoms.length)
       return Fail("More patterns than subjects, so no match is possible.",
@@ -85,7 +88,7 @@ object AMatcher {
       
     // If there are the same number, then this is a simple case of matching.
     if (plist.atoms.length == slist.atoms.length)
-      return SequenceMatcher.tryMatch(plist.atoms, slist.atoms, binds)
+      return SequenceMatcher.tryMatch(plist.atoms, slist.atoms, context, binds)
       
     // If there is exactly one pattern then match it immediately.
     if (plist.atoms.length == 1) {
@@ -93,17 +96,18 @@ object AMatcher {
       // the single pattern against the result.
       return Matcher(plist.atoms(0), op match {
         case Some(opref) =>
-          Apply(opref, slist)
+          ApplyHandler(opref, slist, context)
+
         case None =>
           slist
-      }, binds)
+      }, context, binds)
     }
       
     // We need to group the atoms so there is the same number of patterns and
     // subjects.  If there are N subjects and M patterns (with M < N per the
     // above checks) then we essentially insert M-1 markers between elements
     // of the N subjects.  Get it?  We use a special iterator for that.
-    val iter = new AMatchIterator(plist, slist, binds, op)
+    val iter = new AMatchIterator(plist, slist, context, binds, op)
     if (iter.hasNext) return Many(iter)
     else Fail("The lists do not match.", plist, slist)
   }
@@ -184,13 +188,18 @@ object AMatcher {
    * 
    * @param patterns	The patterns.
    * @param subjects	The subjects.
+   * @param context   The context needed to build atoms.
    * @param binds			Bindings to honor.
    */
-  private class AMatchIterator(patterns: AtomSeq, subjects: AtomSeq,
-      binds: Bindings, op: Option[OperatorRef]) extends MatchIterator {
+  private class AMatchIterator(
+      patterns: AtomSeq,
+      subjects: AtomSeq,
+      context: Context,
+      binds: Bindings,
+      op: Option[OperatorRef]) extends MatchIterator {
     
     /** An iterator over all groupings of the subjects. */
-    private val _groups = new GroupingIterator(patterns, subjects, op)
+    private val _groups = new GroupingIterator(patterns, subjects, context, op)
     
     /**
      * Find the next match.  At the end of running this method either we
@@ -206,16 +215,19 @@ object AMatcher {
       } else {
         _local = null
         if (_groups.hasNext) {
-          SequenceMatcher.tryMatch(patterns.atoms, _groups.next, binds) match {
+          SequenceMatcher.tryMatch(patterns.atoms, _groups.next, context,
+              binds) match {
             case fail:Fail =>
               // We ignore this case.  We only fail if we exhaust all attempts.
               Debugger("matching", fail.toString)
               findNext
+              
             case Match(binds1) =>
               // This case we care about.  Save the bindings as the current match.
               _current = (binds ++ binds1).set(binds1.patterns.getOrElse(patterns),
                   binds1.subjects.getOrElse(subjects))
               Debugger("matching", "A Found.")
+              
             case Many(iter) =>
               // We've potentially found many matches.  We save this as a local
               // iterator and then use it in the future.

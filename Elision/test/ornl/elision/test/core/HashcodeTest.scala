@@ -73,7 +73,7 @@ class HashcodeTest extends AssertionsForJUnit {
       val atom = f(i)
       
       rt(i) = System.currentTimeMillis
-      atom.hashCode
+      val hc = atom.hashCode
       rt(i) = System.currentTimeMillis - rt(i)
     }
     println("Avg time to compute hashCode: " + rt.reduceLeft(_ + _) / rt.length + "(ms)") 
@@ -84,7 +84,7 @@ class HashcodeTest extends AssertionsForJUnit {
       val atom = f(i)
       
       gt(i) = System.currentTimeMillis
-      atom.otherHashCode
+      val hc = atom.otherHashCode
       gt(i) = System.currentTimeMillis - gt(i)
     }
     println("Avg time to compute otherHashCode: " + gt.reduceLeft(_ + _) / gt.length + "(ms)") 

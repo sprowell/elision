@@ -51,9 +51,7 @@ import ornl.elision.core.NONE
 import ornl.elision.core.NamedRootType
 import ornl.elision.core.OPREF
 import ornl.elision.core.OperatorRef
-import ornl.elision.core.RSREF
 import ornl.elision.core.RULETYPE
-import ornl.elision.core.RulesetRef
 import ornl.elision.core.STRATEGY
 import ornl.elision.core.STRING
 import ornl.elision.core.SYMBOL
@@ -96,7 +94,6 @@ object ElisionGenerator {
         case INTEGER => buf.append("INTEGER")
         case NONE => buf.append("NONE")
         case OPREF => buf.append("OPREF")
-        case RSREF => buf.append("RSREF")
         case RULETYPE => buf.append("RULETYPE")
         case STRATEGY => buf.append("STRATEGY")
         case STRING => buf.append("STRING")
@@ -320,9 +317,6 @@ object ElisionGenerator {
           apply(left, buf.append("("), limit-1)
           apply(right, buf.append(" -> "), limit-1).append(")")
         }
-        
-      case RulesetRef(name) =>
-        buf.append(toESymbol(name)).append(":RSREF")
         
       case vari: Variable =>
         buf.append(vari.prefix)
