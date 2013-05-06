@@ -226,33 +226,6 @@ abstract class BasicAtom(val loc: Loc = Loc.internal) extends HasOtherHash {
   lazy val spouse = BasicAtom.buildSpouse(this)
 
   /**
-   * Get all the variables referenced in an atom. Override this if the
-   * atom can actually contain variables.
-   * 
-   * The set uses hash codes to distinguish elements, and variables and
-   * metavariables have distinct hash codes, so `$``x` and `$``$``x` will
-   * both be included - if present - in the result.
-   * 
-   * @return A set of the variables referenced in the atom, if it has
-   * any. 
-   */
-  def getVariables() : Option[MutableHashSet[BasicAtom]] = {
-    return None
-  }
-
-  /**
-   * Get all the named operators referenced in an atom. Override this if the
-   * atom can actually contain operator expressions.
-   *
-   * @param opNames The names of the operators to look for.
-   * @return A set of the operators referenced in the atom, if it has
-   * any. 
-   */
-  def getOperators(opNames : MutableHashSet[String]) : Option[MutableHashSet[BasicAtom]] = {
-    return None
-  }
-
-  /**
    * Rewrite this atom with the specified bindings.  If types are involved, it
    * is expected that overriding types will handle rewriting those, as well.
    * 
@@ -296,7 +269,7 @@ abstract class BasicAtom(val loc: Loc = Loc.internal) extends HasOtherHash {
    * @return  The appendable.
    */
   def toParseString(app: Appendable, limit: Int = -1) =
-    Dialect.serialize('scala, new StringBuffer(), this, limit)
+    Dialect.serialize('elision, new StringBuffer(), this, limit)
     
   /**
    * Generate a parseable string from this atom.
@@ -334,6 +307,8 @@ object BasicAtom {
    * This field specifies a closure to create the spouse object.  The
    * basic atom constructor calls this closure, passing the basic atom
    * itself, and caching the returned object.
+   * 
+   * The default implementation of this simply returns the object itself.
    */
   var buildSpouse: (BasicAtom) => T forSome {type T <: AnyRef} =
     ((obj: BasicAtom) => obj)

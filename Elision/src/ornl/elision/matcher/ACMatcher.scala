@@ -48,7 +48,7 @@ import ornl.elision.core.knownExecutor
 import ornl.elision.util.Debugger
 import scala.annotation.tailrec
 import ornl.elision.context.Context
-import ornl.elision.context.ApplyHandler
+import ornl.elision.context.ApplyBuilder
 import ornl.elision.context.Context
 
 /**

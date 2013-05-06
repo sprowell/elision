@@ -92,7 +92,7 @@ class ApplyData(val op: SymbolicOperator, val args: AtomSeq,
   val console = context.console
 
   /** Just preserve the apply as it is. */
-  def as_is = ApplyHandler(op, args, context, true)
+  def as_is = ApplyBuilder(op, args, context, true)
 }
 
 /**
@@ -365,11 +365,11 @@ object OperatorApplyHandler {
     val done = op.cases.exists {
       _ match {
         case rew: Strategy =>
-          val pair = ApplyHandler.test(rew, arg, context)
+          val pair = ApplyBuilder.test(rew, arg, context)
           result = Some(pair._1)
           pair._2
         case app: Applicable =>
-          result = Some(ApplyHandler(app, arg, context, bypass))
+          result = Some(ApplyBuilder(app, arg, context, bypass))
           true
         case atom =>
           result = Some(atom)

@@ -37,6 +37,7 @@
 package ornl.elision.core
 
 import ornl.elision.util.ElisionException
+import ornl.elision.util.hashify
 import ornl.elision.util.other_hashify
 import ornl.elision.util.Loc
 
@@ -51,6 +52,48 @@ import ornl.elision.util.Loc
  */
 class IllegalPropertiesSpecification(loc: Loc, msg: String)
 extends ElisionException(loc, msg)
+
+/**
+ * Simplified creation and matching for algebraic properties objects.
+ */
+object AlgProp {
+  /**
+   * Create an algebraic properties object.
+   * 
+   * @param loc           Location of this properties object declaration.
+   * @param associative   Optional associativity.  Default is none.
+   * @param commutative   Optional commutativity.  Default is none.
+   * @param idempotent    Optional idempotency.  Default is none.
+   * @param absorber      Optional absorber.  Default is none.
+   * @param identity      Optional identity.  Default is none.
+   * @return  The new algebraic properties object.
+   */
+  def apply(loc: Loc,
+      associative: Option[BasicAtom] = None,
+      commutative: Option[BasicAtom] = None,
+      idempotent: Option[BasicAtom] = None,
+      absorber: Option[BasicAtom] = None,
+      identity: Option[BasicAtom] = None)(
+      implicit eval: Evaluator) = {
+    // Having the value ANY is really the same as being unspecified, so
+    // we correct that now.
+    def adjust(opt: Option[BasicAtom]) = opt match {
+      case Some(ANY) => None
+      case _ => opt
+    }
+    eval.newAlgProp(loc, adjust(associative), adjust(commutative),
+        adjust(idempotent), adjust(absorber), adjust(identity))
+  }
+  
+  /**
+   * Pull apart an algebraic properties object.
+   * 
+   * @param ap  The algebraic properties object.
+   * @return  Associativity, commutativity, idempotency, absorber, and identity.
+   */
+  def unapply(ap: AlgProp) = Some((ap.associative, ap.commutative,
+      ap.idempotent, ap.absorber, ap.identity))
+}
 
 /**
  * Encapsulate the algebraic properties ascribed to some object.
@@ -101,7 +144,7 @@ extends ElisionException(loc, msg)
  * @param absorber			Optional absorber.  Default is none.
  * @param identity			Optional identity.  Default is none.
  */
-class AlgProp protected[core] (
+class AlgProp protected[elision] (
     loc: Loc,
     val associative: Option[BasicAtom] = None,
     val commutative: Option[BasicAtom] = None,
@@ -110,26 +153,14 @@ class AlgProp protected[core] (
     val identity: Option[BasicAtom] = None)
     extends BasicAtom(loc) with Applicable {
   
-  /**
-   * Provide a hash code for an optional atom.
-   * 
-   * @param atom    The optional atom.
-   * @return  The hash code.
-   */
-  private def _codify(atom: Option[BasicAtom]) = atom match {
-    case None => None.hashCode
-    case Some(atom) => atom.hashCode
-  }
+  // Put all the properties in a list for quick access.
+  private val _plist =
+    List(associative, commutative, idempotent, absorber, identity)
   
   lazy val otherHashCode =
     (this.toString).foldLeft(BigInt(0))(other_hashify)+1
-    
-  override lazy val hashCode =
-    (((((_codify(associative) * 31) +
-    _codify(commutative) * 31) +
-    _codify(idempotent) * 31) +
-    _codify(absorber) * 31) +
-    _codify(identity) * 31)
+
+  override lazy val hashCode = _plist.foldLeft(0)(hashify)
   
   // Type check the Boolean properties.
   private def _isNotBool(opt: Option[BasicAtom]) = opt match {
@@ -155,7 +186,7 @@ class AlgProp protected[core] (
         "Idempotency value must be a Boolean, but the provided value was: " +
         idempotent.get.toParseString)
   
-  // If we are not associative, we cannot have idempotency, identities, or
+  // Without associativity, there cannot be idempotency, identities, or
   // absorbers.
   if (!isA(true)) {
     if (isI(false))
@@ -169,9 +200,7 @@ class AlgProp protected[core] (
           "An identity requires associativity.")
   }
   
-  private val _plist =
-    List(associative, commutative, idempotent, absorber, identity)
-  
+  // All algebraic properties have type ^TYPE.
   val theType = TypeUniverse
   
   lazy val depth = _plist.foldLeft(0) {
@@ -181,24 +210,11 @@ class AlgProp protected[core] (
     })
   } + 1
   
-  lazy val isTerm = _plist.foldLeft(true)(_ && _.getOrElse(Literal.TRUE).isTerm)
+  lazy val isTerm =
+    _plist.foldLeft(true)(_ && _.getOrElse(Literal.TRUE).isTerm)
   
-  lazy val isConstant = (associative match {
-    case None => true
-    case Some(atom) => atom.isConstant
-  }) && (commutative match {
-    case None => true
-    case Some(atom) => atom.isConstant
-  }) && (idempotent match {
-    case None => true
-    case Some(atom) => atom.isConstant
-  }) && (absorber match {
-    case None => true
-    case Some(atom) => atom.isConstant
-  }) && (identity match {
-    case None => true
-    case Some(atom) => atom.isConstant
-  })
+  lazy val isConstant =
+    _plist.foldLeft(true)(_ && _.getOrElse(Literal.TRUE).isConstant)
   
   lazy val deBruijnIndex =
     _plist.foldLeft(0)(_ max _.getOrElse(Literal.TRUE).deBruijnIndex)
@@ -268,14 +284,13 @@ class AlgProp protected[core] (
         }
       }
     }
-    
     val assoc = _rewrite(associative)
     val commu = _rewrite(commutative)
     val idemp = _rewrite(idempotent)
     val absor = _rewrite(absorber)
     val ident = _rewrite(identity)
     if (assoc._2 || commu._2 || idemp._2 || absor._2 || ident._2) {
-      (AlgProp(loc, assoc._1, commu._1, idemp._1, absor._1, ident._1), true)
+      (new AlgProp(loc, assoc._1, commu._1, idemp._1, absor._1, ident._1), true)
     } else {
       (this, false)
     }
@@ -290,7 +305,6 @@ class AlgProp protected[core] (
         val (newatom, flag) = atom.replace(map)
         (Some(newatom), flag)
     }
-    
     map.get(this) match {
       case Some(atom) =>
         (atom, true)
@@ -302,7 +316,7 @@ class AlgProp protected[core] (
         val (newB, flagB) = _replace(absorber)
         val (newD, flagD) = _replace(identity)
         if (flagA || flagC || flagI || flagB || flagD) {
-          (AlgProp(loc, newA, newC, newI, newB, newD), true)
+          (new AlgProp(loc, newA, newC, newI, newB, newD), true)
         } else {
           (this, false)
         }
@@ -332,7 +346,7 @@ class AlgProp protected[core] (
    * @return	A new algebraic properties list.
    */
   def and(other: AlgProp) = {
-    AlgProp(loc,
+    new AlgProp(loc,
       joinatoms(associative, other.associative),
       joinatoms(commutative, other.commutative),
       joinatoms(idempotent, other.idempotent),
@@ -358,7 +372,8 @@ class AlgProp protected[core] (
    * @return	The new algebraic properties list.
    */
   def unary_! = {
-    AlgProp(loc, invert(associative), invert(commutative), invert(idempotent))
+    new AlgProp(loc, invert(associative), invert(commutative),
+        invert(idempotent))
   }
   
   /**
@@ -414,47 +429,6 @@ class AlgProp protected[core] (
     if (list.length == 0) "no properties"
     else list.mkString(" and ")
   }
-}
-
-/**
- * Simplified creation and matching for algebraic properties objects.
- */
-object AlgProp {
-  /**
-   * Create an algebraic properties object.
-   * 
-   * @param loc           Location of this properties object declaration.
-	 * @param associative		Optional associativity.  Default is none.
-	 * @param commutative		Optional commutativity.  Default is none.
-	 * @param idempotent		Optional idempotency.  Default is none.
-	 * @param absorber			Optional absorber.  Default is none.
-	 * @param identity			Optional identity.  Default is none.
-	 * @return	The new algebraic properties object.
-   */
-  def apply(loc: Loc,
-      associative: Option[BasicAtom] = None,
-      commutative: Option[BasicAtom] = None,
-      idempotent: Option[BasicAtom] = None,
-      absorber: Option[BasicAtom] = None,
-      identity: Option[BasicAtom] = None) = {
-    // Having the value ANY is really the same as being unspecified, so
-    // we correct that now.
-    def adjust(opt: Option[BasicAtom]) = opt match {
-      case Some(ANY) => None
-      case _ => opt
-    }
-    new AlgProp(loc, adjust(associative), adjust(commutative),
-        adjust(idempotent), adjust(absorber), adjust(identity))
-  }
-  
-  /**
-   * Pull apart an algebraic properties object.
-   * 
-   * @param ap	The algebraic properties object.
-   * @return	Associativity, commutativity, idempotency, absorber, and identity.
-   */
-  def unapply(ap: AlgProp) = Some((ap.associative, ap.commutative,
-      ap.idempotent, ap.absorber, ap.identity))
 }
 
 /** No properties. */

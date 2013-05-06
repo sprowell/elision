@@ -565,8 +565,8 @@ private object Completor {
     var newpatternlist = as.atoms :+ right
     var newrewritelist = OmitSeq[BasicAtom](rewrite) :+ right
     val newRule = RewriteRule(rule.loc,
-        ApplyHandler(op, AtomSeq(props, newpatternlist), context),
-        ApplyHandler(op, AtomSeq(props, newrewritelist), context),
+        ApplyBuilder(op, AtomSeq(props, newpatternlist), context),
+        ApplyBuilder(op, AtomSeq(props, newrewritelist), context),
         rule.guards,
         rule.rulesets,
         true)
@@ -586,16 +586,16 @@ private object Completor {
     newpatternlist = left +: as.atoms
     newrewritelist = left +: OmitSeq[BasicAtom](rewrite)
     list :+= RewriteRule(rule.loc,
-        ApplyHandler(op, AtomSeq(props, newpatternlist), context),
-        ApplyHandler(op, AtomSeq(props, newrewritelist), context),
+        ApplyBuilder(op, AtomSeq(props, newpatternlist), context),
+        ApplyBuilder(op, AtomSeq(props, newrewritelist), context),
         rule.guards, rule.rulesets, true)
         
     // And again add the argument on the right-hand side.
     newpatternlist = newpatternlist :+ right
     newrewritelist = newrewritelist :+ right
     list :+= RewriteRule(rule.loc,
-        ApplyHandler(op, AtomSeq(props, newpatternlist), context),
-        ApplyHandler(op, AtomSeq(props, newrewritelist), context),
+        ApplyBuilder(op, AtomSeq(props, newpatternlist), context),
+        ApplyBuilder(op, AtomSeq(props, newrewritelist), context),
         rule.guards, rule.rulesets, true)
         
     // Done.

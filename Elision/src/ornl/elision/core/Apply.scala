@@ -42,6 +42,20 @@ import scala.collection.mutable.HashSet
 import scala.collection.mutable.Stack
 
 /**
+ * Provide construction and extraction for an `Apply`.  This is the correct
+ * place to come to make an application object.
+ */
+object Apply {
+  /**
+   * Extract the components of an apply and return them.
+   * 
+   * @param apply The apply.
+   * @return  A pair consisting of the operator and argument, in order.
+   */
+  def unapply(apply: Apply) = Some(apply.op, apply.arg)
+}
+
+/**
  * The common root for all application atoms.  This class represents the
  * "applicative dot."
  * 
@@ -101,20 +115,6 @@ abstract class Apply(val op: BasicAtom, val arg: BasicAtom) extends BasicAtom {
         }
     }
   }
-}
-
-/**
- * Provide construction and extraction for an `Apply`.  This is the correct
- * place to come to make an application object.
- */
-object Apply {
-  /**
-   * Extract the components of an apply and return them.
-   * 
-   * @param apply	The apply.
-   * @return	A pair consisting of the operator and argument, in order.
-   */
-  def unapply(apply: Apply) = Some(apply.op, apply.arg)
 }
 
 /**

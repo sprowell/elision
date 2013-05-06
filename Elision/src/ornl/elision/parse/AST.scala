@@ -66,7 +66,7 @@ import ornl.elision.core.Variable
 import ornl.elision.core.boolToLiteral
 import ornl.elision.core.wrapBindingsAtom
 import ornl.elision.util.Loc
-import ornl.elision.context.ApplyHandler
+import ornl.elision.context.ApplyBuilder
 
 
 /**

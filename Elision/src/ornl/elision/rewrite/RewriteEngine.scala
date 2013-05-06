@@ -44,7 +44,7 @@ import scala.math.BigInt.long2bigInt
 import ornl.elision.context.Context
 import ornl.elision.context.RuleApplyHandler
 import ornl.elision.core.Bindings
-import ornl.elision.context.ApplyHandler
+import ornl.elision.context.ApplyBuilder
 
 /**
  * Hold defaults for all rewrite engine instances.

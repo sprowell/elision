@@ -27,17 +27,30 @@
  * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package ornl.elision.core
+package ornl.elision.context
 
 import ornl.elision.util.Loc
+import ornl.elision.core.BasicAtom
+import ornl.elision.core.AlgProp
+import ornl.elision.core.Literal
+import ornl.elision.core.AtomSeq
+import ornl.elision.core.Lambda
+import ornl.elision.core.SymbolLiteral
+import ornl.elision.core.StringLiteral
+import ornl.elision.core.IntegerLiteral
+import ornl.elision.core.BitStringLiteral
+import ornl.elision.core.FloatLiteral
+import ornl.elision.core.MapPair
+import ornl.elision.core.MatchAtom
+import ornl.elision.core.SpecialForm
+import ornl.elision.core.Variable
+import ornl.elision.core.TermVariable
+import ornl.elision.core.MetaVariable
 
 /**
- * An evaluator is responsible for evaluating atoms just prior to their
- * construction.  This avoids creating an atom and then immediately
- * discarding it because of its immediate evaluation.  To use this extend
- * it and override any methods that need evaluation.
+ * Construct atoms, first applying any evaluation logic.
  */
-abstract class Evaluator {
+abstract class Builder {
 
   /**
    * Make a new algebraic property specification.
@@ -52,7 +65,7 @@ abstract class Evaluator {
    */
   def newAlgProp(loc: Loc, associative: Option[BasicAtom],
       commutative: Option[BasicAtom], idempotent: Option[BasicAtom],
-      absorber: Option[BasicAtom], identity: Option[BasicAtom]) = {
+      absorber: Option[BasicAtom], identity: Option[BasicAtom]): AlgProp = {
     new AlgProp(loc, associative, commutative, idempotent, absorber, identity)
   }
   
@@ -64,9 +77,7 @@ abstract class Evaluator {
    * @param argument      The argument.
    * @return  The result.
    */
-  def newApply(loc: Loc, operator: BasicAtom, argument: BasicAtom) = {
-    
-  }
+  def newApply(loc: Loc, operator: BasicAtom, argument: BasicAtom): BasicAtom
   
   /**
    * Make a new atom collection.
@@ -76,9 +87,7 @@ abstract class Evaluator {
    * @param atoms         The atoms in the collection.
    * @return  The new collection.
    */
-  def newAtomSeq(loc: Loc, properties: AlgProp, atoms: Seq[BasicAtom]) = {
-    
-  }
+  def newAtomSeq(loc: Loc, properties: AlgProp, atoms: Seq[BasicAtom]): AtomSeq
   
   /**
    * Make a new lambda.
@@ -88,9 +97,7 @@ abstract class Evaluator {
    * @param body          The lambda body.
    * @return  The new lambda.
    */
-  def newLambda(loc: Loc, parameter: Variable, body: BasicAtom) = {
-    
-  }
+  def newLambda(loc: Loc, parameter: Variable, body: BasicAtom): Lambda
   
   /**
    * Make a new symbol literal.
@@ -100,9 +107,7 @@ abstract class Evaluator {
    * @param value         The value.
    * @return  The new literal.
    */
-  def newLiteral(loc: Loc, typ: BasicAtom, value: Symbol) = {
-    
-  }
+  def newLiteral(loc: Loc, typ: BasicAtom, value: Symbol): SymbolLiteral
   
   /**
    * Make a new string literal.
@@ -112,9 +117,7 @@ abstract class Evaluator {
    * @param value         The value.
    * @return  The new literal.
    */
-  def newLiteral(loc: Loc, typ: BasicAtom, value: String) = {
-    
-  }
+  def newLiteral(loc: Loc, typ: BasicAtom, value: String): StringLiteral
   
   /**
    * Make a new integer literal.
@@ -124,9 +127,7 @@ abstract class Evaluator {
    * @param value         The value.
    * @return  The new literal.
    */
-  def newLiteral(loc: Loc, typ: BasicAtom, value: BigInt) = {
-    
-  }
+  def newLiteral(loc: Loc, typ: BasicAtom, value: BigInt): IntegerLiteral
   
   /**
    * Make a new bit string literal.
@@ -137,9 +138,8 @@ abstract class Evaluator {
    * @param length        The width of the bit field.
    * @return  The new literal.
    */
-  def newLiteral(loc: Loc, typ: BasicAtom, value: BigInt, length: Int) = {
-    
-  }
+  def newLiteral(loc: Loc, typ: BasicAtom, value: BigInt,
+      length: Int): BitStringLiteral
   
   /**
    * Make a new symbol literal.
@@ -152,9 +152,7 @@ abstract class Evaluator {
    * @return  The new literal.
    */
   def newLiteral(loc: Loc, typ: BasicAtom, significand: BigInt, exponent: Int,
-      radix: Int) = {
-    
-  }
+      radix: Int): FloatLiteral
   
   /**
    * Make a new map pair.
@@ -164,9 +162,7 @@ abstract class Evaluator {
    * @param rewrite       The rewrite atom.
    * @return  The new map pair.
    */
-  def newMapPair(loc: Loc, pattern: BasicAtom, rewrite: BasicAtom) = {
-    
-  }
+  def newMapPair(loc: Loc, pattern: BasicAtom, rewrite: BasicAtom): MapPair
   
   /**
    * Make a new match atom.
@@ -175,9 +171,7 @@ abstract class Evaluator {
    * @param pattern       The pattern to match.
    * @return  The new match atom.
    */
-  def newMatchAtom(loc: Loc, pattern: BasicAtom) = {
-    
-  }
+  def newMatchAtom(loc: Loc, pattern: BasicAtom): MatchAtom
   
   /**
    * Make a new special form.
@@ -187,9 +181,7 @@ abstract class Evaluator {
    * @param content       The content.
    * @return  The new special form.
    */
-  def newSpecialForm(loc: Loc, tag: BasicAtom, content: BasicAtom) = {
-    
-  }
+  def newSpecialForm(loc: Loc, tag: BasicAtom, content: BasicAtom): SpecialForm
   
   /**
    * Make a new term variable.
@@ -205,8 +197,8 @@ abstract class Evaluator {
    */
   def newTermVariable(loc: Loc, typ: BasicAtom, name: String,
       guard: BasicAtom = Literal.TRUE, labels: Set[String] = Set(),
-      byname: Boolean = false) = {
-    
+      byname: Boolean = false): TermVariable = {
+    new TermVariable(loc, typ, name, guard, labels, byname)
   }
   
   /**
@@ -223,7 +215,7 @@ abstract class Evaluator {
    */
   def newMetaVariable(loc: Loc, typ: BasicAtom, name: String,
       guard: BasicAtom = Literal.TRUE, labels: Set[String] = Set(),
-      byname: Boolean = false) = {
-    
+      byname: Boolean = false): MetaVariable = {
+    new MetaVariable(loc, typ, name, guard, labels, byname)
   }
 }

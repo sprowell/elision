@@ -78,7 +78,7 @@ extends ElisionException(loc, msg)
  * This object provides the rules to interpret the application based on the
  * choice of atoms.
  */
-object ApplyHandler {
+object ApplyBuilder {
 
   /**
    * Turn a pair into a binding to be returned from a strategy.  This turns
@@ -88,7 +88,7 @@ object ApplyHandler {
    * @param pair    The pair of atom and flag.
    * @return  The binding of atom and flag.
    */
-  def pair2bind(pair: (BasicAtom, Boolean)): BindingsAtom = {
+  private def pair2bind(pair: (BasicAtom, Boolean)): BindingsAtom = {
     Bindings("atom" -> pair._1, "flag" -> Literal(pair._2))
   }
   
@@ -97,17 +97,17 @@ object ApplyHandler {
    * 
    * @param strat     The strategy to apply.
    * @param arg       The argument.
-   * @param context   The context needed to build atoms.
+   * @param builder   The builder needed to build atoms.
    * @return  The pair of result atom and flag.
    */
-  def test(strat: Strategy, arg: BasicAtom,
-      context: Context): (BasicAtom, Boolean) = {
+  private def test(strat: Strategy, arg: BasicAtom,
+      builder: Builder): (BasicAtom, Boolean) = {
     strat match {
       case op_mappair: MapPair =>
         // Handle the case of a map pair.  A map pair is a primitive sort of
         // rewrite rule that consists of a pattern and a rewrite, and nothing
         // else.
-        Matcher(op_mappair.left, arg, context, Bindings(), None) match {
+        Matcher(op_mappair.left, arg, builder, Bindings(), None) match {
           case file:Fail => 
             (arg, false)
             
@@ -121,7 +121,7 @@ object ApplyHandler {
       case op_rule: RewriteRule =>
         // A rewrite rule generalizes both the match atom and the map pair
         // as a package (a special form) to perform controlled rewriting.
-        RuleApplyHandler(op_rule, arg, Bindings(), None, context)
+        RuleApplyHandler(op_rule, arg, Bindings(), None, builder)
         
       case c =>
         // We come here if we find an unsupported strategy class.
@@ -135,11 +135,11 @@ object ApplyHandler {
    * 
    * @param op        The operator.
    * @param arg       The argument.
-   * @param context   The context necessary to create atoms.
+   * @param builder   The builder necessary to create atoms.
    * @param bypass    If true, bypass native handlers.
    * @return  The result of applying the operator to the argument.
    */
-  def apply(op: BasicAtom, arg: BasicAtom, context: Context,
+  def apply(op: BasicAtom, arg: BasicAtom, builder: Builder,
       bypass: Boolean = false): BasicAtom = {
     op match {
         case StringLiteral(typ, str) if arg.isInstanceOf[StringLiteral] =>
@@ -185,7 +185,7 @@ object ApplyHandler {
           // Make it possible to check types by matching the variable against the
           // argument instead of just binding.  For pure binding without checking
           // types, use a bind.
-          Matcher(op_lambda.lvar, arg, context, Bindings(), None) match {
+          Matcher(op_lambda.lvar, arg, builder, Bindings(), None) match {
             case fail:Fail =>
               throw new LambdaVariableMismatchException(arg.loc,
                   "Lambda argument does not match parameter: " + fail.theReason)
@@ -205,18 +205,18 @@ object ApplyHandler {
         
       case op_strat: Strategy =>
         // Handle a strategy.
-        pair2bind(test(op_strat, arg, context))
+        pair2bind(test(op_strat, arg, builder))
         
       case op_opref: OperatorRef =>
         // An operator reference holds an operator as a "closure."  We need to
         // extract the operator and then apply it.
-        apply(op_opref.operator, arg, context, bypass)
+        apply(op_opref.operator, arg, builder, bypass)
         
       case op_op: Operator =>
         // An operator can be applied to another atom, potentially resulting
         // in a new atom being instantiated.
         try {
-          OperatorApplyHandler(op_op, arg, context, bypass)
+          OperatorApplyHandler(op_op, arg, builder, bypass)
         } catch {
           case ex: StackOverflowError =>
             // Trapped unbounded recursion... probably.

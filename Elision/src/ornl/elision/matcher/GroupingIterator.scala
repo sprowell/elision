@@ -42,7 +42,7 @@ import ornl.elision.core.BasicAtom
 import ornl.elision.core.OperatorRef
 import ornl.elision.util.OmitSeq
 import ornl.elision.util.OmitSeq.fromIndexedSeq
-import ornl.elision.context.ApplyHandler
+import ornl.elision.context.ApplyBuilder
 import ornl.elision.context.Context
 
 /**

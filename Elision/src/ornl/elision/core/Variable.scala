@@ -43,12 +43,105 @@ import ornl.elision.util.other_hashify
 import ornl.elision.matcher.Outcome
 import ornl.elision.matcher.Fail
 import ornl.elision.matcher.Match
+import ornl.elision.util.Loc
+
+/**
+ * Common base class for both term- and meta-variables.
+ * 
+ * @param loc     Location of the atom's declaration.
+ * @param typ			The variable type.
+ * @param name		The variable name.
+ * @param guard		The variable's guard.  Default is true.
+ * @param labels	Labels for this variable.  Default is none.
+ * @param byName  If true, this is a "by name" variable.  Default is false.
+ */
+abstract class Variable(loc: Loc, typ: BasicAtom, val name: String,
+    val guard: BasicAtom = Literal.TRUE,
+    val labels: Set[String] = Set[String](),
+    val byName: Boolean = false) extends BasicAtom(loc) {
+  /** The prefix for this variable. */
+  val prefix: String
+
+  /** The variable's type must be given. */
+  val theType = typ
+  
+  /** The de Bruijn index is zero, unless overridden. */
+  val deBruijnIndex = 0
+  
+  /** Variables are not constant. */
+  val isConstant = false
+  
+  /** The depth is zero, regardless of the type. */
+  val depth = 0
+  
+  /** By default, variables can be bound. */
+  override val isBindable = true
+  
+  /**
+   * Generate a term variable with the same properties as this variable,
+   * including type, guards, and labels.  If this is already a term variable,
+   * then it is simply returned as-is.
+   * 
+   * @return  A term variable.
+   */
+  def asTermVariable: TermVariable
+  
+  /**
+   * Generate a metavariable with the same properties as this variable,
+   * including type, guards, and labels.  If this is already a metavariable,
+   * then it is simply returned as-is.
+   * 
+   * @return  A metavariable.
+   */
+  def asMetaVariable: MetaVariable
+  
+  override def equals(varx: Any) = varx match {
+    case ovar:Variable =>
+      feq(ovar, this,
+          ovar.theType == theType &&
+          ovar.name == name &&
+          ovar.guard == guard &&
+          ovar.labels == labels &&
+          ovar.isTerm == isTerm)
+    		
+    case _ =>
+      false
+  }
+}
+
+/**
+ * Companion object to make and match metavariables.
+ */
+object TermVariable {
+  /**
+   * Make a new term variable instance.
+   *
+   * @param loc     Location of the atom's declaration. 
+   * @param typ     The variable type.
+   * @param name    The variable name.
+   * @param guard   The variable's guard.  Default is true.
+   * @param labels  Labels for this variable.  Default is none.
+   * @param byName  If true, this is a "by name" variable.  Default is false.
+   */
+  def apply(loc: Loc, typ: BasicAtom, name: String,
+      guard: BasicAtom = Literal.TRUE, labels: Set[String] = Set[String](),
+      byName: Boolean) = new TermVariable(loc, typ, name, guard, labels, byName)
+  
+  /**
+   * Extract the parts of a term variable.
+   * 
+   * @param vx  The variable.
+   * @return  The type, name, guard, labels, and by-name status.
+   */
+  def unapply(vx: TermVariable) = Some((vx.theType, vx.name, vx.guard,
+      vx.labels, vx.byName))
+}
 
 /**
  * Represent a variable.
  * 
  * == Structure and Syntax ==
- * A variable is indicated with a leading dollar sign (`$`) followed by a
+ * A term variable is indicated with a leading dollar sign (`$`) followed by a
  * valid symbol.  So the following are valid variables:
  * - `$``x`
  * - `$``Fred51_2`
@@ -98,38 +191,45 @@ import ornl.elision.matcher.Match
  * problematic, as the guards are used to determine whether a match succeeds!
  * Labels are also not matched, as they serve a different semantic purpose.
  * 
- * @param typ			The variable type.
- * @param name		The variable name.
- * @param guard		The variable's guard.  Default is true.
- * @param labels	Labels for this variable.  Default is none.
+ * @param loc     Location of the atom's declaration.
+ * @param typ     The variable type.
+ * @param name    The variable name.
+ * @param guard   The variable's guard.  Default is true.
+ * @param labels  Labels for this variable.  Default is none.
  * @param byName  If true, this is a "by name" variable.  Default is false.
  */
-class Variable(typ: BasicAtom, val name: String,
-    val guard: BasicAtom = Literal.TRUE,
-    val labels: Set[String] = Set[String](),
-    val byName: Boolean = false) extends BasicAtom {
-  /** The prefix for this variable. */
-  val prefix = "$"
+class TermVariable protected[elision] (
+    loc: Loc,
+    typ: BasicAtom,
+    name: String,
+    guard: BasicAtom = Literal.TRUE,
+    labels: Set[String] = Set[String](),
+    byName: Boolean = false)
+    extends Variable(loc, typ, name, guard, labels) {
+  // This variable is a term.
+  override val isTerm = true
+  
+  // Use the term variable prefix.
+  override val prefix = "$"
     
-  /** This variable is a term. */
-  val isTerm = true
-  val theType = typ
-  val deBruijnIndex = 0
-  /** Variables are not constant. */
-  val isConstant = false
-  val depth = 0
-  /** By default, variables can be bound. */
-  override val isBindable = true
-
+  // Hash codes are based on the type and name.
+  override lazy val hashCode = typ.hashCode * 31 + name.hashCode
+  override lazy val otherHashCode = typ.otherHashCode +
+    8191*(name.toString).foldLeft(BigInt(0))(other_hashify)+1
+    
   /**
-   * This contains a single variable, itself.
+   * Make a non-meta version of this metavariable.
+   * @return  The new variable.
    */
-  override def getVariables() : Option[HashSet[BasicAtom]] = {
-    val r = new HashSet[BasicAtom]
-    r.add(this)
-    return Some(r)
-  }
-	  
+  override def asVariable = this
+  
+  /**
+   * Make a meta version of this metavariable.  I.e., do nothing.
+   * @return  This metavariable.
+   */
+  override def asMetaVariable =
+    new MetaVariable(loc, typ, name, guard, labels, byName)
+
   def rewrite(binds: Bindings) = {
     // If we have no bindings, don't rewrite the variable.
     if (binds == null) {
@@ -139,14 +239,15 @@ class Variable(typ: BasicAtom, val name: String,
       // the bound value.
       binds.get(name) match {
         case Some(atom) =>
-	        (atom, true)
+          (atom, true)
         
         case None => {
-	        // Though the atom is not bound, its type still might have to be
+          // Though the atom is not bound, its type still might have to be
           // rewritten.
           theType.rewrite(binds) match {
             case (newtype, true) =>
-              (Variable(newtype, name), true)
+              (new TermVariable(Loc.internal, newtype, name, guard, labels,
+                  byName), true)
             
             case _ => {
               (this, false)
@@ -156,8 +257,8 @@ class Variable(typ: BasicAtom, val name: String,
       }
     }
   }
-  
-  def replace(map: Map[BasicAtom, BasicAtom]) = {
+
+  override def replace(map: Map[BasicAtom, BasicAtom]) = {
     // Variables are complex critters.  We need to replace in (1) the type,
     // (2) the guard(s), and (3) the variable itself.  We try the easiest
     // case first.
@@ -168,69 +269,41 @@ class Variable(typ: BasicAtom, val name: String,
         val (newtype, flag1) = theType.replace(map)
         val (newguard, flag2) = guard.replace(map)
         if (flag1 || flag2) {
-          (Variable(newtype, name, newguard, labels, byName), true)
+          (new TermVariable(Loc.internal, newtype, name, newguard, labels,
+              byName), true)
         } else {
           (this, false)
         }
     }
   }
-  
-  /**
-   * Make a non-meta version of this variable.
-   * @return  The new variable.
-   */
-  def asVariable = this
-
-  /**
-   * Make a meta version of this variable.
-   * @return  The new metavariable.
-   */
-  def asMetaVariable = MetaVariable(typ, name, guard, labels, byName)
-      
-  override lazy val hashCode = typ.hashCode * 31 + name.hashCode
-  lazy val otherHashCode = typ.otherHashCode +
-    8191*(name.toString).foldLeft(BigInt(0))(other_hashify)+1
-  
-  override def equals(varx: Any) = varx match {
-    case ovar:Variable =>
-      feq(ovar, this,
-          ovar.theType == theType &&
-          ovar.name == name &&
-          ovar.guard == guard &&
-          ovar.labels == labels &&
-          ovar.isTerm == isTerm)
-    		
-    case _ =>
-      false
-  }
 }
 
 /**
- * Simplified creation and matching of variables.
+ * Companion object to make and match metavariables.
  */
-object Variable extends {
+object MetaVariable {
   /**
-   * Make a new variable instance.
+   * Make a new metavariable instance.
    * 
-	 * @param typ			The variable type.
-	 * @param name		The variable name.
+   * @param loc     Location of the atom's declaration.
+   * @param typ     The variable type.
+   * @param name    The variable name.
    * @param guard   The variable's guard.  Default is true.
    * @param labels  Labels for this variable.  Default is none.
    * @param byName  If true, this is a "by name" variable.  Default is false.
-	 */
-  def apply(typ: BasicAtom, name: String, guard: BasicAtom = Literal.TRUE,
-      labels: Set[String] = Set[String](), byName: Boolean = false) =
-        new Variable(typ, name, guard, labels, byName)
+   */
+  def apply(loc: Loc, typ: BasicAtom, name: String,
+      guard: BasicAtom = Literal.TRUE, labels: Set[String] = Set[String](),
+      byName: Boolean) = new MetaVariable(loc, typ, name, guard, labels, byName)
   
   /**
-   * Extract the parts of a variable.
+   * Extract the parts of a metavariable.
    * 
-   * @param vx	The variable.
-   * @return	The type, name, guard, labels, and whether this is a "by name"
-   *          variable.
+   * @param vx  The variable.
+   * @return  The type, name, guard, labels, and by-name status.
    */
-  def unapply(vx: Variable) = Some((vx.theType, vx.name, vx.guard, vx.labels,
-      vx.byName))
+  def unapply(vx: MetaVariable) = Some((vx.theType, vx.name, vx.guard,
+      vx.labels, vx.byName))
 }
 
 /**
@@ -247,20 +320,28 @@ object Variable extends {
  * `is_bindable($``$``x)` using the metavariable, and evaluation is
  * deferred until the atom is rewritten.
  * 
+ * @param loc     Location of the atom's declaration.
  * @param typ			The variable type.
  * @param name		The variable name.
  * @param guard   The variable's guard.  Default is true.
  * @param labels  Labels for this variable.  Default is none.
  * @param byName  If true, this is a "by name" variable.  Default is false.
  */
-class MetaVariable(typ: BasicAtom, name: String,
+class MetaVariable protected[elision] (
+    loc: Loc,
+    typ: BasicAtom,
+    name: String,
     guard: BasicAtom = Literal.TRUE,
     labels: Set[String] = Set[String](),
     byName: Boolean = false)
-    extends Variable(typ, name, guard, labels) {
+    extends Variable(loc, typ, name, guard, labels) {
+  // This variable is not a term.
   override val isTerm = false
-  /** Metavariable prefix. */
+  
+  // Use the metavariable prefix.
   override val prefix = "$$"
+    
+  // Hash codes are based on the type and name.
   override lazy val hashCode = typ.hashCode * 37 + name.hashCode
   override lazy val otherHashCode = typ.otherHashCode +
     8193*(name.toString).foldLeft(BigInt(0))(other_hashify)+1
@@ -269,14 +350,43 @@ class MetaVariable(typ: BasicAtom, name: String,
    * Make a non-meta version of this metavariable.
    * @return  The new variable.
    */
-  override def asVariable = Variable(typ, name, guard, labels, byName)
+  override def asVariable =
+    new TermVariable(loc, typ, name, guard, labels, byName)
   
   /**
    * Make a meta version of this metavariable.  I.e., do nothing.
    * @return  This metavariable.
    */
   override def asMetaVariable = this
-  
+      
+  def rewrite(binds: Bindings) = {
+    // If we have no bindings, don't rewrite the variable.
+    if (binds == null) {
+      (this, false)
+    } else {
+      // If this variable is bound in the provided bindings, replace it with
+      // the bound value.
+      binds.get(name) match {
+        case Some(atom) =>
+          (atom, true)
+        
+        case None => {
+          // Though the atom is not bound, its type still might have to be
+          // rewritten.
+          theType.rewrite(binds) match {
+            case (newtype, true) =>
+              (new MetaVariable(Loc.internal, newtype, name, guard, labels,
+                  byName), true)
+            
+            case _ => {
+              (this, false)
+            }
+          }
+        }
+      }
+    }
+  }
+
   override def replace(map: Map[BasicAtom, BasicAtom]) = {
     // Variables are complex critters.  We need to replace in (1) the type,
     // (2) the guard(s), and (3) the variable itself.  We try the easiest
@@ -288,37 +398,11 @@ class MetaVariable(typ: BasicAtom, name: String,
         val (newtype, flag1) = theType.replace(map)
         val (newguard, flag2) = guard.replace(map)
         if (flag1 || flag2) {
-          (MetaVariable(newtype, name, newguard, labels, byName), true)
+          (new MetaVariable(Loc.internal, newtype, name, newguard, labels,
+              byName), true)
         } else {
           (this, false)
         }
     }
   }
-}
-
-/**
- * Companion object to make and match metavariables.
- */
-object MetaVariable {
-  /**
-   * Make a new metavariable instance.
-   * 
-	 * @param typ			The variable type.
-	 * @param name		The variable name.
-   * @param guard   The variable's guard.  Default is true.
-   * @param labels  Labels for this variable.  Default is none.
-   * @param byName  If true, this is a "by name" variable.  Default is false.
- 	 */
-  def apply(typ: BasicAtom, name: String, guard: BasicAtom = Literal.TRUE,
-      labels: Set[String] = Set[String](), byName: Boolean) =
-        new MetaVariable(typ, name, guard, labels, byName)
-  
-  /**
-   * Extract the parts of a metavariable.
-   * 
-   * @param vx	The variable.
-   * @return	The type, name, guard, labels, and by-name status.
-   */
-  def unapply(vx: MetaVariable) = Some((vx.theType, vx.name, vx.guard,
-      vx.labels, vx.byName))
 }

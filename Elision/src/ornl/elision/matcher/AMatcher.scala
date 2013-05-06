@@ -46,7 +46,7 @@ import ornl.elision.util.OmitSeq.fromIndexedSeq
 import scala.annotation.tailrec
 import ornl.elision.core.AtomSeq
 import ornl.elision.context.Context
-import ornl.elision.context.ApplyHandler
+import ornl.elision.context.ApplyBuilder
 
 /**
  * Match two sequences, where the elements of the second sequence can be
