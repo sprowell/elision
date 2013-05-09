@@ -238,31 +238,40 @@ package object core {
   //======================================================================
   
   /** Convert a Scala symbol to a variable. */
-  implicit def symToVariable(symbol: Symbol) = Variable(ANY, symbol.name)
+  implicit def symToVariable(symbol: Symbol) =
+    new TermVariable(Loc.internal, ANY, symbol.name)
   
   /** Convert a variable to a Scala symbol. */
-  implicit def variableToSym(variable: Variable) = Symbol(variable.name)
+  implicit def variableToSym(variable: TermVariable) =
+    Symbol(variable.name)
   
   /** Convert an integer to an integer literal. */
-  implicit def intToLiteral(value: Int) = Literal(value)
+  implicit def intToLiteral(value: Int) =
+    new IntegerLiteral(Loc.internal, value)
 
   /** Convert an integer to an integer literal. */
-  implicit def intToLiteral(value: BigInt) = Literal(value)
+  implicit def intToLiteral(value: BigInt) =
+    new IntegerLiteral(Loc.internal, value)
   
   /** Convert an integer literal to an integer. */
-  implicit def literalToInt(value: IntegerLiteral) = value.value
+  implicit def literalToInt(value: IntegerLiteral) =
+    value.value
   
   /** Convert a string to a string literal. */
-  implicit def strToLiteral(string: String) = Literal(string)
+  implicit def strToLiteral(string: String) =
+    new StringLiteral(Loc.internal, string)
   
   /** Convert a string literal to a string. */
-  implicit def literalToStr(value: StringLiteral) = value.value
+  implicit def literalToStr(value: StringLiteral) =
+    value.value
   
   /** Convert a Scala Boolean to a Boolean literal. */
-  implicit def boolToLiteral(bool: Boolean) = Literal(bool)
+  implicit def boolToLiteral(bool: Boolean) =
+    new BooleanLiteral(Loc.internal, bool)
   
   /** Convert a Boolean literal to a Scala Boolean. */
-  implicit def literalToBool(value: BooleanLiteral) = value.value
+  implicit def literalToBool(value: BooleanLiteral) =
+    value.value
   
   /**
    * Where needed, convert a bindings object into a bindings atom (wrap).
@@ -270,7 +279,8 @@ package object core {
    * @param binds	The bindings.
    * @return	The new bindings atom.
    */
-  implicit def wrapBindingsAtom(binds: Bindings) = new BindingsAtom(binds)
+  implicit def wrapBindingsAtom(binds: Bindings) =
+    new BindingsAtom(binds)
   
   /**
    * Where needed, convert a bindings atom to a simple bindings object (unwrap).
@@ -278,5 +288,6 @@ package object core {
    * @param atom	The bindings atom.
    * @return	The bindings.
    */
-  implicit def unwrapBindingsAtom(atom: BindingsAtom) = atom.mybinds
+  implicit def unwrapBindingsAtom(atom: BindingsAtom) =
+    atom.mybinds
 }

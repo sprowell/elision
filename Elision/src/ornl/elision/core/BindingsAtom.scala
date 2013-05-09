@@ -42,6 +42,7 @@ import scala.collection.mutable.ListBuffer
 import ornl.elision.util.OmitSeq
 import ornl.elision.util.other_hashify
 import ornl.elision.matcher.SequenceMatcher
+import ornl.elision.util.Loc
 
 /**
  * Encapsulate a set of bindings as an atom.
@@ -69,9 +70,24 @@ import ornl.elision.matcher.SequenceMatcher
  * Bindings are equal iff they bind the same symbols to equal values.  They
  * match only if they bind the same symbols, and their respective bindings
  * match.
+ * 
+ * @param loc           Location of this atom's declaration.
+ * @param mybinds       Bindings for this atom.
  */
-case class BindingsAtom(mybinds: Bindings) extends BasicAtom with Applicable {
+case class BindingsAtom(loc: Loc, mybinds: Bindings)
+extends BasicAtom(loc) with Applicable {
+  
   require(mybinds != null, "Bindings are null.")
+  
+  /**
+   * Alternate constructor to wrap a map.
+   * 
+   * @param loc           Location of this atom's declaration.
+   * @param mybinds       Bindings for this atom.
+   */
+  def this(loc: Loc, mybinds: Map[String, BasicAtom]) = {
+    this(loc, Bindings(mybinds))
+  }
   
   lazy val otherHashCode = (this.toString).foldLeft(BigInt(0))(other_hashify)+1
 
@@ -81,42 +97,6 @@ case class BindingsAtom(mybinds: Bindings) extends BasicAtom with Applicable {
   lazy val isTerm = mybinds.values.forall(_.isTerm)
   lazy val deBruijnIndex = mybinds.values.foldLeft(0)(_ max _.deBruijnIndex)
   lazy val depth = mybinds.values.foldLeft(0)(_ max _.depth) + 1
-	
-  def rewrite(binds: Bindings) = {
-    var changed = false
-    var newmap = Bindings()
-    for ((key, value) <- mybinds) {	
-      val (newvalue, valuechanged) = value.rewrite(binds)
-      changed |= valuechanged
-      newmap += (key -> newvalue)
-    } // Rewrite all bindings.
-  	
-    if (changed) {
-  		(BindingsAtom(newmap), true) 
-  	} else {
-      (this, false)
-    }
-  }
-  
-  def replace(map: Map[BasicAtom, BasicAtom]) = {
-    map.get(this) match {
-      case Some(atom) =>
-        (atom, true)
-      case None =>
-        var flag = false
-        val newbinds = mybinds map {
-          bind =>
-            val (newbind, changed) = bind._2.replace(map)
-            flag |= changed
-            (bind._1, newbind)
-        }
-        if (flag) {
-          (BindingsAtom(newbinds), true)
-        } else {
-          (this, false)
-        }
-    }
-  }
     
   override def equals(other: Any) = other match {
     case oba: BindingsAtom =>
@@ -131,50 +111,7 @@ case class BindingsAtom(mybinds: Bindings) extends BasicAtom with Applicable {
  * Simplified construction of bindings atoms.
  */
 object BindingsAtom {
+  
   /** The special form tag. */
   val tag = Literal('binds)
-  
-  /**
-   * Make a bindings atom from the specified special form data.
-   * 
-   * @param sfh	Parsed special form data.
-   */
-  def apply(sfh: SpecialFormHolder): BindingsAtom = sfh.content match {
-    case AtomSeq(_, atoms) => _build(atoms)
-    case _ =>
-      val bh = sfh.requireBindings
-      bh.check(Map("" -> false))
-      val seq = bh.fetchAs[AtomSeq]("", Some(EmptySeq))
-      _build(seq.atoms)
-  }
-  
-  /**
-   * Make a bindings atom directly froma map.
-   * 
-   * @param map The map.
-   * @return  The new atom.
-   */
-  def apply(map: HashMap[String,BasicAtom]) =
-    new BindingsAtom(new Bindings(map))
-  
-  /**
-   * Make a bindings atom from the provided sequence of atoms.  Every atom
-   * must be an instance of [[ornl.elision.core.MapPair]].
-   * 
-   * @param atoms	The atoms making up the binding.
-   */
-  private def _build(atoms: Seq[BasicAtom]) = atoms.foldLeft(Bindings()) {
-    (binds, atom) => binds + (atom match {
-      case MapPair(left, right) => left match {
-        case SymbolLiteral(_, sym) => (sym.name -> right)
-        case _ =>
-          throw new SpecialFormException(atom.loc,
-              "Invalid binding specification: " + atom.toParseString)
-      }
-      case _ =>
-        throw new SpecialFormException(atom.loc,
-            "Invalid binding specification (not a map pair): " +
-            atom.toParseString)
-    })
-  }
 }

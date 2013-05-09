@@ -43,11 +43,12 @@ import ornl.elision.matcher.AMatcher
 import ornl.elision.matcher.CMatcher
 import ornl.elision.matcher.ACMatcher
 import ornl.elision.matcher.SequenceMatcher
+import ornl.elision.util.Loc
 
 /**
  * Fast access to an untyped empty sequence.
  */
-object EmptySeq extends AtomSeq(NoProps, IndexedSeq())
+object EmptySeq extends AtomSeq(Loc.internal, NoProps, IndexedSeq())
 
 /**
  * An atom sequence is just that: a sequence of atoms.
@@ -64,21 +65,39 @@ object EmptySeq extends AtomSeq(NoProps, IndexedSeq())
  * Create a list by specifying the properties and then providing a list of 
  * atoms to include in the list.  The atoms are specified using an instance
  * of an `IndexedSeq`.
- * 
- * @param props		The properties for this atom sequence.
- * @param xatoms	The sequence of atoms in this sequence.  Note that, depending
- * on the specified properties, the stored sequence may be different.
+ *
+ * @param loc         The location of the atom's declaration. 
+ * @param props		    The properties for this atom sequence.
+ * @param orig_xatoms	The sequence of atoms in this sequence.  Note that,
+ *                    depending on the specified properties, the stored
+ *                    sequence may be different.
  */
-class AtomSeq(val props: AlgProp, orig_xatoms: IndexedSeq[BasicAtom])
-extends BasicAtom with IndexedSeq[BasicAtom] {
+class AtomSeq protected[elision] (
+    loc: Loc,
+    val props: AlgProp,
+    orig_xatoms: IndexedSeq[BasicAtom])
+    extends BasicAtom(loc) with IndexedSeq[BasicAtom] {
+  
   require(xatoms != null)
   require(props != null)
+  
+  /**
+   * Provide an alternate constructor using a variable-length argument list.
+   * 
+   * @param loc         The location of the atom's declaration. 
+   * @param props       The properties for this atom sequence.
+   * @param orig_xatoms The sequence of atoms in this sequence.  Note that,
+   *                    depending on the specified properties, the stored
+   *                    sequence may be different.
+   */
+  def this(loc: Loc, props: AlgProp, orig_xatoms: BasicAtom*) =
+    this(loc, props, orig_xatoms.toIndexedSeq)
   
   /**
    * Determine whether we have to sort the atoms.  If we know the list is
    * commutative, then we have to sort it.
    */
-  lazy val xatoms =
+  lazy private val xatoms =
     (if (props.isC(false)) orig_xatoms.sorted(BasicAtomComparator)
         else orig_xatoms)
   
@@ -117,15 +136,6 @@ extends BasicAtom with IndexedSeq[BasicAtom] {
    * The atoms in this sequence.
    */
   val atoms = AtomSeq.process(props, xatoms)
-
-  /**
-   * This is a mapping from constants in the sequence to the (zero-based)
-   * index of the constant.
-   */
-  val constantMap = scala.collection.mutable.OpenHashMap[BasicAtom, Int]()
-  // Because it is used right here, the constant map cannot be lazy.
-  for (i <- 0 until atoms.length)
-    if (atoms(i).isConstant) constantMap(atoms(i)) = i
   
   import SymbolicOperator.LIST
   
@@ -157,54 +167,6 @@ extends BasicAtom with IndexedSeq[BasicAtom] {
   /** The length of this sequence. */
   def length = atoms.length
 
-  def rewrite(binds: Bindings): (AtomSeq, Boolean) = {
-    // Rewrite the properties.
-    val (newprop, pchanged) = props.rewrite(binds)
-    
-    // We must rewrite every child atom, and collect them into a new sequence.
-    var schanged = false
-    val newseq = atoms map {
-      atom =>
-        val (newatom, changed) = atom.rewrite(binds)
-        schanged |= changed
-        newatom
-    }
-    
-    // If anything changed, make a new sequence.
-    if (pchanged || schanged) {
-      (new AtomSeq(newprop, newseq), true)
-    } else {
-      (this, false)
-    }
-  }
-  
-  def replace(map: Map[BasicAtom, BasicAtom]) = {
-    map.get(this) match {
-      case Some(atom) =>
-        (atom, true)
-      case None =>
-        var flag1 = false
-        val newatoms = atoms map {
-          atom =>
-            val (newatom, changed) = atom.replace(map)
-            flag1 |= changed
-            newatom
-        }
-        // The algebraic properties must rewrite to a valid algebraic
-        // properties atom, or we must discard it since we cannot build a
-        // legal algebraic properties atom otherwise.
-        val (newprops, flag2) = props.replace(map) match {
-          case (ap: AlgProp, flag: Boolean) => (ap, flag)
-          case _ => (props, false)
-        }
-        if (flag1 || flag2) {
-          (AtomSeq(newprops, newatoms), true)
-        } else {
-          (this, false)
-        }
-    }
-  }
-
   /**
    * Provide a "naked" version of the sequence, without the parens and property
    * indicators.
@@ -213,18 +175,22 @@ extends BasicAtom with IndexedSeq[BasicAtom] {
    * 					to the sequence may themselves be lists; that is okay, since the
    * 					parse string is used for those atoms.
    */
-  def toNakedString = atoms.mkParseString("", ", ", "")
+  lazy val toNakedString = atoms.mkParseString("", ", ", "")
   
   override lazy val hashCode = atoms.hashCode * 31 + props.hashCode
   lazy val otherHashCode = atoms.otherHashCode + 8191*props.otherHashCode
 
   /**
    * Two sequences are equal iff their properties and atoms are equal.
+   * 
+   * @param other   The other atom.
+   * @return  True iff the other atom is equal to this one.
    */
   override def equals(other: Any) = {
     other match {
       case oseq: AtomSeq =>
         feq(oseq, this, (props == oseq.props) && (atoms == oseq.atoms))
+        
       case _ => false
     }
   }
@@ -234,9 +200,6 @@ extends BasicAtom with IndexedSeq[BasicAtom] {
  * Simplified construction and matching for atom sequences.
  */
 object AtomSeq {
-  
-  /** An empty atom sequence with no properties. */
-  val EmptySeq = new AtomSeq(NoProps, IndexedSeq[BasicAtom]())
   
   /** Get an empty atom sequence with no properties. */
   def apply() = EmptySeq
@@ -248,24 +211,6 @@ object AtomSeq {
    * @return	The properties and the atoms.
    */
   def unapply(seq: AtomSeq) = Some(seq.props, seq.atoms)
-  
-  /**
-   * Make a new atom sequence with the given properties and children.
-   * 
-   * @param props	The properties.
-   * @param atoms	The atoms.
-   */
-  def apply(props: AlgProp, seq: IndexedSeq[BasicAtom]) =
-    new AtomSeq(props, seq)
-  
-  /**
-   * Make a new atom sequence with the given properties and children.
-   * 
-   * @param props	The properties.
-   * @param atoms	The atoms.
-   */
-  def apply(props: AlgProp, atoms: BasicAtom*) =
-    new AtomSeq(props, atoms.toIndexedSeq)
   
   /**
    * Process the atoms and build the new sequence.  This reduces any included
@@ -339,6 +284,7 @@ object AtomSeq {
  * }}}
  */
 object Args {
+  
   /**
    * Allow matching of an atom sequence as a sequence.
    * 

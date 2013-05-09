@@ -46,6 +46,8 @@ import ornl.elision.core.SpecialForm
 import ornl.elision.core.Variable
 import ornl.elision.core.TermVariable
 import ornl.elision.core.MetaVariable
+import ornl.elision.core.Bindings
+import ornl.elision.core.BindingsAtom
 
 /**
  * Construct atoms, first applying any evaluation logic.
@@ -55,7 +57,7 @@ abstract class Builder {
   /**
    * Make a new algebraic property specification.
    * 
-   * @param loc           Location of this specification.
+   * @param loc           Location of this atom's declaration.
    * @param associative   Optional associativity.  Default is none.
    * @param commutative   Optional commutativity.  Default is none.
    * @param idempotent    Optional idempotency.  Default is none.
@@ -72,7 +74,7 @@ abstract class Builder {
   /**
    * Apply one atom to another.
    * 
-   * @param loc           Location of this specification.
+   * @param loc           Location of this atom's declaration.
    * @param operator      The operator.
    * @param argument      The argument.
    * @return  The result.
@@ -82,69 +84,104 @@ abstract class Builder {
   /**
    * Make a new atom collection.
    * 
-   * @param loc           Location of this specification.
+   * @param loc           Location of this atom's declaration.
    * @param properties    The algebraic properties of the collection.
    * @param atoms         The atoms in the collection.
    * @return  The new collection.
    */
-  def newAtomSeq(loc: Loc, properties: AlgProp, atoms: Seq[BasicAtom]): AtomSeq
+  def newAtomSeq(loc: Loc, properties: AlgProp,
+      atoms: IndexedSeq[BasicAtom]): AtomSeq = {
+    new AtomSeq(loc, properties, atoms)
+  }
+  
+  /**
+   * Make a new bindings atom.
+   * 
+   * @param loc           Location of this atom's declaration.
+   * @param binds         The bindings.
+   * @return  The new bindings atom.
+   */
+  def newBindingsAtom(loc: Loc, binds: Bindings): BindingsAtom = {
+    new BindingsAtom(loc, binds)
+  }
+  
+  /**
+   * Make a new bindings atom.
+   * 
+   * @param loc           Location of this atom's declaration.
+   * @param binds         The bindings.
+   * @return  The new bindings atom.
+   */
+  def newBindingsAtom(loc: Loc, binds: Map[String, BasicAtom]): BindingsAtom = {
+    new BindingsAtom(loc, binds)
+  }
   
   /**
    * Make a new lambda.
    * 
-   * @param loc           Location of this specification.
+   * @param loc           Location of this atom's declaration.
    * @param parameter     The lambda parameter.
    * @param body          The lambda body.
    * @return  The new lambda.
    */
-  def newLambda(loc: Loc, parameter: Variable, body: BasicAtom): Lambda
+  def newLambda(loc: Loc, parameter: Variable, body: BasicAtom): Lambda = {
+    new Lambda(loc, parameter, body)
+  }
   
   /**
    * Make a new symbol literal.
    * 
-   * @param loc           Location of this specification.
+   * @param loc           Location of this atom's declaration.
    * @param typ           The type.
    * @param value         The value.
    * @return  The new literal.
    */
-  def newLiteral(loc: Loc, typ: BasicAtom, value: Symbol): SymbolLiteral
+  def newLiteral(loc: Loc, typ: BasicAtom, value: Symbol): SymbolLiteral = {
+    new SymbolLiteral(loc, typ, value)
+  }
   
   /**
    * Make a new string literal.
    * 
-   * @param loc           Location of this specification.
+   * @param loc           Location of this atom's declaration.
    * @param typ           The type.
    * @param value         The value.
    * @return  The new literal.
    */
-  def newLiteral(loc: Loc, typ: BasicAtom, value: String): StringLiteral
+  def newLiteral(loc: Loc, typ: BasicAtom, value: String): StringLiteral = {
+    new StringLiteral(loc, typ, value)
+  }
   
   /**
    * Make a new integer literal.
    * 
-   * @param loc           Location of this specification.
+   * @param loc           Location of this atom's declaration.
    * @param typ           The type.
    * @param value         The value.
    * @return  The new literal.
    */
-  def newLiteral(loc: Loc, typ: BasicAtom, value: BigInt): IntegerLiteral
+  def newLiteral(loc: Loc, typ: BasicAtom, value: BigInt): IntegerLiteral = {
+    new IntegerLiteral(loc, typ, value)
+  }
   
   /**
    * Make a new bit string literal.
    * 
-   * @param loc           Location of this specification.
+   * @param loc           Location of this atom's declaration.
    * @param typ           The type.
    * @param value         The value.
    * @param length        The width of the bit field.
    * @return  The new literal.
    */
   def newLiteral(loc: Loc, typ: BasicAtom, value: BigInt,
-      length: Int): BitStringLiteral
+      length: Int): BitStringLiteral = {
+    new BitStringLiteral(loc, typ, value, length)
+  }
   
   /**
    * Make a new symbol literal.
    * 
-   * @param loc           Location of this specification.
+   * @param loc           Location of this atom's declaration.
    * @param typ           The type.
    * @param significand   The significand.
    * @param exponent      The exponent.
@@ -152,31 +189,26 @@ abstract class Builder {
    * @return  The new literal.
    */
   def newLiteral(loc: Loc, typ: BasicAtom, significand: BigInt, exponent: Int,
-      radix: Int): FloatLiteral
+      radix: Int): FloatLiteral = {
+    new FloatLiteral(loc, typ, significand, exponent, radix)
+  }
   
   /**
    * Make a new map pair.
    * 
-   * @param loc           Location of this specification.
+   * @param loc           Location of this atom's declaration.
    * @param pattern       The pattern to match.
    * @param rewrite       The rewrite atom.
    * @return  The new map pair.
    */
-  def newMapPair(loc: Loc, pattern: BasicAtom, rewrite: BasicAtom): MapPair
-  
-  /**
-   * Make a new match atom.
-   * 
-   * @param loc           Location of this specification.
-   * @param pattern       The pattern to match.
-   * @return  The new match atom.
-   */
-  def newMatchAtom(loc: Loc, pattern: BasicAtom): MatchAtom
+  def newMapPair(loc: Loc, pattern: BasicAtom, rewrite: BasicAtom): MapPair = {
+    new MapPair(loc, pattern, rewrite)
+  }
   
   /**
    * Make a new special form.
    * 
-   * @param loc           Location of this specification.
+   * @param loc           Location of this atom's declaration.
    * @param tag           The special form tag.
    * @param content       The content.
    * @return  The new special form.
@@ -186,7 +218,7 @@ abstract class Builder {
   /**
    * Make a new term variable.
    * 
-   * @param loc           Location of this specification.
+   * @param loc           Location of this atom's declaration.
    * @param typ           The type.
    * @param name          The name of the variable.
    * @param guard         The variable guard.  True by default.
@@ -204,7 +236,7 @@ abstract class Builder {
   /**
    * Make a new meta variable.
    * 
-   * @param loc           Location of this specification.
+   * @param loc           Location of this atom's declaration.
    * @param typ           The type.
    * @param name          The name of the variable.
    * @param guard         The variable guard.  True by default.

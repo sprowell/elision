@@ -88,7 +88,7 @@ object ApplyBuilder {
    * @param pair    The pair of atom and flag.
    * @return  The binding of atom and flag.
    */
-  private def pair2bind(pair: (BasicAtom, Boolean)): BindingsAtom = {
+  private def pair2bind(pair: (BasicAtom, Boolean)): Bindings = {
     Bindings("atom" -> pair._1, "flag" -> Literal(pair._2))
   }
   
@@ -142,10 +142,11 @@ object ApplyBuilder {
   def apply(op: BasicAtom, arg: BasicAtom, builder: Builder,
       bypass: Boolean = false): BasicAtom = {
     op match {
-        case StringLiteral(typ, str) if arg.isInstanceOf[StringLiteral] =>
+        case StringLiteral(loc, typ, str) if arg.isInstanceOf[StringLiteral] =>
           // If the argument is also a string literal, then we want to simply
           // concatenate them.
-          StringLiteral(typ, str + arg.asInstanceOf[StringLiteral].value)
+          new StringLiteral(Loc.internal, typ,
+              str + arg.asInstanceOf[StringLiteral].value)
           
       case op_ap: AlgProp =>
         // Handle the case of algebraic properties being applied.  These can
@@ -157,10 +158,12 @@ object ApplyBuilder {
            */
           case ap: AlgProp =>
             (ap and op_ap)
+            
           case as: AtomSeq => 
-            AtomSeq(as.props and op_ap, as.atoms)
+            new AtomSeq(Loc.internal, as.props and op_ap, as.atoms)
+            
           case _ => 
-            SimpleApply(op_ap, arg)
+            new SimpleApply(Loc.internal, op_ap, arg)
         }
 
       case op_bind: BindingsAtom =>

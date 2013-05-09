@@ -39,6 +39,7 @@ package ornl.elision.core
 
 import scala.collection.immutable.HashMap
 import ornl.elision.util.other_hashify
+import ornl.elision.util.Loc
 
 /**
  * Represent a literal.  This is the common root class for all literals.
@@ -102,8 +103,9 @@ import ornl.elision.util.other_hashify
  * @param typ		The Elision type of this literal.
  * @param mTYPE	The manifest for `TYPE`.
  */
-abstract sealed class Literal[TYPE](typ: BasicAtom)(implicit mTYPE: Manifest[TYPE])
-extends BasicAtom {
+abstract sealed class
+Literal[TYPE](loc: Loc, typ: BasicAtom)(implicit mTYPE: Manifest[TYPE])
+extends BasicAtom(loc) {
   
   /** The type. */
   val theType = typ
@@ -147,133 +149,140 @@ extends BasicAtom {
  * Provide more convenient ways to construct and extract literals.
  */
 object Literal {
-  /** Make an integer literal from a big integer. */
-  def apply(value: BigInt): IntegerLiteral = new IntegerLiteral(value)
-  /** Make an integer literal from a Scala integer value. */
-  def apply(value: Int): IntegerLiteral = new IntegerLiteral(value)
-  /** Make a bit string literal from two Scala integer values. */
+  /**
+   * Make an integer literal from a big integer.
+   * 
+   * @param value The value of the integer.
+   * @return  A new integer literal.
+   */
+  def apply(value: BigInt): IntegerLiteral =
+    new IntegerLiteral(Loc.internal, INTEGER, value)
+  
+  /**
+   * Make an integer literal from a Scala integer value.
+   * 
+   * @param value The value of the integer.
+   * @return A new integer literal.
+   */
+  def apply(value: Int): IntegerLiteral =
+    new IntegerLiteral(Loc.internal, INTEGER, value)
+  
+  /**
+   * Make a bit string literal from two Scala integer values.
+   * 
+   * @param bits  The bits.
+   * @param len   The length.
+   * @return  The new bit string literal.
+   */
   def apply(bits: BigInt, len: Int): BitStringLiteral =
-    new BitStringLiteral(bits, len)
-  /** Make a string literal from a Scala string value. */
-  def apply(value: String): StringLiteral = new StringLiteral(value)
-  /** Make a symbol literal from a Scala symbol value. */
-  def apply(value: Symbol): SymbolLiteral = new SymbolLiteral(value)
+    new BitStringLiteral(Loc.internal, BITSTRING, bits, len)
+  
+  /**
+   * Make a string literal from a Scala string value.
+   * 
+   * @param value The string value.
+   * @return  The new string literal.
+   */
+  def apply(value: String): StringLiteral =
+    new StringLiteral(Loc.internal, STRING, value)
+  
+  /**
+   * Make a symbol literal from a Scala symbol value.
+   * 
+   * @param value The symbol value.
+   * @return  The new symbol literal.
+   */
+  def apply(value: Symbol): SymbolLiteral =
+    new SymbolLiteral(Loc.internal, SYMBOL, value)
+  
   /**
    * Get the appropriate Boolean literal for a Scala Boolean value.
+   * 
+   * @param value The Boolean value.
+   * @return  The new Boolean literal.
    */
   def apply(value: Boolean): BooleanLiteral = if (value) TRUE else FALSE
+  
   /**
    * Make a floating point literal.
    * 
    * @param significand		The significand.
    * @param exponent			The exponent.
    * @param radix					The radix, which must be 2, 8, 10, or 16.
+   * @return  The new floating point literal.
    */
   def apply(significand: BigInt, exponent: Int, radix: Int): FloatLiteral =
-    new FloatLiteral(significand, exponent, radix)
-  /** Make an integer literal from a big integer, and override the type. */
-  def apply(typ: BasicAtom, value: BigInt): IntegerLiteral =
-    IntegerLiteral(typ, value)
-  /** Make an integer literal from a Scala integer value and override the type. */
-  def apply(typ: BasicAtom, value: Int): IntegerLiteral =
-    IntegerLiteral(typ, value)
-  /** Make an string literal from a Scala string value and override the type. */
-  def apply(typ: BasicAtom, value: String): StringLiteral =
-    StringLiteral(typ, value)
-  /** Make an symbol literal from a Scala symbol value and override the type. */
-  def apply(typ: BasicAtom, value: Symbol): SymbolLiteral =
-    SymbolLiteral(typ, value)
-  /**
-   * Get the appropriate Boolean literal for a Scala Boolean value, and
-   * override the type.
-   */
-  def apply(typ: BasicAtom, value: Boolean): BooleanLiteral =
-    BooleanLiteral(typ, value)
+    new FloatLiteral(Loc.internal, FLOAT, significand, exponent, radix)
+    
   /** Boolean true literal. */
-  val TRUE = new BooleanLiteral(BOOLEAN, true)
+  val TRUE = new BooleanLiteral(Loc.internal, BOOLEAN, true)
+  
   /** Boolean false literal. */
-  val FALSE = new BooleanLiteral(BOOLEAN, false)  
-  /**
-   * Make a floating point literal, and override the default type.
-   *
-   * @param typ						The type to use.
-   * @param significand		The significand.
-   * @param exponent			The exponent.
-   * @param radix					The radix, which must be 2, 8, 10, or 16.
-   */
-  def apply(typ: BasicAtom, significand: BigInt, exponent: Int,
-	    radix: Int): FloatLiteral = FloatLiteral(typ, significand, exponent, radix)
-	/** Make a bit string literal from two Scala integers and override the type. */
-	def apply(typ: BasicAtom, bits: BigInt, len: Int): BitStringLiteral =
-	  new BitStringLiteral(typ, bits, len)
+  val FALSE = new BooleanLiteral(Loc.internal, BOOLEAN, false)
 }
 
 /**
  * Provide an integer literal.  Integer literals are backed by the Scala
  * `BigInt` type, so they can contain arbitrarily large values.
  * 
+ * @param loc   The location of the atom declaration.
  * @param typ		The type.
  * @param value	The value.
  */
-case class IntegerLiteral(typ: BasicAtom, value: BigInt)
-extends Literal[BigInt](typ) {
-  /**
-   * Alternate constructor with default `INTEGER` type.
-   */
-  def this(value: BigInt) = this(INTEGER, value)
-  /**
-   * Alternate constructor with default `INTEGER` type.
-   */
-  def this(value: Int) = this(INTEGER, value)
+case class IntegerLiteral protected[elision] (
+    loc: Loc,
+    typ: BasicAtom,
+    value: BigInt) extends Literal[BigInt](loc, typ) {
   
-  def rewrite(binds: Bindings) = {
-		theType.rewrite(binds) match {
-		  case (newtype, true) =>
-        (Literal(newtype, value), true)
-		  case _ =>
-        (this, false)
-		}
-	}
-  
-  def replace(map: Map[BasicAtom, BasicAtom]) = {
-    map.get(this) match {
-      case Some(atom) =>
-        (atom, true)
-      case None =>
-        val (newtype, flag) = theType.replace(map)
-        if (flag) {
-          (IntegerLiteral(newtype, value), true)
-        } else {
-          (this, false)
-        }
-    }
-  }
+  /**
+   * Provide an alternate constructor using the default type.
+   * 
+   * @param loc   The location of the atom declaration.
+   * @param value The value.
+   */
+  def this(loc: Loc, value: BigInt) = this(loc, INTEGER, value)
 }
 
 /**
  * Provide an bit string literal.  Bit string literals are backed by the Scala
  * `BigInt` type, so they can contain arbitrarily large values.
  * 
- * @param typ   The type.
- * @param bits  The bits.
- * @param len   The length.
+ * @param loc           The location of the atom declaration.
+ * @param typ           The type.
+ * @param original_bits The original bit value.  This may be modified.
+ * @param len           The length.
  */
-case class BitStringLiteral(typ: BasicAtom, var bits: BigInt, len: Int)
-extends Literal[(BigInt, Int)](typ) {
+case class BitStringLiteral protected[elision] (
+    loc: Loc,
+    typ: BasicAtom,
+    original_bits: BigInt,
+    len: Int) extends Literal[(BigInt, Int)](loc, typ) {
+  
+  /**
+   * Provide an alternate constructor using the default type.
+   * 
+   * @param loc   The location of the atom declaration.
+   * @param value The value.
+   */
+  def this(loc: Loc, bits: BigInt, len: Int) = this(loc, BITSTRING, bits, len)
+  
   /** If true, prefer to display this as a signed value.  If false, do not. */
-  val neghint = (bits < 0)
+  val neghint = (original_bits < 0)
 
   // Figure out the minimum number of bits required to hold the base.
-  if (neghint) {
-    bits = BigInt(2).pow(len) + bits
-  }
-  private val _bbl = bits.bitLength
-  if (len < _bbl) {
-    // Truncate the base to obtain the new base.
-    bits = bits & (BigInt(2).pow(len)-1)
-  } else if (len == 0) {
-    // Just return the well-known zero.
-    bits = 0
+  val bits = {
+    var _newbits = original_bits
+    if (neghint) {
+      _newbits = BigInt(2).pow(len) + _newbits
+    }
+    if (len < _newbits.bitLength) {
+      // Truncate the base to obtain the new base.
+      _newbits = _newbits & (BigInt(2).pow(len)-1)
+    } else if (len == 0) {
+      // Just return the well-known zero.
+      _newbits = 0
+    }
+    _newbits
   }
   
   /** Value as a pair of bits and length. */
@@ -320,106 +329,53 @@ extends Literal[(BigInt, Int)](typ) {
       unsigned
     }
   }
-  
-  /**
-   * Alternate constructor with default `BITSTRING` type.
-   */
-  def this(bits: BigInt, len: Int) = this(BITSTRING, bits, len)
-  
-  def rewrite(binds: Bindings) = {
-    theType.rewrite(binds) match {
-      case (newtype, true) =>
-        (Literal(newtype, unsigned), true)
-      case _ =>
-        (this, false)
-    }
-  }
-  
-  def replace(map: Map[BasicAtom, BasicAtom]) = {
-    map.get(this) match {
-      case Some(atom) =>
-        (atom, true)
-      case None =>
-        val (newtype, flag) = theType.replace(map)
-        if (flag) {
-          (IntegerLiteral(newtype, unsigned), true)
-        } else {
-          (this, false)
-        }
-    }
-  }
 }
 
 /**
  * Provide a string literal.  String literals are backed by the `String`
  * type.
+ * 
+ * @param loc   The location of the atom declaration.
+ * @param typ   The type.
+ * @param value The value.
  */
-case class StringLiteral(typ: BasicAtom, value: String)
-extends Literal[String](typ) {
+case class StringLiteral protected[elision] (
+    loc: Loc,
+    typ: BasicAtom,
+    value: String) extends Literal[String](loc, typ) {
+  
   /**
-   * Alternate constructor with default `STRING` type.
+   * Provide an alternate constructor using the default type.
+   * 
+   * @param loc   The location of the atom declaration.
+   * @param value The value.
    */
-  def this(value: String) = this(STRING, value)
-  
-  def rewrite(binds: Bindings) = {
-		theType.rewrite(binds) match {
-		  case (newtype, true) =>
-        (Literal(newtype, value), true)
-		  case _ =>
-        (this, false)
-		}
-	}
-  
-  def replace(map: Map[BasicAtom, BasicAtom]) = {
-    map.get(this) match {
-      case Some(atom) =>
-        (atom, true)
-      case None =>
-        val (newtype, flag) = theType.replace(map)
-        if (flag) {
-          (StringLiteral(newtype, value), true)
-        } else {
-          (this, false)
-        }
-    }
-  }
+  def this(loc: Loc, value: String) = this(loc, STRING, value)
 }
 
 /**
  * Provide a symbol literal.  Symbol literals are backed by the Scala
  * `Symbol` type.
+ * 
+ * @param loc   The location of the atom declaration.
+ * @param typ   The type.
+ * @param value The value.
  */
-case class SymbolLiteral(typ: BasicAtom, value: Symbol)
-extends Literal[Symbol](typ) {
+case class SymbolLiteral protected[elision] (
+    loc: Loc,
+    typ: BasicAtom,
+    value: Symbol) extends Literal[Symbol](loc, typ) {
+  
   /**
-   * Alternate constructor with default `SYMBOL` type.
+   * Provide an alternate constructor using the default type.
+   * 
+   * @param loc   The location of the atom declaration.
+   * @param value The value.
    */
-  def this(value: Symbol) = this(SYMBOL, value)
+  def this(loc: Loc, value: Symbol) = this(loc, SYMBOL, value)
   
-  override lazy val otherHashCode = (value.toString).foldLeft(BigInt(0))(other_hashify)
-
-  def rewrite(binds: Bindings) = {
-		theType.rewrite(binds) match {
-		  case (newtype, true) =>
-        (Literal(newtype, value), true)
-		  case _ =>
-        (this, false)
-		}
-	}
-  
-  def replace(map: Map[BasicAtom, BasicAtom]) = {
-    map.get(this) match {
-      case Some(atom) =>
-        (atom, true)
-      case None =>
-        val (newtype, flag) = theType.replace(map)
-        if (flag) {
-          (SymbolLiteral(newtype, value), true)
-        } else {
-          (this, false)
-        }
-    }
-  }
+  override lazy val otherHashCode =
+    (value.toString).foldLeft(BigInt(0))(other_hashify)
 }
 
 /**
@@ -430,42 +386,30 @@ extends Literal[Symbol](typ) {
  * 
  * The only reason to use this is to create a Boolean literal with a
  * type other than `BOOLEAN`.  Why?
+ * 
+ * @param loc   The location of the atom declaration.
+ * @param typ   The type.
+ * @param value The value.
  */
-case class BooleanLiteral(typ: BasicAtom, value: Boolean)
-extends Literal[Boolean](typ) {
+case class BooleanLiteral protected[elision] (
+    loc: Loc,
+    typ: BasicAtom,
+    value: Boolean) extends Literal[Boolean](loc, typ) {
+  
+  /**
+   * Provide an alternate constructor using the default type.
+   * 
+   * @param loc   The location of the atom declaration.
+   * @param value The value.
+   */
+  def this(loc: Loc, value: Boolean) = this(loc, BOOLEAN, value)
 
   override lazy val hashCode = theType.hashCode * 31 + value.hashCode
-  override lazy val otherHashCode = typ.otherHashCode + 8191*(value.toString).foldLeft(BigInt(0))(other_hashify)
+  override lazy val otherHashCode =
+    typ.otherHashCode + 8191*(value.toString).foldLeft(BigInt(0))(other_hashify)
 
   override val isTrue = value == true
   override val isFalse = value == false
-  /**
-   * Alternate constructor with default `BOOLEAN` type.
-   */
-  def this(value: Boolean) = this(BOOLEAN, value)
-  
-  def rewrite(binds: Bindings) = {
-		theType.rewrite(binds) match {
-		  case (newtype, true) =>
-        (Literal(newtype, value), true)
-		  case _ =>
-        (this, false)
-		}
-	}
-  
-  def replace(map: Map[BasicAtom, BasicAtom]) = {
-    map.get(this) match {
-      case Some(atom) =>
-        (atom, true)
-      case None =>
-        val (newtype, flag) = theType.replace(map)
-        if (flag) {
-          (BooleanLiteral(newtype, value), true)
-        } else {
-          (this, false)
-        }
-    }
-  }
 }
 
 /**
@@ -479,6 +423,9 @@ extends Literal[Boolean](typ) {
  *    the fraction set to zero, when the fraction is not itself zero.
  *  - Infinity (positive and negative, depending on the sign bit) is indicated
  *    with the exponent set to all ones and a zero fraction.
+ *    
+ * @param width       The width of the representation.
+ * @param significand The portion of the width dedicated to the significand.
  */
 case class IEEE754(width: Int, significand: Int) {
   require (significand < (width - 2))
@@ -546,13 +493,28 @@ object IEEE754Half extends IEEE754(16, 10)
 /**
  * Provide a floating-point literal value.
  * 
+ * @param loc           The location of the atom declaration.
  * @param typ						The type.
  * @param significand		The significand.
  * @param exponent			The exponent.
  * @param radix					The radix, which must be 2, 8, 10, or 16.
  */
-case class FloatLiteral(typ: BasicAtom, significand: BigInt, exponent: Int,
-    radix: Int) extends Literal[(BigInt, Int, Int)](typ) {
+case class FloatLiteral protected[elision] (
+    loc: Loc,
+    typ: BasicAtom,
+    significand: BigInt,
+    exponent: Int,
+    radix: Int) extends Literal[(BigInt, Int, Int)](loc, typ) {
+  
+  /**
+   * Provide an alternate constructor using the default type.
+   * 
+   * @param loc   The location of the atom declaration.
+   * @param value The value.
+   */
+  def this(loc: Loc, significand: BigInt, exponent: Int, radix: Int) =
+    this(loc, FLOAT, significand, exponent, radix)
+  
   // Validate the radix and compute the prefix string.
   private lazy val _prefix = radix match {
     case 16 => "0x"
@@ -561,12 +523,16 @@ case class FloatLiteral(typ: BasicAtom, significand: BigInt, exponent: Int,
     case 2  => "0b"
     case _  => require(false, "Invalid radix.")
   }
+  
   /** Is the significand negative. */
   private val _sneg = significand < 0
+  
   /** Is the exponent negative. */
   private val _eneg = exponent < 0
+  
   /** Absolute value of significand. */
   private val _spos = if (_sneg) -significand else significand
+  
   /** Absolute value of exponent. */
   private val _epos = if (_eneg) -exponent else exponent
   
@@ -614,7 +580,8 @@ case class FloatLiteral(typ: BasicAtom, significand: BigInt, exponent: Int,
     // otherwise there is.
     ns = ns | (if (ne != -plaf.exponentBias) plaf.hiddenOne else 0)
     // Done!
-    FloatLiteral(theType, if (sign != 0) -ns else ns, ne.toInt, 2)
+    new FloatLiteral(Loc.internal, theType,
+        if (sign != 0) -ns else ns, ne.toInt, 2)
   }
 
   /**
@@ -638,44 +605,11 @@ case class FloatLiteral(typ: BasicAtom, significand: BigInt, exponent: Int,
       ns /= 2
       ne += 1
     }
-    FloatLiteral(theType, ns, ne.toInt, 2)
+    new FloatLiteral(Loc.internal, theType, ns, ne.toInt, 2)
   }
   
   /** The value as a triple: significand, exponent, and radix. */
   val value = (significand, exponent, radix)
-  
-  /**
-   * Alternate constructor using the default type `FLOAT`.
-   * 
-	 * @param significand		The significand.
-	 * @param exponent			The exponent.
-	 * @param radix					The radix, which must be 2, 8, 10, or 16.
-   */
-  def this(significand: BigInt, exponent: Int, radix: Int) =
-    this(FLOAT, significand, exponent, radix)
-	
-  def rewrite(binds: Bindings) = {
-		theType.rewrite(binds) match {
-		  case (newtype, true) =>
-        (Literal(newtype, significand, exponent, radix), true)
-		  case _ =>
-        (this, false)
-		}
-	}
-  
-  def replace(map: Map[BasicAtom, BasicAtom]) = {
-    map.get(this) match {
-      case Some(atom) =>
-        (atom, true)
-      case None =>
-        val (newtype, flag) = theType.replace(map)
-        if (flag) {
-          (Literal(newtype, significand, exponent, radix), true)
-        } else {
-          (this, false)
-        }
-    }
-  }
 }
 
 /**

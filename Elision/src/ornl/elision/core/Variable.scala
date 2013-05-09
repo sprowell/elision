@@ -55,10 +55,14 @@ import ornl.elision.util.Loc
  * @param labels	Labels for this variable.  Default is none.
  * @param byName  If true, this is a "by name" variable.  Default is false.
  */
-abstract class Variable(loc: Loc, typ: BasicAtom, val name: String,
+abstract class Variable(
+    loc: Loc,
+    typ: BasicAtom,
+    val name: String,
     val guard: BasicAtom = Literal.TRUE,
     val labels: Set[String] = Set[String](),
     val byName: Boolean = false) extends BasicAtom(loc) {
+  
   /** The prefix for this variable. */
   val prefix: String
 
@@ -113,6 +117,7 @@ abstract class Variable(loc: Loc, typ: BasicAtom, val name: String,
  * Companion object to make and match metavariables.
  */
 object TermVariable {
+  
   /**
    * Make a new term variable instance.
    *
@@ -206,6 +211,7 @@ class TermVariable protected[elision] (
     labels: Set[String] = Set[String](),
     byName: Boolean = false)
     extends Variable(loc, typ, name, guard, labels) {
+  
   // This variable is a term.
   override val isTerm = true
   
@@ -229,59 +235,13 @@ class TermVariable protected[elision] (
    */
   override def asMetaVariable =
     new MetaVariable(loc, typ, name, guard, labels, byName)
-
-  def rewrite(binds: Bindings) = {
-    // If we have no bindings, don't rewrite the variable.
-    if (binds == null) {
-      (this, false)
-    } else {
-      // If this variable is bound in the provided bindings, replace it with
-      // the bound value.
-      binds.get(name) match {
-        case Some(atom) =>
-          (atom, true)
-        
-        case None => {
-          // Though the atom is not bound, its type still might have to be
-          // rewritten.
-          theType.rewrite(binds) match {
-            case (newtype, true) =>
-              (new TermVariable(Loc.internal, newtype, name, guard, labels,
-                  byName), true)
-            
-            case _ => {
-              (this, false)
-            }
-          }
-        }
-      }
-    }
-  }
-
-  override def replace(map: Map[BasicAtom, BasicAtom]) = {
-    // Variables are complex critters.  We need to replace in (1) the type,
-    // (2) the guard(s), and (3) the variable itself.  We try the easiest
-    // case first.
-    map.get(this) match {
-      case Some(atom) =>
-        (atom, true)
-      case None =>
-        val (newtype, flag1) = theType.replace(map)
-        val (newguard, flag2) = guard.replace(map)
-        if (flag1 || flag2) {
-          (new TermVariable(Loc.internal, newtype, name, newguard, labels,
-              byName), true)
-        } else {
-          (this, false)
-        }
-    }
-  }
 }
 
 /**
  * Companion object to make and match metavariables.
  */
 object MetaVariable {
+  
   /**
    * Make a new metavariable instance.
    * 
@@ -335,6 +295,7 @@ class MetaVariable protected[elision] (
     labels: Set[String] = Set[String](),
     byName: Boolean = false)
     extends Variable(loc, typ, name, guard, labels) {
+  
   // This variable is not a term.
   override val isTerm = false
   
@@ -358,51 +319,4 @@ class MetaVariable protected[elision] (
    * @return  This metavariable.
    */
   override def asMetaVariable = this
-      
-  def rewrite(binds: Bindings) = {
-    // If we have no bindings, don't rewrite the variable.
-    if (binds == null) {
-      (this, false)
-    } else {
-      // If this variable is bound in the provided bindings, replace it with
-      // the bound value.
-      binds.get(name) match {
-        case Some(atom) =>
-          (atom, true)
-        
-        case None => {
-          // Though the atom is not bound, its type still might have to be
-          // rewritten.
-          theType.rewrite(binds) match {
-            case (newtype, true) =>
-              (new MetaVariable(Loc.internal, newtype, name, guard, labels,
-                  byName), true)
-            
-            case _ => {
-              (this, false)
-            }
-          }
-        }
-      }
-    }
-  }
-
-  override def replace(map: Map[BasicAtom, BasicAtom]) = {
-    // Variables are complex critters.  We need to replace in (1) the type,
-    // (2) the guard(s), and (3) the variable itself.  We try the easiest
-    // case first.
-    map.get(this) match {
-      case Some(atom) =>
-        (atom, true)
-      case None =>
-        val (newtype, flag1) = theType.replace(map)
-        val (newguard, flag2) = guard.replace(map)
-        if (flag1 || flag2) {
-          (new MetaVariable(Loc.internal, newtype, name, newguard, labels,
-              byName), true)
-        } else {
-          (this, false)
-        }
-    }
-  }
 }

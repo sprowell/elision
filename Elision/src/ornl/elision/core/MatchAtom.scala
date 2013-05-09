@@ -44,6 +44,23 @@ import ornl.elision.matcher.Fail
 import ornl.elision.matcher.Many
 
 /**
+ * Provide construction and matching.
+ */
+object MatchAtom {
+  
+  /** The special form tag. */
+  val tag = Literal('match)
+  
+  /**
+   * Extract the pattern atom and any guards.
+   * 
+   * @param ma  The match atom.
+   * @return  The pattern and then guards.
+   */
+  def unapply(ma: MatchAtom) = Some((ma.pattern, ma.guards))
+}
+
+/**
  * Encapsulate a simple atom to perform basic matching.
  * 
  * == Purpose ==
@@ -66,11 +83,18 @@ import ornl.elision.matcher.Many
  * we might get `NONE` as the result from the match and this will not
  * get "digested" by the applicative dot.
  */
-class MatchAtom(sfh: SpecialFormHolder,
-    val pattern: BasicAtom, val guards: AtomSeq)
-extends SpecialForm(sfh.loc, sfh.tag, sfh.content) with Applicable {
+class MatchAtom(
+    loc: Loc,
+    content: => BasicAtom,
+    val pattern: BasicAtom,
+    val guards: AtomSeq)
+    extends SpecialForm(loc, MatchAtom.tag, content) with Applicable {
+  
   /** The type of this atom. */
-  override val theType = SymbolicOperator.MAP(ANY, BINDING)
+  override val theType = new OpApply(
+      Loc.internal,
+      SymbolicOperator.MAP,
+      new AtomSeq(Loc.internal, NoProps, ANY, BINDING))
   
   override def equals(other: Any) = other match {
     case oma: MatchAtom =>
@@ -79,52 +103,4 @@ extends SpecialForm(sfh.loc, sfh.tag, sfh.content) with Applicable {
     case _ =>
       false
   }
-}
-
-/**
- * Provide construction and matching.
- */
-object MatchAtom {
-  /** The special form tag. */
-  val tag = Literal('match)
-  
-  /**
-   * Make a new pair from the provided special form data.
-   * 
-   * @param	sfh		Parsed special form data.
-   */
-  def apply(sfh: SpecialFormHolder): MatchAtom = {
-    val bh = sfh.requireBindings
-    bh.check(Map(""->true, "if"->false))
-    val guards = bh.fetchAs[AtomSeq]("if", Some(EmptySeq))
-    bh.fetchAs[AtomSeq]("") match {
-      case Args(atom: BasicAtom) =>
-        new MatchAtom(sfh, atom, guards)
-      case x =>
-        throw new SpecialFormException(sfh.loc,
-            "Did not find exactly one pattern: " + x.toParseString)
-    }
-  }
-  
-  /**
-   * Make a new match atom from the provided parts.
-   * 
-   * @param loc       Location of the match atom.
-   * @param pattern		The pattern to match.
-   * @param guards		The guards, if any.
-   */
-  def apply(loc: Loc, pattern: BasicAtom, guards: BasicAtom*) = {
-    val guardseq = AtomSeq(NoProps, guards.toIndexedSeq)
-    val binds = Bindings() + (""->AtomSeq(NoProps, pattern)) + ("if"->guardseq)
-    val sfh = new SpecialFormHolder(loc, tag, binds)
-    new MatchAtom(sfh, pattern, guardseq)
-  }
-  
-  /**
-   * Extract the pattern atom and any guards.
-   * 
-   * @param ma	The match atom.
-   * @return	The pattern and then guards.
-   */
-  def unapply(ma: MatchAtom) = Some((ma.pattern, ma.guards))
 }

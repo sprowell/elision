@@ -55,26 +55,9 @@ extends ElisionException(loc, msg)
  * Provide construction and matching for operators.
  */
 object Operator {
+  
   /** Tag for this special form. */
-  val tag = Literal('operator)
-
-  /**
-   * Construct an operator from the provided special form data.
-   *
-   * @param sfh   The parsed special form data.
-   * @return  An operator.
-   */
-  def apply(sfh: SpecialFormHolder): Operator = {
-    val bh = sfh.requireBindings
-    bh.check(Map("name" -> true, "cases" -> false, "params" -> false,
-        "type" -> false, "description" -> false, "detail" -> false,
-        "evenmeta" -> false, "handler" -> false))
-    if (bh.either("cases", "params") == "cases") {
-      CaseOperator(sfh)
-    } else {
-      TypedSymbolicOperator(sfh)
-    }
-  }
+  val tag = new SymbolLiteral(Loc.internal, 'operator)
 
   /**
    * Extract the parts of an operator.
@@ -100,6 +83,8 @@ object Operator {
  * == Use ==
  * The companion object provides methods to create operators.
  *
+ * @param loc         The location.
+ * @param content     The content.  This is lazily evaluated.
  * @param name				The operator name.
  * @param typ					The type of the fully-applied operator.
  * @param definition	A definition for the operator.
@@ -109,65 +94,22 @@ object Operator {
  * 										by default, and you should probably leave it alone.
  */
 abstract class Operator(
-  sfh: SpecialFormHolder,
-  val name: String,
-  val typ: BasicAtom,
-  definition: AtomSeq,
-  val description: String,
-  val detail: String,
-  override val evenMeta: Boolean = false)
-  extends SpecialForm(sfh.loc, sfh.tag, sfh.content) with Applicable {
+    val loc: Loc,
+    content: => BasicAtom,
+    val name: String,
+    val typ: BasicAtom,
+    definition: AtomSeq,
+    val description: String,
+    val detail: String,
+    override val evenMeta: Boolean = false)
+    extends SpecialForm(loc, Operator.tag, content) with Applicable {
+  
 }
 
 /**
  * Construction and matching of macros (case operators).
  */
 object CaseOperator {
-  /**
-   * Make a case operator from the given special form data.
-   *
-   * @param sfh	The special form data.
-   * @return	The case operator.
-   */
-  def apply(sfh: SpecialFormHolder): CaseOperator = {
-    val bh = sfh.requireBindings
-    bh.check(Map("name" -> true, "cases" -> true, "type" -> false,
-      "description" -> false, "detail" -> false, "evenmeta" -> false))
-    val name = bh.fetchAs[SymbolLiteral]("name").value.name
-    val cases = bh.fetchAs[AtomSeq]("cases")
-    val typ = bh.fetchAs[BasicAtom]("type", Some(ANY))
-    var description = bh.fetchAs[StringLiteral]("description", Some("No description."))
-    if (description.value(0) == '|') description = description.value.stripMargin('|')
-    val detail = bh.fetchAs[StringLiteral]("detail", Some("No detail."))
-    val evenMeta = bh.fetchAs[BooleanLiteral]("evenmeta", Some(false)).value
-    return new CaseOperator(sfh, name, typ, cases, description, detail, evenMeta)
-  }
-
-  /**
-   * Make a case operator from the components.
-   *
-   * @param loc           Location of the definition of this operator.
-   * @param name					Operator name.
-   * @param typ						The operator type (may be `ANY`).
-   * @param cases					The cases, as a sequence of atoms.
-   * @param description		An optional short description for the operator.
-   * @param detail				Optional detailed help for the operator.
-   * @param evenMeta			Apply this operator even when the arguments contain
-   * 											meta-terms.  This is not advisable, and you should
-   * 											probably leave this with the default value of false.
-   * @return	The new case operator.
-   */
-  def apply(loc: Loc, name: String, typ: BasicAtom, cases: AtomSeq,
-    description: String, detail: String,
-    evenMeta: Boolean = false): CaseOperator = {
-    val nameS = Literal(Symbol(name))
-    val binds = Bindings() + ("name" -> nameS) + ("cases" -> cases) +
-      ("type" -> typ) + ("description" -> Literal(description)) +
-      ("detail" -> Literal(detail))
-    val sfh = new SpecialFormHolder(loc, Operator.tag, binds)
-
-    return new CaseOperator(sfh, name, typ, cases, description, detail, evenMeta)
-  }
 
   /**
    * Extract the parts of a case operator.
@@ -195,7 +137,8 @@ object CaseOperator {
  * If the end of the list is reached and no value is determined, then an
  * error is generated (an `ArgumentListException`).
  *
- * @param sfh						Special form data.
+ * @param loc           The location.
+ * @param content       The content.  This is lazily evaluated.
  * @param name					The operator name.
  * @param typ						The operator type.
  * @param cases					The definition.
@@ -205,10 +148,49 @@ object CaseOperator {
  * 											meta-terms.  This is not advisable, and you should
  * 											probably leave this with the default value of false.
  */
-class CaseOperator private (sfh: SpecialFormHolder,
-  name: String, typ: BasicAtom, val cases: AtomSeq,
-  description: String, detail: String, evenMeta: Boolean)
-  extends Operator(sfh, name, typ, cases, description, detail, evenMeta) {
+class CaseOperator protected[elision] (
+    loc: Loc,
+    content: => BasicAtom,
+    name: String,
+    typ: BasicAtom,
+    val cases: AtomSeq,
+    description: String,
+    detail: String,
+    evenMeta: Boolean) extends Operator(loc, content, name, typ, cases,
+        description, detail, evenMeta) {
+  
+  /**
+   * Alternate constructor for an operator omitting the special form content
+   * binding.
+   * 
+   * @param loc           The location.
+   * @param name          The operator name.
+   * @param typ           The operator type.
+   * @param cases         The definition.
+   * @param description   An optional short description for the operator.
+   * @param detail        Optional detailed help for the operator.
+   * @param evenMeta      Apply this operator even when the arguments contain
+   *                      meta-terms.  This is not advisable, and you should
+   *                      probably leave this with the default value of false.
+   */
+  def this(
+      loc: Loc,
+      name: String,
+      typ: BasicAtom,
+      cases: AtomSeq,
+      description: String,
+      detail: String,
+      evenMeta: Boolean) = {
+    this(loc, new Bindings {
+      "name" -> new SymbolLiteral(Loc.internal, Symbol(name))
+      "type" -> typ
+      "cases" -> cases
+      "description" -> new StringLiteral(Loc.internal, description)
+      "detail" -> new StringLiteral(Loc.internal, detail)
+      "evenmeta" -> new BooleanLiteral(Loc.internal, evenMeta)
+    }, name, typ, cases, description, detail, evenMeta)
+  }
+
   /** The type of the operator is the provided type. */
   override val theType = typ
 }
@@ -217,68 +199,6 @@ class CaseOperator private (sfh: SpecialFormHolder,
  * Construction and matching of typed symbolic operators.
  */
 object TypedSymbolicOperator {
-  /**
-   * Make a typed symbolic operator from the provided special form data.
-   *
-   * @param sfh		The parsed special form data.
-   * @return	The typed symbolic operator.
-   */
-  def apply(sfh: SpecialFormHolder): TypedSymbolicOperator = {
-    val bh = sfh.requireBindings
-    bh.check(Map("name" -> true, "params" -> true, "type" -> false,
-      "description" -> false, "detail" -> false, "evenmeta" -> false,
-      "handler" -> false))
-    val name = bh.fetchAs[SymbolLiteral]("name").value.name
-    val params = bh.fetchAs[AtomSeq]("params")
-    val typ = bh.fetchAs[BasicAtom]("type", Some(ANY))
-    var description = bh.fetchAs[StringLiteral]("description", Some("No description."))
-    if (description.length > 0 && description.value(0) == '|')
-      description = description.value.stripMargin('|')
-    val detail = bh.fetchAs[StringLiteral]("detail", Some("No detail."))
-    val evenMeta = bh.fetchAs[BooleanLiteral]("evenmeta", Some(false)).value
-
-    // Fetch the handler text, if any was provided.
-    val handlertxt = bh.fetchAs[StringLiteral]("handler", Some(null)) match {
-      case null => None
-      case x: StringLiteral => Some(x.value)
-    }
-
-    // Now create the operator.
-    new TypedSymbolicOperator(sfh, name, typ, params,
-      description, detail, evenMeta, handlertxt)
-  }
-  
-  /**
-   * Make a typed symbolic operator from the provided parts.
-   *
-   * @param loc           Location of the definition of this operator.
-   * @param name					The operator name.
-   * @param typ						The type of the fully-applied operator.
-   * @param params				The operator parameters.
-   * @param description		An optional short description for the operator.
-   * @param detail				Optional detailed help for the operator.
-   * @param evenMeta			Apply this operator even when the arguments contain
-   * 											meta-terms.  This is not advisable, and you should
-   * 											probably leave this with the default value of false.
-   * @param handler       Optional native handler code.  Default is `None`.
-   * @return	The typed symbolic operator.
-   */
-  def apply(loc: Loc, name: String, typ: BasicAtom, params: AtomSeq,
-    description: String, ddetail: String, evenMeta: Boolean = false,
-    handler: Option[String] = None): TypedSymbolicOperator = {
-    val detail = ddetail
-    val nameS = Literal(Symbol(name))
-    var binds = Bindings() + ("name" -> nameS) + ("params" -> params) +
-      ("type" -> typ) + ("description" -> Literal(description)) +
-      ("detail" -> Literal(detail)) + ("evenmeta" -> Literal(evenMeta))
-    handler match {
-      case None =>
-      case Some(text) => binds += ("handler" -> Literal(text))
-    }
-    val sfh = new SpecialFormHolder(loc, Operator.tag, binds)
-    return new TypedSymbolicOperator(sfh, name, typ, params,
-      description, detail, evenMeta, handler)
-  }
 
   /**
    * Extract the parts of a typed symbolic operator.
@@ -299,21 +219,65 @@ object TypedSymbolicOperator {
  * parameters and the provided "fully applied" type.  The result has the form
  * of a mapping from a domain to a co-domain.
  *
- * @param sfh         The parsed special form data.
- * @param name        The operator name.
- * @param typ         The type of the fully-applied operator.
- * @param params      The operator parameters.
- * @param evenMeta    Apply this operator even when the arguments contain
- *                    meta-terms.  This is not advisable, and you should
- *                    probably leave this with the default value of false.
- * @param handlertxt  The text for an optional native handler.
+ * @param loc           The location.
+ * @param tag           The tag.
+ * @param content       The content.  This is lazily evaluated.
+ * @param name          The operator name.
+ * @param typ           The type of the fully-applied operator.
+ * @param params        The operator parameters.
+ * @param description   An optional short description for the operator.
+ * @param detail        Optional detailed help for the operator.
+ * @param evenMeta      Apply this operator even when the arguments contain
+ *                      meta-terms.  This is not advisable, and you should
+ *                      probably leave this with the default value of false.
+ * @param handlertxt    The text for an optional native handler.
  */
-class TypedSymbolicOperator private (sfh: SpecialFormHolder,
-  name: String, typ: BasicAtom, params: AtomSeq,
-  description: String, detail: String, evenMeta: Boolean,
-  handlertxt: Option[String])
-  extends SymbolicOperator(sfh, name, typ, params,
-      description, detail, evenMeta, handlertxt) {
+class TypedSymbolicOperator protected[elision] (
+    loc: Loc,
+    content: => BasicAtom,
+    name: String,
+    typ: BasicAtom,
+    params: AtomSeq,
+    description: String,
+    detail: String,
+    evenMeta: Boolean,
+    handlertxt: Option[String]) extends SymbolicOperator(loc, content, name,
+        typ, params, description, detail, evenMeta, handlertxt) {
+  
+  /**
+   * Alternate constructor for an operator omitting the special form content
+   * binding.
+   * 
+   * @param loc           The location.
+   * @param name          The operator name.
+   * @param typ           The type of the fully-applied operator.
+   * @param params        The operator parameters.
+   * @param description   An optional short description for the operator.
+   * @param detail        Optional detailed help for the operator.
+   * @param evenMeta      Apply this operator even when the arguments contain
+   *                      meta-terms.  This is not advisable, and you should
+   *                      probably leave this with the default value of false.
+   * @param handlertxt    The text for an optional native handler.
+   */
+  def this(
+      loc: Loc,
+      name: String,
+      typ: BasicAtom,
+      params: AtomSeq,
+      description: String,
+      detail: String,
+      evenMeta: Boolean,
+      handlertxt: Option[String]) = {
+    this(loc, new Bindings {
+      "name" -> new SymbolLiteral(Loc.internal, Symbol(name))
+      "type" -> typ
+      "params" -> params
+      "description" -> new StringLiteral(Loc.internal, description)
+      "detail" -> new StringLiteral(Loc.internal, detail)
+      "evenmeta" -> new BooleanLiteral(Loc.internal, evenMeta)
+    }, name, typ, params, description, detail, evenMeta, handlertxt)
+  }
+  
   /**
    * The type of an operator is a mapping from the operator domain to the
    * operator codomain.
@@ -333,38 +297,6 @@ object SymbolicOperator {
   protected[elision] class AbstractApplyData
 
   /**
-   * Make a symbolic operator from the provided parts.
-   *
-   * @param loc           Location of the definition of this operator.
-   * @param name					The operator name.
-   * @param typ						The type of the fully-applied operator.
-   * @param params				The operator parameters.
-   * @param description		An optional short description for the operator.
-   * @param detail				Optional detailed help for the operator.
-   * @param evenMeta			Apply this operator even when the arguments contain
-   * 											meta-terms.  This is not advisable, and you should
-   * 											probably leave this with the default value of false.
-   * @param handler       The text for an optional native handler.
-   * @return	The typed symbolic operator.
-   */
-  def apply(loc: Loc, name: String, typ: BasicAtom, params: AtomSeq,
-    description: String, ddetail: String, evenMeta: Boolean = false,
-    handler: Option[String] = None): SymbolicOperator = {
-    val detail = ddetail
-    val nameS = Literal(Symbol(name))
-    var binds = Bindings() + ("name" -> nameS) + ("params" -> params) +
-      ("type" -> typ) + ("description" -> Literal(description)) +
-      ("detail" -> Literal(detail)) + ("evenmeta" -> Literal(evenMeta))
-    handler match {
-      case None =>
-      case Some(text) => binds += ("handler" -> Literal(text))
-    }
-    val sfh = new SpecialFormHolder(loc, Operator.tag, binds)
-    return new SymbolicOperator(sfh, name, typ, params,
-      description, detail, evenMeta, handler)
-  }
-
-  /**
    * Extract the parts of a symbolic operator.
    *
    * @param so	The operator.
@@ -380,12 +312,16 @@ object SymbolicOperator {
    * This makes the types of operators look more natural when viewed.
    */
   val MAP = OperatorRef(
-    SymbolicOperator(Loc.internal, "MAP", TypeUniverse, AtomSeq(NoProps,
-        'domain, 'codomain),
-      "Mapping constructor.",
-      "This operator is used to construct types for operators.  It " +
-      "indicates a mapping from one type (the domain) to another type " +
-      "(the codomain)."))
+      new SymbolicOperator(
+          Loc.internal,
+          "MAP",
+          TypeUniverse,
+          new AtomSeq(Loc.internal, NoProps, 'domain, 'codomain),
+          "Mapping constructor.",
+          "This operator is used to construct types for operators.  It " +
+          "indicates a mapping from one type (the domain) to another type " +
+          "(the codomain)."))
+      
   /**
    * The well-known cross product operator.  This is needed to define the
    * types of operators, but is not used to define its own type.  The type
@@ -393,22 +329,31 @@ object SymbolicOperator {
    * associative.
    */
   val xx = OperatorRef(
-    SymbolicOperator(Loc.internal, "xx", ANY, AtomSeq(Associative(true), 'x, 'y),
-      "Cross product.",
-      "This operator is used to construct types for operators.  It " +
-      "indicates the cross product of two atoms (typically types).  " +
-      "These originate from the types of the parameters of an operator."))
+      new SymbolicOperator(
+          Loc.internal,
+          "xx",
+          ANY,
+          new AtomSeq(Loc.internal, Associative(true), 'x, 'y),
+          "Cross product.",
+          "This operator is used to construct types for operators.  It " +
+          "indicates the cross product of two atoms (typically types).  " +
+          "These originate from the types of the parameters of an operator."))
+      
   /**
    * The well-known list operator.  This is used to define the type of lists
    * such as the atom sequence.  It has type ^TYPE, indicating that it is a
    * root type.
    */
   val LIST = OperatorRef(
-    SymbolicOperator(Loc.internal, "LIST", TypeUniverse, AtomSeq(NoProps, 'type),
-      "List type constructor.",
-      "This operator is used to indicate the type of a list.  It takes a " +
-      "single argument that is the type of the atoms in the list.  For " +
-      "heterogeneous lists this will be ANY."))
+      new SymbolicOperator(
+          Loc.internal,
+          "LIST",
+          TypeUniverse,
+          new AtomSeq(Loc.internal, NoProps, 'type),
+          "List type constructor.",
+          "This operator is used to indicate the type of a list.  It takes a " +
+          "single argument that is the type of the atoms in the list.  For " +
+          "heterogeneous lists this will be ANY."))
 
   /**
    * Compute an operator type.
@@ -419,9 +364,29 @@ object SymbolicOperator {
    */
   def makeOperatorType(params: AtomSeq, typ: BasicAtom) =
     params.length match {
-      case 0 => MAP(NONE, typ)
-      case 1 => MAP(params(0).theType, typ)
-      case _ => MAP(xx(params.map(_.theType): _*), typ)
+      case 0 =>
+        new OpApply(
+            Loc.internal,
+            MAP,
+            new AtomSeq(Loc.internal, NONE, typ))
+        
+      case 1 =>
+        new OpApply(
+            Loc.internal,
+            MAP,
+            new AtomSeq(Loc.internal, params(0).theType, typ))
+        
+      case _ =>
+        new OpApply(
+            Loc.internal,
+            MAP,
+            new AtomSeq(
+                Loc.internal,
+                new OpApply(
+                    Loc.internal,
+                    xx,
+                    params.map(_.theType)),
+                typ))
     }
 }
 
@@ -433,20 +398,65 @@ object SymbolicOperator {
  * for special "primitive" operators that are themselves used to specify the
  * types of operators.
  *
- * @param sfh         The parsed special form data.
- * @param name        The operator name.
- * @param typ         The type of the fully-applied operator.
- * @param params		  The operator parameters.
- * @param evenMeta    Apply this operator even when the arguments contain
- *                    meta-terms.  This is not advisable, and you should
- *                    probably leave this with the default value of false.
- * @param handlertxt  The text for an optional native handler.
+ * @param loc           The location.
+ * @param tag           The tag.
+ * @param content       The content.  This is lazily evaluated.
+ * @param name          The operator name.
+ * @param typ           The type of the fully-applied operator.
+ * @param params        The operator parameters.
+ * @param description   An optional short description for the operator.
+ * @param detail        Optional detailed help for the operator.
+ * @param evenMeta      Apply this operator even when the arguments contain
+ *                      meta-terms.  This is not advisable, and you should
+ *                      probably leave this with the default value of false.
+ * @param handlertxt    Optional text for a native handler.  None by default.
  */
-protected class SymbolicOperator protected (sfh: SpecialFormHolder,
-  name: String, typ: BasicAtom, val params: AtomSeq,
-  description: String, detail: String, evenMeta: Boolean,
-  val handlertxt: Option[String])
-  extends Operator(sfh, name, typ, params, description, detail, evenMeta) {
+class SymbolicOperator protected[elision] (
+    loc: Loc,
+    content: => BasicAtom,
+    name: String,
+    typ: BasicAtom,
+    val params: AtomSeq,
+    description: String = "no description",
+    detail: String = "no detail",
+    evenMeta: Boolean = false,
+    val handlertxt: Option[String] = None) extends Operator(loc, content, name,
+        typ, params, description, detail, evenMeta) {
+    
+  /**
+   * Alternate constructor for an operator omitting the special form content
+   * binding.
+   * 
+   * @param loc           The location.
+   * @param name          The operator name.
+   * @param typ           The type of the fully-applied operator.
+   * @param params        The operator parameters.
+   * @param description   An optional short description for the operator.
+   * @param detail        Optional detailed help for the operator.
+   * @param evenMeta      Apply this operator even when the arguments contain
+   *                      meta-terms.  This is not advisable, and you should
+   *                      probably leave this with the default value of false.
+   * @param handlertxt    The text for an optional native handler.
+   */
+  def this(
+      loc: Loc,
+      name: String,
+      typ: BasicAtom,
+      params: AtomSeq,
+      description: String = "no description",
+      detail: String = "no detail",
+      evenMeta: Boolean = false,
+      handlertxt: Option[String] = None) = {
+    this(loc, new Bindings {
+      "name" -> new SymbolLiteral(Loc.internal, Symbol(name))
+      "type" -> typ
+      "params" -> params
+      "description" -> new StringLiteral(Loc.internal, description)
+      "detail" -> new StringLiteral(Loc.internal, detail)
+      "evenmeta" -> new BooleanLiteral(Loc.internal, evenMeta)
+    }, name, typ, params, description, detail, evenMeta, handlertxt)
+  }
+
   // Save the type.  Symbolic operators can't construct their type like the
   // typed symbolic operators can (thus the names).
   override val theType: BasicAtom = ANY

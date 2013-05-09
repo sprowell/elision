@@ -42,17 +42,9 @@ import ornl.elision.matcher.Matcher
 import ornl.elision.matcher.Match
 import ornl.elision.matcher.Fail
 import ornl.elision.matcher.Many
+import ornl.elision.util.Loc
 
 object MapPair {
-  /**
-   * Make a new instance.
-   * 
-   * @param left  The left atom.
-   * @param right The right atom.
-   * @return  The new map pair.
-   */
-  def apply(left: BasicAtom, right: BasicAtom) =
-    new MapPair(left, right)
   
   /**
    * Extract the parts of a map pair.
@@ -76,9 +68,16 @@ object MapPair {
  * At present there is no way to specify general guards, so the first match
  * of the left hand side is used immediately and unconditionally.  (Variable
  * guards are, of course, honored.)
+ * 
+ * @param loc     Location of the declaration of the atom.
+ * @param left    The left atom.
+ * @param right   The right atom.
  */
-class MapPair(val left: BasicAtom, val right: BasicAtom)
-extends BasicAtom with Strategy {
+class MapPair(
+    loc: Loc,
+    val left: BasicAtom,
+    val right: BasicAtom) extends BasicAtom(loc) with Strategy {
+  
 	/** A map pair is actually a strategy. */
   val theType = STRATEGY
   lazy val isConstant = left.isConstant && right.isConstant
@@ -88,32 +87,6 @@ extends BasicAtom with Strategy {
 
   override lazy val hashCode = left.hashCode * 31 + right.hashCode
   lazy val otherHashCode = left.otherHashCode + 8191*right.otherHashCode
-	
-  def rewrite(binds: Bindings): (BasicAtom, Boolean) = {
-    val newleft = left.rewrite(binds)
-    val newright = right.rewrite(binds)
-    if (newleft._2 || newright._2) {
-      (MapPair(newleft._1, newright._2), true)
-    } else {
-      (this, false)
-    }
-  }
-	
-  def replace(map: Map[BasicAtom, BasicAtom]) = {
-    map.get(this) match {
-      case Some(atom) =>
-        (atom, true)
-        
-      case None =>
-        val (newleft, flag1) = left.replace(map)
-        val (newright, flag2) = right.replace(map)
-        if (flag1 || flag2) {
-          (MapPair(newleft, newright), true)
-        } else {
-          (this, false)
-        }
-    }
-  }
   
   override def equals(other: Any) = other match {
     case omp: MapPair =>

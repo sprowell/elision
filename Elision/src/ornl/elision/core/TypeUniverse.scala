@@ -37,6 +37,7 @@
 package ornl.elision.core
 
 import ornl.elision.util.other_hashify
+import ornl.elision.util.Loc
 
 /**
  * Define the unique type universe.
@@ -51,7 +52,8 @@ import ornl.elision.util.other_hashify
  * ==Equality and Matching==
  * The type universe is equal only to itself, and matches only itself.
  */
-object TypeUniverse extends SymbolLiteral(null, Symbol("^TYPE")) {
+object TypeUniverse extends SymbolLiteral(Loc.internal, null, Symbol("^TYPE")) {
+  
   /** The type of the type universe is itself. */
   override val theType = this
 
@@ -68,6 +70,7 @@ object TypeUniverse extends SymbolLiteral(null, Symbol("^TYPE")) {
     
   /** Compute the hash code. */
   override lazy val hashCode = toParseString.hashCode
-  override lazy val otherHashCode = (value.toString).foldLeft(BigInt(0))(other_hashify)  
+  override lazy val otherHashCode =
+    (value.toString).foldLeft(BigInt(0))(other_hashify)  
   override def equals(other: Any) = TypeUniverse eq other.asInstanceOf[AnyRef]
 }

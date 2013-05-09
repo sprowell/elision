@@ -57,33 +57,6 @@ extends ElisionException(loc, msg)
  * Simplified creation and matching for algebraic properties objects.
  */
 object AlgProp {
-  /**
-   * Create an algebraic properties object.
-   * 
-   * @param loc           Location of this properties object declaration.
-   * @param associative   Optional associativity.  Default is none.
-   * @param commutative   Optional commutativity.  Default is none.
-   * @param idempotent    Optional idempotency.  Default is none.
-   * @param absorber      Optional absorber.  Default is none.
-   * @param identity      Optional identity.  Default is none.
-   * @return  The new algebraic properties object.
-   */
-  def apply(loc: Loc,
-      associative: Option[BasicAtom] = None,
-      commutative: Option[BasicAtom] = None,
-      idempotent: Option[BasicAtom] = None,
-      absorber: Option[BasicAtom] = None,
-      identity: Option[BasicAtom] = None)(
-      implicit eval: Evaluator) = {
-    // Having the value ANY is really the same as being unspecified, so
-    // we correct that now.
-    def adjust(opt: Option[BasicAtom]) = opt match {
-      case Some(ANY) => None
-      case _ => opt
-    }
-    eval.newAlgProp(loc, adjust(associative), adjust(commutative),
-        adjust(idempotent), adjust(absorber), adjust(identity))
-  }
   
   /**
    * Pull apart an algebraic properties object.
@@ -270,57 +243,6 @@ class AlgProp protected[elision] (
   def getD(default: BasicAtom) = absorber match {
     case Some(atom) => atom
     case _ => default
-  }
-  
-  def rewrite(binds: Bindings): (AlgProp, Boolean) = {
-    def _rewrite(opt: Option[BasicAtom]) = {
-      opt match {
-        case None => 
-          (None, false)
-          
-        case Some(atom) => {
-          val newatom = atom.rewrite(binds)
-          (Some(newatom._1), newatom._2)
-        }
-      }
-    }
-    val assoc = _rewrite(associative)
-    val commu = _rewrite(commutative)
-    val idemp = _rewrite(idempotent)
-    val absor = _rewrite(absorber)
-    val ident = _rewrite(identity)
-    if (assoc._2 || commu._2 || idemp._2 || absor._2 || ident._2) {
-      (new AlgProp(loc, assoc._1, commu._1, idemp._1, absor._1, ident._1), true)
-    } else {
-      (this, false)
-    }
-  }  
-  
-  def replace(map: Map[BasicAtom, BasicAtom]) = {
-    def _replace(opt: Option[BasicAtom]) = opt match {
-      case None =>
-        (None, false)
-        
-      case Some(atom) =>
-        val (newatom, flag) = atom.replace(map)
-        (Some(newatom), flag)
-    }
-    map.get(this) match {
-      case Some(atom) =>
-        (atom, true)
-        
-      case None =>
-        val (newA, flagA) = _replace(associative)
-        val (newC, flagC) = _replace(commutative)
-        val (newI, flagI) = _replace(idempotent)
-        val (newB, flagB) = _replace(absorber)
-        val (newD, flagD) = _replace(identity)
-        if (flagA || flagC || flagI || flagB || flagD) {
-          (new AlgProp(loc, newA, newC, newI, newB, newD), true)
-        } else {
-          (this, false)
-        }
-    }
   }
   
   /**

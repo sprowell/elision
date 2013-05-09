@@ -84,13 +84,17 @@ trait Strategy extends Applicable
  *  - Specify the type of the object.  To do this add `val theType = `(a basic
  *    atom).
  *    
- *  - Implement `rewrite`.
+ *  - Visit [[ornl.elision.core.AtomWalker]] and add code to traverse the atom.
  *  
- *  - Visit [[ornl.elision.core.ElisionGenerator]] and add code to create a
+ *  - Visit [[ornl.elision.context.Builder]] and add code or a method to make
+ *    the atom.  If specialized processing is required then add that in an
+ *    appropriate subclass, such as [[ornl.elision.context.StandardBuilder]].
+ *  
+ *  - Visit [[ornl.elision.dialects.ElisionGenerator]] and add code to create a
  *    string from the new atom.  This must return a string that is parseable by
- *    [[ornl.elision.core.AtomParser]] to re-create the atom.
+ *    [[ornl.elision.parse.AtomParser]] to re-create the atom.
  *    
- *  - Visit [[ornl.elision.core.ScalaGenerator]] and add code to create a
+ *  - Visit [[ornl.elision.dialects.ScalaGenerator]] and add code to create a
  *    string from the new atom.  This must return a string that is parseable by
  *    Scala to re-create the atom.  In many cases making the class into a
  *    `case class` will be sufficient, but if there are arguments that are
@@ -224,29 +228,6 @@ abstract class BasicAtom(val loc: Loc = Loc.internal) extends HasOtherHash {
    * Construct and cache the spouse of this object.
    */
   lazy val spouse = BasicAtom.buildSpouse(this)
-
-  /**
-   * Rewrite this atom with the specified bindings.  If types are involved, it
-   * is expected that overriding types will handle rewriting those, as well.
-   * 
-   * @param binds		The bindings.
-   * @return	The result of rewriting this atom, and whether or not anything
-   * 					changed.
-   */
-  def rewrite(binds: Bindings): (BasicAtom, Boolean)
-  
-  /**
-   * Systematically replace one basic atom with another basic atom.
-   * 
-   * Note that you can use this to search for a subterm.  The idea is to map
-   * the subterm to itself (so no real "change" is made) and then look at the
-   * flag on return.
-   * 
-   * @param map   A mapping from old atom to replacement atom.
-   * @return  The result of the replacement (a potentially new atom), and a
-   *          flag indicating whether or not any replacement was performed.
-   */
-  def replace(map: Map[BasicAtom, BasicAtom]): (BasicAtom, Boolean)
 
   /**
    * Generate a parseable string from this atom.  The returned string should

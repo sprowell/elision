@@ -40,12 +40,14 @@ import scala.compat.Platform
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.Stack
+import ornl.elision.util.Loc
 
 /**
  * Provide construction and extraction for an `Apply`.  This is the correct
  * place to come to make an application object.
  */
 object Apply {
+  
   /**
    * Extract the components of an apply and return them.
    * 
@@ -70,10 +72,15 @@ object Apply {
  * Use this class via the companion object, so that the correct result is
  * returned.  The result may be any kind of atom.
  * 
+ * @param loc   The location of the atom's declaration.
  * @param op		The left-hand element of the apply (operator).
  * @param arg		The right-hand element of the apply (argument).
  */
-abstract class Apply(val op: BasicAtom, val arg: BasicAtom) extends BasicAtom {
+abstract class Apply(
+    loc: Loc,
+    val op: BasicAtom,
+    val arg: BasicAtom) extends BasicAtom(loc) {
+  
   lazy val isConstant = op.isConstant && arg.isConstant
   lazy val isTerm = op.isTerm && arg.isTerm
   lazy val depth = (op.depth max arg.depth) + 1
@@ -90,31 +97,6 @@ abstract class Apply(val op: BasicAtom, val arg: BasicAtom) extends BasicAtom {
       case _ =>
         false
     })
-
-  def rewrite(binds: Bindings) = {
-    val (nop, nof) = op.rewrite(binds)
-    val (narg, naf) = arg.rewrite(binds)
-    if (nof || naf) {
-  		(Apply(nop, narg), true)
-  	} else { 
-      (this, false)
-    }
-  }
-  
-  def replace(map: Map[BasicAtom, BasicAtom]) = {
-    map.get(this) match {
-      case Some(atom) =>
-        (atom, true)
-      case None =>
-        val (newop, flag1) = op.replace(map)
-        val (newarg, flag2) = arg.replace(map)
-        if (flag1 || flag2) {
-          (Apply(newop, newarg), true)
-        } else {
-          (this, false)
-        }
-    }
-  }
 }
 
 /**
@@ -130,14 +112,19 @@ abstract class Apply(val op: BasicAtom, val arg: BasicAtom) extends BasicAtom {
  * for an operator application.  '''Do not use this directly.'''  Instead,
  * use the methods in the [[ornl.elision.core.Apply]] companion object.
  * 
+ * @param loc     Location of the atom's declaration.
  * @param op			The operator.
  * @param arg			The argument list.
  * @param pabinds	The bindings from parameter name to argument.  Note that
  * 								if the operator is associative the parameters may be
  * 								synthetic!
  */
-case class OpApply protected[core] (override val op: OperatorRef,
-    override val arg: AtomSeq, val pabinds: Bindings) extends Apply(op, arg) {
+case class OpApply protected[core] (
+    loc: Loc,
+    override val op: OperatorRef,
+    override val arg: AtomSeq,
+    val pabinds: Bindings) extends Apply(loc, op, arg) {
+  
   /**
    * Compute the type from the type specified by the operator, and the bindings
    * provided during parameter matching.  This allows rewriting otherwise
@@ -175,83 +162,6 @@ case class OpApply protected[core] (override val op: OperatorRef,
       }
     }  
   }
-
-  /**
-   * Get the variables in the operator arguments.
-   */
-  override def getVariables(): Option[HashSet[BasicAtom]] = {
-    // Make the result set to hold the variables.
-    var r = new HashSet[BasicAtom]
-
-    // This is used a lot, so it needs to be fast. We will find all
-    // the variables here with a stack to avoid recursive calls.
-    var work = new Stack[BasicAtom]
-    var done = new HashSet[BasicAtom]
-    work.push(this)
-    while (!work.isEmpty) {
-      work.pop match {
-
-        // Are we working on an operator instance?
-        case op: OpApply => {
-          // Push all the operator arguments on the stack to check, if
-          // we have not already checked this operator instance.
-          if (!(done contains op)) {
-            for (a <- op.arg) work.push(a)
-            done += op
-          }
-        }
-
-        // Did we find a variable?
-        case v: Variable => {
-
-          // Save the variable.
-          r.add(v)
-        }
-        
-        // Any other type of atom we ignore.
-        case _ => {}
-      }
-    }
-
-    return Some(r)
-  }
-
-  /**
-   * Get the operators in the operator arguments, plus this operator.
-   */
-  override def getOperators(opNames: HashSet[String]): Option[HashSet[BasicAtom]] = {
-    // Make the result set to hold the variables.
-    var r = new HashSet[BasicAtom]
-
-    // This is used a lot, so it needs to be fast. We will find all
-    // the operators here with a stack to avoid recursive calls.
-    var work = new Stack[BasicAtom]
-    var done = new HashSet[BasicAtom]
-    work.push(this)
-    while (!work.isEmpty) {
-      work.pop match {
-
-        // Are we working on an operator instance?
-        case currOp: OpApply => {
-
-          // Is this one of the operators we are looking for?
-          if (opNames contains currOp.op.operator.name) r.add(currOp)
-
-          // Push all the operator arguments on the stack to check, if
-          // we have not already checked this operator instance.
-          if (!(done contains currOp)) {
-            for (a <- currOp.arg) work.push(a)
-            done += currOp
-          }
-        }
-        
-        // Any other type of atom we ignore.
-        case _ => {}
-      }
-    }
-
-    return Some(r)
-  }
 }
 
 /**
@@ -262,11 +172,15 @@ case class OpApply protected[core] (override val op: OperatorRef,
  * [[ornl.elision.core.Apply]] companion object to create an apply using
  * the correct processing.
  * 
+ * @param loc   The location of the atom's declaration.
  * @param op		The operator.
  * @param arg		The argument.
  */
-case class SimpleApply protected[core] (override val op: BasicAtom,
-    override val arg: BasicAtom) extends Apply(op, arg) {
+case class SimpleApply protected[core] (
+    loc: Loc,
+    override val op: BasicAtom,
+    override val arg: BasicAtom) extends Apply(loc, op, arg) {
+  
   /**
    * We take the type from the operator.  This may be an incomplete type, but
    * we cannot rewrite it yet because we don't know the full bindings.  This

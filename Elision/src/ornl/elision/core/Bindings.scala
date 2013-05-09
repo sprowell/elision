@@ -43,6 +43,35 @@ import scala.collection.mutable.SynchronizedMap
 import ornl.elision.util.OmitSeq
 
 /**
+ * Simplified construction of bindings.
+ */
+object Bindings {
+  
+  /**
+   * An empty bindings object.  Since bindings are immutable, you should use
+   * this to avoid object construction when you just need an empty set of
+   * bindings.
+   */
+  val EmptyBinds = new Bindings(Map[String,BasicAtom]())
+  
+  /**
+   * Create bindings from the provided map.
+   * 
+   * @param map The map to transform into a bindings object.
+   */
+  def apply(map: Map[String,BasicAtom]) = new Bindings(map)
+  
+  /**
+   * Create a bindings from the provided pairs.
+   * 
+   * @param pairs The pairs to include in the bindings.
+   */
+  def apply(pairs: (String,BasicAtom)*) =
+    if (pairs.length == 0) EmptyBinds
+    else new Bindings(HashMap(pairs:_*))
+}
+
+/**
  * Bindings are used to store variable / value maps used during matching, and
  * as the result of a successful match.
  * 
@@ -67,8 +96,9 @@ import ornl.elision.util.OmitSeq
  * 
  * @param self	The backing map.
  */
-class Bindings(val self: HashMap[String, BasicAtom])
-extends HashMap[String, BasicAtom] with Mutable {
+class Bindings(val self: Map[String, BasicAtom])
+extends Map[String, BasicAtom] with Mutable {
+  
   override def size = self.size
   override def foreach[U](f: ((String, BasicAtom)) =>  U): Unit =
     self.foreach(f)
@@ -146,31 +176,3 @@ extends HashMap[String, BasicAtom] with Mutable {
     }
   }
 } 
-
-/**
- * Simplified construction of bindings.
- */
-object Bindings {
-  /**
-   * An empty bindings object.  Since bindings are immutable, you should use
-   * this to avoid object construction when you just need an empty set of
-   * bindings.
-   */
-  val EmptyBinds = new Bindings(new HashMap[String,BasicAtom]())
-  
-  /**
-   * Create bindings from the provided map.
-   * 
-   * @param map	The map to transform into a bindings object.
-   */
-  def apply(map: HashMap[String,BasicAtom]) = new Bindings(map)
-  
-  /**
-   * Create a bindings from the provided pairs.
-   * 
-   * @param pairs	The pairs to include in the bindings.
-   */
-  def apply(pairs: (String,BasicAtom)*) =
-    if (pairs.length == 0) EmptyBinds
-    else new Bindings(HashMap(pairs:_*))
-}

@@ -73,16 +73,6 @@ class OperatorRef(val operator: Operator) extends BasicAtom {
   val name = operator.name
 
   /**
-   * Operator references cannot be rewritten.  This is actually why they exist!
-   */
-  def rewrite(binds: Bindings) = (this, false)
-   
-  def replace(map: Map[BasicAtom, BasicAtom]) = map.get(this) match {
-    case None => (this, false)
-    case Some(atom) => (atom, true)
-  }
-
-  /**
    * Operator references are equal iff the referenced operators are equal.
    */
   override def equals(other: Any) = other match {

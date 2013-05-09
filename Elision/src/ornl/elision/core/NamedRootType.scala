@@ -38,6 +38,68 @@
 package ornl.elision.core
 
 import ornl.elision.util.other_hashify
+import ornl.elision.util.Loc
+
+/**
+ * The companion object maintains a registry of the named root types that have
+ * been created.  This can be used during parsing to detect the use of named
+ * root types.
+ * 
+ * This companion object also provides methods to make and match named root
+ * types.
+ */
+object NamedRootType {
+  
+  /** The map of names to known root types. */
+  private lazy val _known =
+    scala.collection.mutable.OpenHashMap[String,NamedRootType]()
+  
+  /**
+   * Make a new named root type.  In general you can avoid this method, and
+   * prefer instead to extend the class.  However, if you need to create a
+   * named root type programmatically, this will work.
+   * 
+   * @param name    The name of the new root type.
+   * @return  The new root type.
+   */
+  def apply(name: String) =
+    _known.getOrElseUpdate(name, new NamedRootType(name))
+  
+  /**
+   * Extract the name of the root type.
+   * 
+   * @param nrt The named root type.
+   * @return  The name.
+   */
+  def unapply(nrt: NamedRootType) = Some(nrt.name)
+  
+  /**
+   * Get the named root type, if it is known.
+   * 
+   * @param name  The potential root type name.
+   * @return  The root type, if there is one, or None if there is not.
+   */
+  def get(name: String) = _known.get(name)
+  
+  /**
+   * Save the named root type.
+   * 
+   * @param typ The named root type.
+   * @return  The named root type.  This might be a different instance if
+   *          the type has already been declared.
+   */
+  private def _set(typ: NamedRootType) = _known.getOrElseUpdate(typ.name, typ)
+
+  // Initialize the default set of root types.  This just forces them to all
+  // get constructed, and then installed.  It must be the last thing in this
+  // object.
+  List(STRING, SYMBOL,
+      INTEGER, FLOAT, BITSTRING,
+      BOOLEAN, RULETYPE,
+      OPREF, STRATEGY,
+      BINDING,
+      ANY, NONE)
+}
 
 /**
  * Provide a very simple implementation of `RootType`.  This is a trivial root
@@ -70,15 +132,11 @@ import ornl.elision.util.other_hashify
  * @param name	The name.
  */
 class NamedRootType protected (val name: String)
-extends SymbolLiteral(TypeUniverse, Symbol(name)) {
+extends SymbolLiteral(Loc.internal, TypeUniverse, Symbol(name)) {
+  
   // Save this instance in the registry.  This is essential so that the parser
   // can find root types.
   NamedRootType._set(this)
-
-  /**
-   * The root types cannot be rewritten, as they do not have children.
-   */
-  override def rewrite(binds: Bindings) = (this, false)
   
   /** Generate the hash code. */
   override lazy val hashCode = name.hashCode()
@@ -92,66 +150,6 @@ extends SymbolLiteral(TypeUniverse, Symbol(name)) {
     case NamedRootType(oname) if name == oname => true
     case _ => false
   }
-}
-
-/**
- * The companion object maintains a registry of the named root types that have
- * been created.  This can be used during parsing to detect the use of named
- * root types.
- * 
- * This companion object also provides methods to make and match named root
- * types.
- */
-object NamedRootType {
-  /** The map of names to known root types. */
-  private lazy val _known =
-    scala.collection.mutable.OpenHashMap[String,NamedRootType]()
-  
-  /**
-   * Make a new named root type.  In general you can avoid this method, and
-   * prefer instead to extend the class.  However, if you need to create a
-   * named root type programmatically, this will work.
-   * 
-   * @param name		The name of the new root type.
-   * @return	The new root type.
-   */
-  def apply(name: String) =
-    _known.getOrElseUpdate(name, new NamedRootType(name))
-  
-  /**
-   * Extract the name of the root type.
-   * 
-   * @param nrt	The named root type.
-   * @return	The name.
-   */
-  def unapply(nrt: NamedRootType) = Some(nrt.name)
-  
-  /**
-   * Get the named root type, if it is known.
-   * 
-   * @param name	The potential root type name.
-   * @return	The root type, if there is one, or None if there is not.
-   */
-  def get(name: String) = _known.get(name)
-  
-  /**
-   * Save the named root type.
-   * 
-   * @param typ	The named root type.
-   * @return	The named root type.  This might be a different instance if
-   * 					the type has already been declared.
-   */
-  private def _set(typ: NamedRootType) = _known.getOrElseUpdate(typ.name, typ)
-
-  // Initialize the default set of root types.  This just forces them to all
-  // get constructed, and then installed.  It must be the last thing in this
-  // object.
-  List(STRING, SYMBOL,
-      INTEGER, FLOAT, BITSTRING,
-      BOOLEAN, RULETYPE,
-      OPREF, STRATEGY,
-      BINDING,
-      ANY, NONE)
 }
 
 //======================================================================

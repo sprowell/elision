@@ -115,14 +115,18 @@ import ornl.elision.matcher.Many
  * }}}
  * Both are rewritten to <code>\\$`:1`.$`:1`</code>.
  * 
- * @param lvar							The lambda variable which must match the De Bruijn
- * 													index.
- * @param body							The lambda body.
- * @param isFixed						If true, this is a fixed lambda, meaning that the
- * 													body is always returned and never rewritten.
+ * @param loc         The location of the atom declaration.
+ * @param given_lvar	The lambda variable which must match the De Bruijn
+ * 										index.
+ * @param given_body  The lambda body.
  */
-class Lambda private (val lvar: Variable, val body: BasicAtom, isFixed: Boolean)
-extends BasicAtom with Applicable {
+class Lambda protected[elision] (
+    loc: Loc,
+    given_lvar: Variable,
+    given_body: BasicAtom) extends BasicAtom(loc) with Applicable {
+  // Correct the parts.
+  val (lvar, body) = Lambda.adjust(given_lvar, given_body)
+  
   /** The type is a mapping from the variable type to the body type. */
   lazy val theType = SymbolicOperator.MAP(lvar.theType, body.theType)
   
@@ -140,39 +144,12 @@ extends BasicAtom with Applicable {
   /**
    * The lambda is a term iff its body is a term.  
    */
-  lazy val isTerm = body.isTerm  
-  lazy val depth = body.depth + 1
-
-  def rewrite(binds: Bindings): (BasicAtom, Boolean) = {
-    // We test for a special case here.  If the bindings specify that we
-    // should rewrite our own bound De Bruijn index, we explicitly ignore
-    // it.
-    val newbinds = binds - lvar.name
-    body.rewrite(newbinds) match {
-	    case (newatom, changed) if changed => 
-  			(Lambda(lvar, newatom), true)
-	    case _ => 
-        (this, false)
-	  }
-  }
+  lazy val isTerm = body.isTerm
   
-  def replace(map: Map[BasicAtom, BasicAtom]) = {
-    map.get(this) match {
-      case Some(atom) =>
-        (atom, true)
-      case None =>
-        val (newvar, flag) = lvar.replace(map)
-        val (newlvar, flag1) =
-          (if (newvar.isInstanceOf[Variable])
-            (newvar.asInstanceOf[Variable], flag) else (lvar, false))
-        val (newbody, flag2) = body.replace(map)
-        if (flag1 || flag2) {
-          (Lambda(newlvar, newbody), true)
-        } else {
-          (this, false)
-        }
-    }
-  }
+  /**
+   * Lambda depth is body depth plus one.
+   */
+  lazy val depth = body.depth + 1
   
   override lazy val hashCode = lvar.hashCode * 31 + body.hashCode
   lazy val otherHashCode = lvar.otherHashCode + 8191*body.otherHashCode
@@ -204,53 +181,66 @@ object Lambda {
    * @param lambda	The lambda to match.
    * @return	The variable and then body.
    */
-  def unapply(lambda: Lambda) = Some(lambda.lvar, lambda.body)
-  
+  def unapply(lambda: Lambda) = Some(lambda.lvar, lambda.body)  
   
   /**
-   * Make a lambda from the provided parameter and body.
+   * Convert a given lambda variable and body into a new variable and body
+   * that use de Bruijn indices if those are enabled.  Otherwise return the
+   * input variable and body.
    *
-   * @param lvar	The lambda parameter.
-   * @param body	The lambda body.
+   * @param given_lvar	The given lambda parameter.
+   * @param given_body	The given lambda body.
+   * @return  The pair consisting of the corrected variable and body.
    */
-  def apply(lvar: Variable, body: BasicAtom): Lambda = {
+  def adjust(given_lvar: Variable, given_body: BasicAtom) = {
     // Make and return the new lambda.
     if (useDeBruijnIndices) {
       // Decide what De Bruijn index to use for this lambda.  We will use one
       // greater than the maximum index of the body.
-	    val dBI = body.deBruijnIndex + 1
+	    val dBI = given_body.deBruijnIndex + 1
 
 	    // Classes that implement De Bruijn indices.
-	    class DBIV(typ: BasicAtom, val dBI: Int, guard: BasicAtom, lvar: Set[String])
-	    extends Variable(typ, ":" + dBI, guard, lvar) {
+	    class DBIV(
+	        typ: BasicAtom,
+	        val dBI: Int,
+	        guard: BasicAtom,
+	        lvar: Set[String])
+	        extends TermVariable(Loc.internal, typ, ":" + dBI, guard, lvar) {
 	      override val isDeBruijnIndex = true
 	      override val deBruijnIndex = dBI
       }
-      class DBIM(typ: BasicAtom, val dBI: Int, guard: BasicAtom, lvar: Set[String])
-      extends MetaVariable(typ, ":" + dBI, guard, lvar) {
+      class DBIM(
+          typ: BasicAtom,
+          val dBI: Int,
+          guard: BasicAtom,
+          lvar: Set[String])
+          extends MetaVariable(Loc.internal, typ, ":" + dBI, guard, lvar) {
 	      override val isDeBruijnIndex = true
 	      override val deBruijnIndex = dBI
       }
 	    
 	    // Now make new De Bruijn variables for the index.
-      val newvar = new DBIV(lvar.theType, dBI, lvar.guard, lvar.labels)
-      val newmvar = new DBIM(lvar.theType, dBI, lvar.guard, lvar.labels)
+      val newvar =
+        new DBIV(given_lvar.theType, dBI, given_lvar.guard, given_lvar.labels)
+      val newmvar =
+        new DBIM(given_lvar.theType, dBI, given_lvar.guard, given_lvar.labels)
       
       // Create a map.
       val map = Map[BasicAtom, BasicAtom](
-          lvar.asVariable -> newvar, lvar.asMetaVariable -> newmvar)
+          given_lvar.asTermVariable -> newvar,
+          given_lvar.asMetaVariable -> newmvar)
 		
 	    // Bind the old variable to the new one and rewrite the body.
-	    val (newbody, notfixed) = body.replace(map)
+	    val (newbody, notfixed) = given_body.replace(map)
 	    
-	    // Compute the new lambda.
-	    if (notfixed)	{
-        new Lambda(newvar, newbody, false)
-      } else {
-        new Lambda(newvar, body, true)
-      }
+	    // Return the result.
+	    if (given_lvar.isTerm) {
+	      (newvar, newbody)
+	    } else {
+	      (newmvar, newbody)
+	    }
     } else {
-      new Lambda(lvar, body, false)
+      (given_lvar, given_body)
     }
   }
 }
