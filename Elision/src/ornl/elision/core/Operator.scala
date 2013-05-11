@@ -104,6 +104,21 @@ abstract class Operator(
     override val evenMeta: Boolean = false)
     extends SpecialForm(loc, Operator.tag, content) with Applicable {
   
+  /**
+   * Apply the operator to the given argument list.
+   * 
+   * @param args    The argument list.
+   */
+  def apply(args: IndexedSeq[BasicAtom]): BasicAtom
+  
+  /**
+   * Apply the operator to the given argument list.
+   * 
+   * @param args    The argument list.
+   */
+  def apply(args: BasicAtom*): BasicAtom = {
+    apply(args.toIndexedSeq)
+  }
 }
 
 /**
@@ -148,7 +163,7 @@ object CaseOperator {
  * 											meta-terms.  This is not advisable, and you should
  * 											probably leave this with the default value of false.
  */
-class CaseOperator protected[elision] (
+abstract class CaseOperator protected[elision] (
     loc: Loc,
     content: => BasicAtom,
     name: String,
@@ -181,14 +196,14 @@ class CaseOperator protected[elision] (
       description: String,
       detail: String,
       evenMeta: Boolean) = {
-    this(loc, new Bindings {
+    this(loc, new BindingsAtom(loc, Bindings {
       "name" -> new SymbolLiteral(Loc.internal, Symbol(name))
       "type" -> typ
       "cases" -> cases
       "description" -> new StringLiteral(Loc.internal, description)
       "detail" -> new StringLiteral(Loc.internal, detail)
       "evenmeta" -> new BooleanLiteral(Loc.internal, evenMeta)
-    }, name, typ, cases, description, detail, evenMeta)
+    }), name, typ, cases, description, detail, evenMeta)
   }
 
   /** The type of the operator is the provided type. */
@@ -223,7 +238,8 @@ object TypedSymbolicOperator {
  * @param tag           The tag.
  * @param content       The content.  This is lazily evaluated.
  * @param name          The operator name.
- * @param typ           The type of the fully-applied operator.
+ * @param typ           The type of the fully-applied operator (codomain).
+ * @param optype        The type of the operator.
  * @param params        The operator parameters.
  * @param description   An optional short description for the operator.
  * @param detail        Optional detailed help for the operator.
@@ -232,17 +248,18 @@ object TypedSymbolicOperator {
  *                      probably leave this with the default value of false.
  * @param handlertxt    The text for an optional native handler.
  */
-class TypedSymbolicOperator protected[elision] (
+abstract class TypedSymbolicOperator protected[elision] (
     loc: Loc,
     content: => BasicAtom,
     name: String,
     typ: BasicAtom,
+    optype: BasicAtom,
     params: AtomSeq,
     description: String,
     detail: String,
     evenMeta: Boolean,
     handlertxt: Option[String]) extends SymbolicOperator(loc, content, name,
-        typ, params, description, detail, evenMeta, handlertxt) {
+        optype, params, description, detail, evenMeta, handlertxt) {
   
   /**
    * Alternate constructor for an operator omitting the special form content
@@ -250,7 +267,8 @@ class TypedSymbolicOperator protected[elision] (
    * 
    * @param loc           The location.
    * @param name          The operator name.
-   * @param typ           The type of the fully-applied operator.
+   * @param typ           The type of the fully-applied operator (codomain).
+   * @param optype        The type of the operator.
    * @param params        The operator parameters.
    * @param description   An optional short description for the operator.
    * @param detail        Optional detailed help for the operator.
@@ -263,26 +281,27 @@ class TypedSymbolicOperator protected[elision] (
       loc: Loc,
       name: String,
       typ: BasicAtom,
+      optype: BasicAtom,
       params: AtomSeq,
       description: String,
       detail: String,
       evenMeta: Boolean,
       handlertxt: Option[String]) = {
-    this(loc, new Bindings {
+    this(loc, new BindingsAtom(loc, Bindings {
       "name" -> new SymbolLiteral(Loc.internal, Symbol(name))
       "type" -> typ
       "params" -> params
       "description" -> new StringLiteral(Loc.internal, description)
       "detail" -> new StringLiteral(Loc.internal, detail)
       "evenmeta" -> new BooleanLiteral(Loc.internal, evenMeta)
-    }, name, typ, params, description, detail, evenMeta, handlertxt)
+    }), name, typ, optype, params, description, detail, evenMeta, handlertxt)
   }
   
   /**
    * The type of an operator is a mapping from the operator domain to the
    * operator codomain.
    */
-  override val theType = SymbolicOperator.makeOperatorType(params, typ)
+  override val theType = optype
 }
 
 /**
@@ -303,91 +322,6 @@ object SymbolicOperator {
    * @return	The triple of name, computed type, and parameters.
    */
   def unapply(so: SymbolicOperator) = Some((so.name, so.theType, so.params))
-
-  /**
-   * The well-known MAP operator.  This is needed to define the types of
-   * operators, but is not used to define its own type.  The type of the MAP
-   * operator is ^TYPE, indicating that it is a root type.  We could, with
-   * great justice, use xx (the cross product) for this operator, but don't.
-   * This makes the types of operators look more natural when viewed.
-   */
-  val MAP = OperatorRef(
-      new SymbolicOperator(
-          Loc.internal,
-          "MAP",
-          TypeUniverse,
-          new AtomSeq(Loc.internal, NoProps, 'domain, 'codomain),
-          "Mapping constructor.",
-          "This operator is used to construct types for operators.  It " +
-          "indicates a mapping from one type (the domain) to another type " +
-          "(the codomain)."))
-      
-  /**
-   * The well-known cross product operator.  This is needed to define the
-   * types of operators, but is not used to define its own type.  The type
-   * of the cross product is ANY.  Note that it must be ANY, since it is
-   * associative.
-   */
-  val xx = OperatorRef(
-      new SymbolicOperator(
-          Loc.internal,
-          "xx",
-          ANY,
-          new AtomSeq(Loc.internal, Associative(true), 'x, 'y),
-          "Cross product.",
-          "This operator is used to construct types for operators.  It " +
-          "indicates the cross product of two atoms (typically types).  " +
-          "These originate from the types of the parameters of an operator."))
-      
-  /**
-   * The well-known list operator.  This is used to define the type of lists
-   * such as the atom sequence.  It has type ^TYPE, indicating that it is a
-   * root type.
-   */
-  val LIST = OperatorRef(
-      new SymbolicOperator(
-          Loc.internal,
-          "LIST",
-          TypeUniverse,
-          new AtomSeq(Loc.internal, NoProps, 'type),
-          "List type constructor.",
-          "This operator is used to indicate the type of a list.  It takes a " +
-          "single argument that is the type of the atoms in the list.  For " +
-          "heterogeneous lists this will be ANY."))
-
-  /**
-   * Compute an operator type.
-   *
-   * @param params	The parameters.
-   * @param typ			The type of the fully-applied operator.
-   * @return	The type for the operator.
-   */
-  def makeOperatorType(params: AtomSeq, typ: BasicAtom) =
-    params.length match {
-      case 0 =>
-        new OpApply(
-            Loc.internal,
-            MAP,
-            new AtomSeq(Loc.internal, NONE, typ))
-        
-      case 1 =>
-        new OpApply(
-            Loc.internal,
-            MAP,
-            new AtomSeq(Loc.internal, params(0).theType, typ))
-        
-      case _ =>
-        new OpApply(
-            Loc.internal,
-            MAP,
-            new AtomSeq(
-                Loc.internal,
-                new OpApply(
-                    Loc.internal,
-                    xx,
-                    params.map(_.theType)),
-                typ))
-    }
 }
 
 /**
@@ -447,14 +381,14 @@ class SymbolicOperator protected[elision] (
       detail: String = "no detail",
       evenMeta: Boolean = false,
       handlertxt: Option[String] = None) = {
-    this(loc, new Bindings {
+    this(loc, new BindingsAtom(loc, Bindings {
       "name" -> new SymbolLiteral(Loc.internal, Symbol(name))
       "type" -> typ
       "params" -> params
       "description" -> new StringLiteral(Loc.internal, description)
       "detail" -> new StringLiteral(Loc.internal, detail)
       "evenmeta" -> new BooleanLiteral(Loc.internal, evenMeta)
-    }, name, typ, params, description, detail, evenMeta, handlertxt)
+    }), name, typ, params, description, detail, evenMeta, handlertxt)
   }
 
   // Save the type.  Symbolic operators can't construct their type like the

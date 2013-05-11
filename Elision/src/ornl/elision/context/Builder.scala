@@ -48,11 +48,24 @@ import ornl.elision.core.TermVariable
 import ornl.elision.core.MetaVariable
 import ornl.elision.core.Bindings
 import ornl.elision.core.BindingsAtom
+import ornl.elision.core.OperatorRef
+import ornl.elision.core.Operator
+import ornl.elision.core.TypedSymbolicOperator
+import ornl.elision.core.CaseOperator
+import ornl.elision.core.SymbolicOperator
+import ornl.elision.core.TypeUniverse
+import ornl.elision.core.ANY
+import ornl.elision.core.NoProps
+import ornl.elision.core.Associative
+import ornl.elision.core.NONE
 
 /**
  * Construct atoms, first applying any evaluation logic.
  */
 abstract class Builder {
+  
+  /** An associated binder. */
+  val binder = new Binder(this)
 
   /**
    * Make a new algebraic property specification.
@@ -91,7 +104,32 @@ abstract class Builder {
    */
   def newAtomSeq(loc: Loc, properties: AlgProp,
       atoms: IndexedSeq[BasicAtom]): AtomSeq = {
-    new AtomSeq(loc, properties, atoms)
+    val theType = {
+      if (atoms.length == 0) LIST(ANY) else {
+        val aType = atoms(0).theType
+        if (atoms.forall(aType == _.theType)) LIST(aType) else LIST(ANY)
+      }
+    }
+    new AtomSeq(loc, theType, properties, atoms)
+  }
+  
+  /**
+   * Make a new atom collection.
+   * 
+   * @param loc           Location of this atom's declaration.
+   * @param properties    The algebraic properties of the collection.
+   * @param atoms         The atoms in the collection.
+   * @return  The new collection.
+   */
+  def newAtomSeq(loc: Loc, properties: AlgProp,
+      atoms: BasicAtom*): AtomSeq = {
+    val theType = {
+      if (atoms.length == 0) LIST(ANY) else {
+        val aType = atoms(0).theType
+        if (atoms.forall(aType == _.theType)) LIST(aType) else LIST(ANY)
+      }
+    }
+    new AtomSeq(loc, theType, properties, atoms.toIndexedSeq)
   }
   
   /**
@@ -125,7 +163,10 @@ abstract class Builder {
    * @return  The new lambda.
    */
   def newLambda(loc: Loc, parameter: Variable, body: BasicAtom): Lambda = {
-    new Lambda(loc, parameter, body)
+    val (lvar, lbody) = adjust(parameter, body)
+    new Lambda(loc, lvar, lbody, MAP(lvar.theType, lbody.theType)) {
+      def apply(arg: BasicAtom) = newApply(Loc.internal, this, arg)
+    }
   }
   
   /**
@@ -204,6 +245,83 @@ abstract class Builder {
   def newMapPair(loc: Loc, pattern: BasicAtom, rewrite: BasicAtom): MapPair = {
     new MapPair(loc, pattern, rewrite)
   }
+
+  /**
+   * Make a new symbolic operator.
+   * 
+   * @param loc           The location.
+   * @param tag           The tag.
+   * @param content       The content.  This is lazily evaluated.
+   * @param name          The operator name.
+   * @param typ           The type of the fully-applied operator.
+   * @param params        The operator parameters.
+   * @param description   An optional short description for the operator.
+   * @param detail        Optional detailed help for the operator.
+   * @param evenMeta      Apply this operator even when the arguments contain
+   *                      meta-terms.  This is not advisable, and you should
+   *                      probably leave this with the default value of false.
+   * @param handlertxt    The text for an optional native handler.
+   */
+  def newTypedSymbolicOperator(
+      loc: Loc,
+      content: => BasicAtom,
+      name: String,
+      typ: BasicAtom,
+      params: AtomSeq,
+      description: String,
+      detail: String,
+      evenMeta: Boolean,
+      handlertxt: Option[String]): TypedSymbolicOperator = {
+    new TypedSymbolicOperator(loc, content, name, typ,
+        _makeOperatorType(params, typ), params, description, detail, evenMeta,
+        handlertxt) {
+      def apply(args: IndexedSeq[BasicAtom]) =
+        newApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps, args))
+    }
+  }
+  
+  /**
+   * Make a new case operator.
+   * 
+   * @param loc           The location.
+   * @param content       The content.  This is lazily evaluated.
+   * @param name          The operator name.
+   * @param typ           The operator type.
+   * @param cases         The definition.
+   * @param description   An optional short description for the operator.
+   * @param detail        Optional detailed help for the operator.
+   * @param evenMeta      Apply this operator even when the arguments contain
+   *                      meta-terms.  This is not advisable, and you should
+   *                      probably leave this with the default value of false.
+   */
+  def newCaseOperator(
+      loc: Loc,
+      content: => BasicAtom,
+      name: String,
+      typ: BasicAtom,
+      cases: AtomSeq,
+      description: String,
+      detail: String,
+      evenMeta: Boolean): CaseOperator = {
+    new CaseOperator(loc, content, name, typ, cases, description, detail,
+        evenMeta) {
+      def apply(args: IndexedSeq[BasicAtom]) =
+        newApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps, args))
+    }
+  }
+  
+  /**
+   * Make a new operator reference.
+   * 
+   * @param loc           Location of this atom's declaration.
+   * @param operator      The operator.
+   * @return  The new operator reference.
+   */
+  def newOperatorRef(loc: Loc, operator: Operator): OperatorRef = {
+    new OperatorRef(loc, operator) {
+      def apply(args: IndexedSeq[BasicAtom]) = operator(args)
+    }
+  }
   
   /**
    * Make a new special form.
@@ -250,4 +368,170 @@ abstract class Builder {
       byname: Boolean = false): MetaVariable = {
     new MetaVariable(loc, typ, name, guard, labels, byname)
   }
+
+  //======================================================================
+  // Support Lambda construction.
+  //======================================================================
+  
+  /**
+   * Convert a given lambda variable and body into a new variable and body
+   * that use de Bruijn indices if those are enabled.  Otherwise return the
+   * input variable and body.
+   *
+   * @param given_lvar  The given lambda parameter.
+   * @param given_body  The given lambda body.
+   * @return  The pair consisting of the corrected variable and body.
+   */
+  def adjust(given_lvar: Variable, given_body: BasicAtom) = {
+    // Make and return the new lambda.
+    if (Lambda.useDeBruijnIndices) {
+      // Decide what De Bruijn index to use for this lambda.  We will use one
+      // greater than the maximum index of the body.
+      val dBI = given_body.deBruijnIndex + 1
+
+      // Classes that implement De Bruijn indices.
+      class DBIV(
+          typ: BasicAtom,
+          val dBI: Int,
+          guard: BasicAtom,
+          lvar: Set[String])
+          extends TermVariable(Loc.internal, typ, ":" + dBI, guard, lvar) {
+        override val isDeBruijnIndex = true
+        override val deBruijnIndex = dBI
+      }
+      class DBIM(
+          typ: BasicAtom,
+          val dBI: Int,
+          guard: BasicAtom,
+          lvar: Set[String])
+          extends MetaVariable(Loc.internal, typ, ":" + dBI, guard, lvar) {
+        override val isDeBruijnIndex = true
+        override val deBruijnIndex = dBI
+      }
+      
+      // Now make new De Bruijn variables for the index.
+      val newvar =
+        new DBIV(given_lvar.theType, dBI, given_lvar.guard, given_lvar.labels)
+      val newmvar =
+        new DBIM(given_lvar.theType, dBI, given_lvar.guard, given_lvar.labels)
+      
+      // Create a map.
+      val map = Map[BasicAtom, BasicAtom](
+          given_lvar.asTermVariable -> newvar,
+          given_lvar.asMetaVariable -> newmvar)
+    
+      // Bind the old variable to the new one and rewrite the body.
+      val (newbody, notfixed) = binder.replace(given_body, map)
+      
+      // Return the result.
+      if (given_lvar.isTerm) {
+        (newvar, newbody)
+      } else {
+        (newmvar, newbody)
+      }
+    } else {
+      (given_lvar, given_body)
+    }
+  }
+  
+  //======================================================================
+  // Special fixed values.
+  //======================================================================
+  
+  /** An empty atom sequence with no properties. */
+  val EmptySeq = newAtomSeq(Loc.internal, NoProps)
+
+  //======================================================================
+  // Support methods for operator construction.
+  //======================================================================
+
+  /**
+   * Compute an operator type for a typed symbolic operator.
+   *
+   * @param params  The parameters.
+   * @param typ     The type of the fully-applied operator.
+   * @return  The type for the operator.
+   */
+  private def _makeOperatorType(params: AtomSeq, typ: BasicAtom) =
+    params.length match {
+      case 0 =>
+        // For nilary operators the type is NONE -> typ.
+        MAP(NONE, typ)
+        
+      case 1 =>
+        // For unary operators the type is domain -> codomain.
+        MAP(params(0).theType, typ)
+        
+      case _ =>
+        // For n-ary operators the type is the direct product of the
+        // parameter types mapped to the overall type.
+        MAP(xx(params.map(_.theType)), typ)
+    }
+
+  //======================================================================
+  // Define the necessary primitive operators to bootstrap operator typing.
+  //======================================================================
+  
+  /**
+   * The well-known MAP operator.  This is needed to define the types of
+   * operators, but is not used to define its own type.  The type of the MAP
+   * operator is ^TYPE, indicating that it is a root type.  We could, with
+   * great justice, use xx (the cross product) for this operator, but don't.
+   * This makes the types of operators look more natural when viewed.
+   */
+  val MAP = new OperatorRef(
+      Loc.internal,
+      new SymbolicOperator(
+          Loc.internal,
+          "MAP",
+          TypeUniverse,
+          newAtomSeq(Loc.internal, NoProps, 'domain, 'codomain),
+          "Mapping constructor.",
+          "This operator is used to construct types for operators.  It " +
+          "indicates a mapping from one type (the domain) to another type " +
+          "(the codomain).") {
+    def apply(args: IndexedSeq[BasicAtom]) =
+      newApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps, args))
+  })
+      
+  /**
+   * The well-known cross product operator.  This is needed to define the
+   * types of operators, but is not used to define its own type.  The type
+   * of the cross product is ANY.  Note that it must be ANY, since it is
+   * associative.
+   */
+  val xx = new OperatorRef(
+      Loc.internal,
+      new SymbolicOperator(
+          Loc.internal,
+          "xx",
+          ANY,
+          newAtomSeq(Loc.internal, Associative(true), 'x, 'y),
+          "Cross product.",
+          "This operator is used to construct types for operators.  It " +
+          "indicates the cross product of two atoms (typically types).  " +
+          "These originate from the types of the parameters of an operator.") {
+    def apply(args: IndexedSeq[BasicAtom]) =
+      newApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps, args))
+  })
+      
+  /**
+   * The well-known list operator.  This is used to define the type of lists
+   * such as the atom sequence.  It has type ^TYPE, indicating that it is a
+   * root type.
+   */
+  val LIST = new OperatorRef(
+      Loc.internal,
+      new SymbolicOperator(
+          Loc.internal,
+          "LIST",
+          TypeUniverse,
+          newAtomSeq(Loc.internal, NoProps, 'type),
+          "List type constructor.",
+          "This operator is used to indicate the type of a list.  It takes a " +
+          "single argument that is the type of the atoms in the list.  For " +
+          "heterogeneous lists this will be ANY.") {
+    def apply(args: IndexedSeq[BasicAtom]) =
+      newApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps, args))
+  })
 }

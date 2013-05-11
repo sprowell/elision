@@ -29,6 +29,8 @@
  */
 package ornl.elision.core
 
+import ornl.elision.util.Loc
+
 /**
  * Make and match operator references.
  */
@@ -41,16 +43,6 @@ object OperatorRef {
    * @return  The referenced operator.
    */
   def unapply(ref: OperatorRef) = Some(ref.operator)
-  
-  /**
-   * Make a reference for an operator.
-   *
-   * @param op  The operator.
-   * @return  A reference to the operator.
-   */
-  def apply(op: Operator) = new OperatorRef(op) {
-    override val evenMeta = op.evenMeta
-  }
 }
 
 /**
@@ -61,9 +53,12 @@ object OperatorRef {
  * not always desirable; we want the operator to remain fixed.  This class
  * provides a level of indirection.
  *
+ * @param loc       Location of the atom's declaration.
  * @param operator  The referenced operator.
  */
-class OperatorRef(val operator: Operator) extends BasicAtom {
+class OperatorRef(
+    loc: Loc,
+    val operator: Operator) extends BasicAtom(loc) {
   val depth = 0
   val deBruijnIndex = 0
   val isTerm = true
@@ -71,6 +66,25 @@ class OperatorRef(val operator: Operator) extends BasicAtom {
   val theType = OPREF
   /** The operator name. */
   val name = operator.name
+  
+    
+  /**
+   * Apply the operator to the given argument list.
+   * 
+   * @param args    The argument list.
+   */
+  def apply(args: IndexedSeq[BasicAtom]): BasicAtom = {
+    operator(args)
+  }
+  
+  /**
+   * Apply the operator to the given argument list.
+   * 
+   * @param args    The argument list.
+   */
+  def apply(args: BasicAtom*): BasicAtom = {
+    operator(args:_*)
+  }
 
   /**
    * Operator references are equal iff the referenced operators are equal.

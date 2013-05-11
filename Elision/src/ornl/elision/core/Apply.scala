@@ -113,55 +113,19 @@ abstract class Apply(
  * use the methods in the [[ornl.elision.core.Apply]] companion object.
  * 
  * @param loc     Location of the atom's declaration.
+ * @param theType The type of this apply.
  * @param op			The operator.
  * @param arg			The argument list.
  * @param pabinds	The bindings from parameter name to argument.  Note that
  * 								if the operator is associative the parameters may be
  * 								synthetic!
  */
-case class OpApply protected[core] (
+case class OpApply protected[elision] (
     loc: Loc,
+    val theType: BasicAtom,
     override val op: OperatorRef,
     override val arg: AtomSeq,
     val pabinds: Bindings) extends Apply(loc, op, arg) {
-  
-  /**
-   * Compute the type from the type specified by the operator, and the bindings
-   * provided during parameter matching.  This allows rewriting otherwise
-   * abstract type information to get a proper type.
-   */
-  lazy val theType = op.operator.typ.rewrite(pabinds)._1
-  
-  override def rewrite(binds: Bindings) = {
-    // If we have no bindings, don't rewrite the operator.
-    if (binds == null) {
-      (this, false)
-    } else {
-      // We have bindings. Rewrite the operator.
-      // See if we have already rewritten this operator with these
-      // bindings.
-      (binds.rewrites get this) match {
-        // We have already done this rewrite.
-        case Some(rewrite) =>
-          rewrite
-        
-        // We don't have a cached rewrite.
-        case None =>
-          // Rewrite the argument, but not the operator.  In reality, operators
-          // should protect their arguments using De Bruijn indices, but that's
-          // not implemented just yet.
-          val pair = arg.rewrite(binds)
-          if (pair._2) {
-            val newApply = Apply(op, pair._1)
-            binds.rewrites(this) = (newApply, true) 
-            (newApply, true) 
-          } else {
-            binds.rewrites(this) = (this, false) 
-            (this, false)
-          }
-      }
-    }  
-  }
 }
 
 /**
@@ -176,7 +140,7 @@ case class OpApply protected[core] (
  * @param op		The operator.
  * @param arg		The argument.
  */
-case class SimpleApply protected[core] (
+case class SimpleApply protected[elision] (
     loc: Loc,
     override val op: BasicAtom,
     override val arg: BasicAtom) extends Apply(loc, op, arg) {

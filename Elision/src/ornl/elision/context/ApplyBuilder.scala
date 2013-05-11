@@ -97,31 +97,31 @@ object ApplyBuilder {
    * 
    * @param strat     The strategy to apply.
    * @param arg       The argument.
-   * @param builder   The builder needed to build atoms.
+   * @param context   The context needed to build atoms.
    * @return  The pair of result atom and flag.
    */
   private def test(strat: Strategy, arg: BasicAtom,
-      builder: Builder): (BasicAtom, Boolean) = {
+      context: Context): (BasicAtom, Boolean) = {
     strat match {
       case op_mappair: MapPair =>
         // Handle the case of a map pair.  A map pair is a primitive sort of
         // rewrite rule that consists of a pattern and a rewrite, and nothing
         // else.
-        Matcher(op_mappair.left, arg, builder, Bindings(), None) match {
+        Matcher(op_mappair.left, arg, context, Bindings(), None) match {
           case file:Fail => 
             (arg, false)
             
           case Match(binds) =>
-            (op_mappair.right.rewrite(binds)._1, true)
+            (context.binder.apply(op_mappair.right, binds)._1, true)
             
           case Many(iter) =>
-            (op_mappair.right.rewrite(iter.next)._1, true)
+            (context.binder.apply(op_mappair.right, iter.next)._1, true)
         }
 
       case op_rule: RewriteRule =>
         // A rewrite rule generalizes both the match atom and the map pair
         // as a package (a special form) to perform controlled rewriting.
-        RuleApplyHandler(op_rule, arg, Bindings(), None, builder)
+        RuleApplyHandler(op_rule, arg, Bindings(), None, context)
         
       case c =>
         // We come here if we find an unsupported strategy class.
@@ -160,7 +160,7 @@ object ApplyBuilder {
             (ap and op_ap)
             
           case as: AtomSeq => 
-            new AtomSeq(Loc.internal, as.props and op_ap, as.atoms)
+            builder.newAtomSeq(Loc.internal, as.props and op_ap, as.atoms)
             
           case _ => 
             new SimpleApply(Loc.internal, op_ap, arg)

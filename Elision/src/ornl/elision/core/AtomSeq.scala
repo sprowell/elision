@@ -46,11 +46,6 @@ import ornl.elision.matcher.SequenceMatcher
 import ornl.elision.util.Loc
 
 /**
- * Fast access to an untyped empty sequence.
- */
-object EmptySeq extends AtomSeq(Loc.internal, NoProps, IndexedSeq())
-
-/**
  * An atom sequence is just that: a sequence of atoms.
  * 
  * == Properties ==
@@ -67,6 +62,7 @@ object EmptySeq extends AtomSeq(Loc.internal, NoProps, IndexedSeq())
  * of an `IndexedSeq`.
  *
  * @param loc         The location of the atom's declaration. 
+ * @param theType     The type of this sequence.
  * @param props		    The properties for this atom sequence.
  * @param orig_xatoms	The sequence of atoms in this sequence.  Note that,
  *                    depending on the specified properties, the stored
@@ -74,24 +70,13 @@ object EmptySeq extends AtomSeq(Loc.internal, NoProps, IndexedSeq())
  */
 class AtomSeq protected[elision] (
     loc: Loc,
+    val theType: BasicAtom,
     val props: AlgProp,
     orig_xatoms: IndexedSeq[BasicAtom])
     extends BasicAtom(loc) with IndexedSeq[BasicAtom] {
   
   require(xatoms != null)
   require(props != null)
-  
-  /**
-   * Provide an alternate constructor using a variable-length argument list.
-   * 
-   * @param loc         The location of the atom's declaration. 
-   * @param props       The properties for this atom sequence.
-   * @param orig_xatoms The sequence of atoms in this sequence.  Note that,
-   *                    depending on the specified properties, the stored
-   *                    sequence may be different.
-   */
-  def this(loc: Loc, props: AlgProp, orig_xatoms: BasicAtom*) =
-    this(loc, props, orig_xatoms.toIndexedSeq)
   
   /**
    * Determine whether we have to sort the atoms.  If we know the list is
@@ -136,21 +121,7 @@ class AtomSeq protected[elision] (
    * The atoms in this sequence.
    */
   val atoms = AtomSeq.process(props, xatoms)
-  
-  import SymbolicOperator.LIST
-  
-  /**
-   * The type of a sequence is derived from looking at the types of the
-   * elements of the sequence.  If the elements all have the same type,
-   * then the result is that type.  If the elements have different types,
-   * or the sequence is empty, then the type is ANY.
-   */
-  lazy val theType = {
-      if (atoms.length == 0) LIST(ANY) else {
-		    val aType = atoms(0).theType
-		    if (atoms.forall(aType == _.theType)) LIST(aType) else LIST(ANY)
-      }
-    }
+
   lazy val isConstant = atoms.forall(_.isConstant)
   lazy val isTerm = atoms.forall(_.isTerm)
   lazy val deBruijnIndex = atoms.foldLeft(0)(_ max _.deBruijnIndex)
@@ -200,9 +171,6 @@ class AtomSeq protected[elision] (
  * Simplified construction and matching for atom sequences.
  */
 object AtomSeq {
-  
-  /** Get an empty atom sequence with no properties. */
-  def apply() = EmptySeq
   
   /**
    * Match an atom sequence's parts.

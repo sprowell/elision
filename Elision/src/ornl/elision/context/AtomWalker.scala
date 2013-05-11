@@ -27,7 +27,22 @@
  * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package ornl.elision.core
+package ornl.elision.context
+
+import ornl.elision.core.BasicAtom
+import ornl.elision.core.Literal
+import ornl.elision.core.AlgProp
+import ornl.elision.core.TypeUniverse
+import ornl.elision.core.SpecialForm
+import ornl.elision.core.OperatorRef
+import ornl.elision.core.Apply
+import ornl.elision.core.SymbolicOperator
+import ornl.elision.core.BindingsAtom
+import ornl.elision.core.AtomSeq
+import ornl.elision.core.MapPair
+import ornl.elision.core.TermVariable
+import ornl.elision.core.Lambda
+import ornl.elision.core.MetaVariable
 
 /**
  * Traverse an atom hierarchy.  The traversal is depth-first.  The atom is
@@ -327,7 +342,8 @@ class AtomWalker(withtypes: Boolean) {
       case Apply(lhs, rhs) =>
         visitor(atom, typ) &&
         _gotype(atom, visitor) &&
-        (if (lhs == SymbolicOperator.LIST) {
+        (if (lhs.isInstanceOf[OperatorRef] &&
+            lhs.asInstanceOf[OperatorRef].operator.name == "LIST") {
           true
         } else {
           apply(lhs, visitor, false) &&
@@ -362,7 +378,7 @@ class AtomWalker(withtypes: Boolean) {
         _gotype(atom, visitor) &&
         apply(mvari.guard, visitor, false)
         
-      case vari: Variable =>
+      case vari: TermVariable =>
         visitor(atom, typ) &&
         _gotype(atom, visitor) &&
         apply(vari.guard, visitor, false)

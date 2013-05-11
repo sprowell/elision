@@ -106,20 +106,31 @@ object ScalaGenerator {
       case sl: SymbolLiteral => sl match {
         // Handle known constants and types.
         case ANY => buf.append("ANY")
+
         case BINDING => buf.append("BINDING")
+
         case BOOLEAN => buf.append("BOOLEAN")
+        
         case FLOAT => buf.append("FLOAT")
+        
         case INTEGER => buf.append("INTEGER")
+        
         case NONE => buf.append("NONE")
+        
         case OPREF => buf.append("OPREF")
+        
         case RULETYPE => buf.append("RULETYPE")
+        
         case STRATEGY => buf.append("STRATEGY")
+        
         case STRING => buf.append("STRING")
+        
         case SYMBOL => buf.append("SYMBOL")
         
         // Handle the type universe and named root types.
         case TypeUniverse =>
           buf.append("TypeUniverse")
+          
         case NamedRootType(name) =>
           buf.append("NamedRootType(")
           buf.append(toEString(name))
@@ -133,25 +144,29 @@ object ScalaGenerator {
       }
         
       // Process other literals.
-      case IntegerLiteral(typ, value) =>
+      case IntegerLiteral(_, typ, value) =>
         buf.append("IntegerLiteral(")
         gen(typ, context, buf).append(",")
         buf.append("BigInt(\""+value.toString+"\")").append(")")
-      case StringLiteral(typ, value) =>
+        
+      case StringLiteral(_, typ, value) =>
         buf.append("StringLiteral(")
         gen(typ, context, buf).append(",")
         buf.append(toEString(value)).append(")")
-      case BooleanLiteral(typ, value) =>
+        
+      case BooleanLiteral(_, typ, value) =>
         buf.append("BooleanLiteral(")
         gen(typ, context, buf).append(",")
         buf.append(value.toString).append(")")
-      case FloatLiteral(typ, significand, exponent, radix) =>
+        
+      case FloatLiteral(_, typ, significand, exponent, radix) =>
         buf.append("FloatLiteral(")
         gen(typ, context, buf).append(",")
         buf.append(significand.toString).append(",")
         buf.append(exponent.toString).append(",")
         buf.append(radix.toString).append(")")
-      case BitStringLiteral(typ, bits, len) =>
+        
+      case BitStringLiteral(_, typ, bits, len) =>
         buf.append("BitStringLiteral(")
         gen(typ, context, buf).append(",")
         buf.append(bits.toString).append(",")
@@ -176,20 +191,26 @@ object ScalaGenerator {
       case Absorber(atom) =>
         buf.append("Absorber(")
         gen(atom, context, buf).append(")")
+        
       case Associative(atom) =>
         buf.append("Associative(")
         gen(atom, context, buf).append(")")
+        
       case Commutative(atom) =>
         buf.append("Commutative(")
         gen(atom, context, buf).append(")")
+        
       case Idempotent(atom) =>
         buf.append("Idempotent(")
         gen(atom, context, buf).append(")")
+        
       case Identity(atom) =>
         buf.append("Identity(")
         gen(atom, context, buf).append(")")
+        
       case NoProps =>
         buf.append("NoProps")
+        
       case AlgProp(asso, comm, idem, abso, iden) =>
         buf.append("AlgProp(")
         buf.append(atom.loc.toString).append(",")
@@ -223,6 +244,7 @@ object ScalaGenerator {
         gen(cases, context, buf).append(",")
         buf.append(toEString(description)).append(",")
         buf.append(toEString(detail)).append(")")
+        
       case TypedSymbolicOperator(name, typ, params, description, detail,
           evenMeta, handlertxt) =>
         buf.append("TypedSymbolicOperator(")
@@ -239,6 +261,7 @@ object ScalaGenerator {
             buf.append("Some(").append(toEString(text)).append(")")
         }
         buf.append(")")
+        
       case RewriteRule(pat, rew, gua, rs, nm, des, det, syn) =>
         buf.append("RewriteRule(")
         buf.append(atom.loc.toString).append(",")
@@ -260,6 +283,7 @@ object ScalaGenerator {
         buf.append(toEString(des)).append(",")
         buf.append(toEString(det)).append(",")
         buf.append(syn.toString).append(")")
+        
       case SpecialForm(tag, content) =>
         buf.append("SpecialForm(")
         buf.append(atom.loc.toString).append(",")
@@ -385,7 +409,10 @@ object ScalaGenerator {
    */
   private def _option(opt: Option[BasicAtom], context: Boolean,
       buf: Appendable) = opt match {
-    case None => buf.append("None")
-    case Some(atom) => gen(atom, context, buf.append("Some(")).append(")")
+    case None =>
+      buf.append("None")
+      
+    case Some(atom) =>
+      gen(atom, context, buf.append("Some(")).append(")")
   }
 }

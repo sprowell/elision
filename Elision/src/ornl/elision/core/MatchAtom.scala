@@ -82,19 +82,23 @@ object MatchAtom {
  * The reason the above two are not the same is that in the second case
  * we might get `NONE` as the result from the match and this will not
  * get "digested" by the applicative dot.
+ * 
+ * @param loc       Location of the atom's declaration.
+ * @param content   Special form content, lazily constructed.
+ * @param pattern   The pattern to match.
+ * @param guards    Any guards.
+ * @param typ       Type of this match atom.
  */
 class MatchAtom(
     loc: Loc,
     content: => BasicAtom,
     val pattern: BasicAtom,
-    val guards: AtomSeq)
+    val guards: AtomSeq,
+    typ: BasicAtom)
     extends SpecialForm(loc, MatchAtom.tag, content) with Applicable {
   
   /** The type of this atom. */
-  override val theType = new OpApply(
-      Loc.internal,
-      SymbolicOperator.MAP,
-      new AtomSeq(Loc.internal, NoProps, ANY, BINDING))
+  override val theType = typ
   
   override def equals(other: Any) = other match {
     case oma: MatchAtom =>

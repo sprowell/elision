@@ -52,9 +52,9 @@ import ornl.elision.core.AtomSeq
 import ornl.elision.core.TypedSymbolicOperator
 import ornl.elision.core.CaseOperator
 import ornl.elision.core.NoProps
-import ornl.elision.core.EmptySeq
 import ornl.elision.core.MapPair
 import ornl.elision.core.RewriteRule
+import ornl.elision.core.BINDING
 
 object StandardBuilderComponents {
   
@@ -138,8 +138,6 @@ object StandardBuilderComponents {
     Some(new StringLiteral(Loc.internal, "(no description)"))
   private val _no_name = 
     Some(new SymbolLiteral(Loc.internal, Symbol("(no name)")))
-  private val _no_rulesets = Some(EmptySeq)
-  private val _no_ifs = _no_rulesets
   private val _false = Some(Literal.FALSE)
   
   /**
@@ -148,14 +146,16 @@ object StandardBuilderComponents {
    * @param loc       Location of the atom's declaration.
    * @param tag       Tag for the special form, included for consistency.
    * @param content   The content.
+   * @param builder   The builder to make atoms.
    * @return  The new match atom.
    */
-  def buildMatch(loc: Loc, tag: BasicAtom, content: BasicAtom) = {
+  def buildMatch(loc: Loc, tag: BasicAtom, content: BasicAtom,
+      builder: Builder) = {
     // The content is a binding.
     val binds = content.asInstanceOf[BindingsAtom].mybinds
     val pattern = getAs[BasicAtom](loc, tag, binds, "", None)
-    val guards = getAs[AtomSeq](loc, tag, binds, "if", _no_ifs)
-    new MatchAtom(loc, content, pattern, guards)
+    val guards = getAs[AtomSeq](loc, tag, binds, "if", Some(builder.EmptySeq))
+    new MatchAtom(loc, content, pattern, guards, builder.MAP(ANY, BINDING))
   }
   
   /**
@@ -164,9 +164,11 @@ object StandardBuilderComponents {
    * @param loc       Location of the atom's declaration.
    * @param tag       Tag for the special form, included for consistency.
    * @param content   The content.
+   * @param builder   The builder to make atoms.
    * @return  The new rule.
    */
-  def buildRule(loc: Loc, tag: BasicAtom, content: BasicAtom) = {
+  def buildRule(loc: Loc, tag: BasicAtom, content: BasicAtom,
+      builder: Builder) = {
     // The content is a binding.
     val binds = content.asInstanceOf[BindingsAtom].mybinds
     val name = if (binds.contains("name")) {
@@ -179,7 +181,8 @@ object StandardBuilderComponents {
     val detail = getAs[StringLiteral](loc, tag, binds, "detail",
         _no_detail).value
     val map = getAs[MapPair](loc, tag, binds, "", None)
-    val rulesetseq = getAs[AtomSeq](loc, tag, binds, "rulesets", _no_rulesets)
+    val rulesetseq = getAs[AtomSeq](loc, tag, binds, "rulesets",
+        Some(builder.EmptySeq))
     val rulesets = rulesetseq map {
       item => item match {
         case SymbolLiteral(_, _, value) =>
@@ -192,7 +195,7 @@ object StandardBuilderComponents {
               "non-symbol atom "+item.toParseString+" was found.")
       }
     } toSet
-    val guards = getAs[AtomSeq](loc, tag, binds, "if", _no_ifs)
+    val guards = getAs[AtomSeq](loc, tag, binds, "if", Some(builder.EmptySeq))
     new RewriteRule(loc, content, map.left, map.right, guards, rulesets,
         name, description, detail)
   }
@@ -203,9 +206,11 @@ object StandardBuilderComponents {
    * @param loc       Location of the atom's declaration.
    * @param tag       Tag for the special form, included for consistency.
    * @param content   The content.
+   * @param builder   The builder to make atoms.
    * @return  The new operator.
    */
-  def buildOperator(loc: Loc, tag: BasicAtom, content: BasicAtom) = {
+  def buildOperator(loc: Loc, tag: BasicAtom, content: BasicAtom,
+      builder: Builder) = {
     // The content is a binding.
     val binds = content.asInstanceOf[BindingsAtom].mybinds
     
@@ -228,12 +233,13 @@ object StandardBuilderComponents {
       } else {
         None
       })
-      new TypedSymbolicOperator(loc, name, typ, params, description, detail,
-          evenmeta, handlertxt)
+      builder.newTypedSymbolicOperator(loc, content, name, typ, params,
+          description, detail, evenmeta, handlertxt)
     } else if (binds.contains("cases")) {
       // This is a case operator.
       val cases = getAs[AtomSeq](loc, tag, binds, "cases", None)
-      new CaseOperator(loc, name, typ, cases, description, detail, evenmeta)
+      builder.newCaseOperator(loc, content, name, typ, cases, description,
+          detail, evenmeta)
     } else {
       // This is an error.
       throw new SpecialFormException(loc,
@@ -288,13 +294,13 @@ object StandardBuilder extends Builder {
             SpecialForm.check(tag, content, map)
             sym.value match {
               case 'operator =>
-                StandardBuilderComponents.buildOperator(loc, tag, content)
+                StandardBuilderComponents.buildOperator(loc, tag, content, this)
                 
               case 'rule =>
-                StandardBuilderComponents.buildRule(loc, tag, content)
+                StandardBuilderComponents.buildRule(loc, tag, content, this)
                 
               case 'match =>
-                StandardBuilderComponents.buildMatch(loc, tag, content)
+                StandardBuilderComponents.buildMatch(loc, tag, content, this)
                 
               case _ =>
                 new SpecialForm(loc, tag, content)

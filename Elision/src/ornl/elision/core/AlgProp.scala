@@ -138,12 +138,14 @@ class AlgProp protected[elision] (
   // Type check the Boolean properties.
   private def _isNotBool(opt: Option[BasicAtom]) = opt match {
     case Some(ANY) => false
+      
     case Some(atom) =>
       atom.theType match {
         case ANY => false
         case BOOLEAN => false
         case _ => true
       }
+      
     case None => false
   }
   if (_isNotBool(associative))

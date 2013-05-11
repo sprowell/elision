@@ -84,6 +84,27 @@ import ornl.elision.matcher.Many
  */
 
 /**
+ * Companion object with convenient methods to create lambdas.
+ */
+object Lambda {
+  /**
+   * Control whether we are using De Bruijn indices.  This is `true` by
+   * default, and you shoud probably '''leave it alone''' unless you are
+   * doing something that involves debugging lambdas.  You aren't, so don't
+   * modify this.
+   */
+  var useDeBruijnIndices = true
+  
+  /**
+   * Break a lambda into its parameter and body.
+   * 
+   * @param lambda  The lambda to match.
+   * @return  The variable and then body.
+   */
+  def unapply(lambda: Lambda) = Some(lambda.lvar, lambda.body)  
+}
+
+/**
  * A lambda creates an operator that binds a single variable in a term.
  * 
  * To create an instance (or to match an instance) use the methods in the
@@ -119,16 +140,24 @@ import ornl.elision.matcher.Many
  * @param given_lvar	The lambda variable which must match the De Bruijn
  * 										index.
  * @param given_body  The lambda body.
+ * @param typ         The lambda's type, which should be a mapping.
  */
-class Lambda protected[elision] (
+abstract class Lambda protected[elision] (
     loc: Loc,
-    given_lvar: Variable,
-    given_body: BasicAtom) extends BasicAtom(loc) with Applicable {
-  // Correct the parts.
-  val (lvar, body) = Lambda.adjust(given_lvar, given_body)
+    val lvar: Variable,
+    val body: BasicAtom,
+    typ: BasicAtom) extends BasicAtom(loc) with Applicable {
+  
+  /**
+   * Apply this lambda to the given argument.
+   * 
+   * @param arg     The argument.
+   * @return  The result.
+   */
+  def apply(arg: BasicAtom): BasicAtom
   
   /** The type is a mapping from the variable type to the body type. */
-  lazy val theType = SymbolicOperator.MAP(lvar.theType, body.theType)
+  lazy val theType = typ
   
   /**
    * A lambda is constant iff its body is constant.  This is different from
@@ -160,87 +189,5 @@ class Lambda protected[elision] (
       
     case _ =>
       false
-  }
-}
-
-/**
- * Companion object with convenient methods to create lambdas.
- */
-object Lambda {
-  /**
-   * Control whether we are using De Bruijn indices.  This is `true` by
-   * default, and you shoud probably '''leave it alone''' unless you are
-   * doing something that involves debugging lambdas.  You aren't, so don't
-   * modify this.
-   */
-  var useDeBruijnIndices = true
-  
-  /**
-   * Break a lambda into its parameter and body.
-   * 
-   * @param lambda	The lambda to match.
-   * @return	The variable and then body.
-   */
-  def unapply(lambda: Lambda) = Some(lambda.lvar, lambda.body)  
-  
-  /**
-   * Convert a given lambda variable and body into a new variable and body
-   * that use de Bruijn indices if those are enabled.  Otherwise return the
-   * input variable and body.
-   *
-   * @param given_lvar	The given lambda parameter.
-   * @param given_body	The given lambda body.
-   * @return  The pair consisting of the corrected variable and body.
-   */
-  def adjust(given_lvar: Variable, given_body: BasicAtom) = {
-    // Make and return the new lambda.
-    if (useDeBruijnIndices) {
-      // Decide what De Bruijn index to use for this lambda.  We will use one
-      // greater than the maximum index of the body.
-	    val dBI = given_body.deBruijnIndex + 1
-
-	    // Classes that implement De Bruijn indices.
-	    class DBIV(
-	        typ: BasicAtom,
-	        val dBI: Int,
-	        guard: BasicAtom,
-	        lvar: Set[String])
-	        extends TermVariable(Loc.internal, typ, ":" + dBI, guard, lvar) {
-	      override val isDeBruijnIndex = true
-	      override val deBruijnIndex = dBI
-      }
-      class DBIM(
-          typ: BasicAtom,
-          val dBI: Int,
-          guard: BasicAtom,
-          lvar: Set[String])
-          extends MetaVariable(Loc.internal, typ, ":" + dBI, guard, lvar) {
-	      override val isDeBruijnIndex = true
-	      override val deBruijnIndex = dBI
-      }
-	    
-	    // Now make new De Bruijn variables for the index.
-      val newvar =
-        new DBIV(given_lvar.theType, dBI, given_lvar.guard, given_lvar.labels)
-      val newmvar =
-        new DBIM(given_lvar.theType, dBI, given_lvar.guard, given_lvar.labels)
-      
-      // Create a map.
-      val map = Map[BasicAtom, BasicAtom](
-          given_lvar.asTermVariable -> newvar,
-          given_lvar.asMetaVariable -> newmvar)
-		
-	    // Bind the old variable to the new one and rewrite the body.
-	    val (newbody, notfixed) = given_body.replace(map)
-	    
-	    // Return the result.
-	    if (given_lvar.isTerm) {
-	      (newvar, newbody)
-	    } else {
-	      (newmvar, newbody)
-	    }
-    } else {
-      (given_lvar, given_body)
-    }
   }
 }

@@ -88,20 +88,31 @@ object ElisionGenerator {
     atom match {
       case sl: SymbolLiteral => sl match {
         case ANY => buf.append("ANY")
+        
         case BINDING => buf.append("BINDING")
+        
         case BOOLEAN => buf.append("BOOLEAN")
+        
         case FLOAT => buf.append("FLOAT")
+        
         case INTEGER => buf.append("INTEGER")
+        
         case NONE => buf.append("NONE")
+        
         case OPREF => buf.append("OPREF")
+        
         case RULETYPE => buf.append("RULETYPE")
+        
         case STRATEGY => buf.append("STRATEGY")
+        
         case STRING => buf.append("STRING")
+        
         case SYMBOL => buf.append("SYMBOL")
         
         // Handle the type universe and named root types.
         case TypeUniverse =>
           buf.append("^TYPE")
+          
         case NamedRootType(name) =>
           buf.append(toESymbol(name))
           
@@ -112,27 +123,30 @@ object ElisionGenerator {
       }
         
       // Process other literals.
-      case IntegerLiteral(typ, value) =>
+      case IntegerLiteral(_, typ, value) =>
         buf.append(value.toString)
         if (typ != INTEGER || BasicAtom.printTypeInfo) {
           apply(typ, buf.append(":"), limit)
         } else {
           buf
         }
-      case StringLiteral(typ, value) =>
+        
+      case StringLiteral(_, typ, value) =>
         buf.append(toEString(value))
         if (typ != STRING || BasicAtom.printTypeInfo) {
           apply(typ, buf.append(":"), limit)
         } else {
           buf
         }
-      case BooleanLiteral(typ, value) =>
+        
+      case BooleanLiteral(_, typ, value) =>
         buf.append(value.toString)
         if (typ != BOOLEAN || BasicAtom.printTypeInfo) {
           apply(typ, buf.append(":"), limit)
         } else {
           buf
         }
+        
       case fl:FloatLiteral =>
         buf.append(fl.numberString)
         if (fl.theType != FLOAT || BasicAtom.printTypeInfo) {
@@ -200,8 +214,10 @@ object ElisionGenerator {
    * @param limit   The current nesting limit of this atom.
    * @return        The result.
    */
-  private def _gen(atom: SpecialForm, buf: Appendable, limit: Int): Appendable = {
-    if (atom.tag.isInstanceOf[SymbolLiteral] && atom.content.isInstanceOf[BindingsAtom]) {
+  private def _gen(atom: SpecialForm, buf: Appendable,
+      limit: Int): Appendable = {
+    if (atom.tag.isInstanceOf[SymbolLiteral] &&
+        atom.content.isInstanceOf[BindingsAtom]) {
       // Use the expanded form for this special form.
       val kind = atom.tag.asInstanceOf[SymbolLiteral].value.name
       buf.append("{").append(toESymbol(kind))

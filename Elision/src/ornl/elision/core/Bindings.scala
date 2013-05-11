@@ -92,7 +92,7 @@ object Bindings {
  * immutable(ish), it is wasteful to repeatedly create empty bindings!
  * 
  * Yes, bindings are actually slightly mutable.  There is a matching cache
- * accessible via `set`.  Beware!
+ * accessible via `set` and a rewrite cache.  Beware!
  * 
  * @param self	The backing map.
  */
@@ -107,6 +107,12 @@ extends Map[String, BasicAtom] with Mutable {
   def +(kv: (String, BasicAtom)): Bindings = new Bindings(self + kv)
   def ++(other: Bindings): Bindings = new Bindings(self ++ other.self)
   override def -(key: String): Bindings = new Bindings(self - key)
+  
+  /**
+   * A special cache of rewrites that this binding has produced.  This map is
+   * mutable!
+   */
+  val rewrites = scala.collection.mutable.Map[BasicAtom, (BasicAtom, Boolean)]()
 
   /** This is a cache used during associative / commutative matching. */
   private var _patcache: OmitSeq[BasicAtom] = null

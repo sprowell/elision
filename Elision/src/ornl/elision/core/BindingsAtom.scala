@@ -74,8 +74,9 @@ import ornl.elision.util.Loc
  * @param loc           Location of this atom's declaration.
  * @param mybinds       Bindings for this atom.
  */
-case class BindingsAtom(loc: Loc, mybinds: Bindings)
-extends BasicAtom(loc) with Applicable {
+class BindingsAtom(
+    loc: Loc,
+    val mybinds: Bindings) extends BasicAtom(loc) with Applicable {
   
   require(mybinds != null, "Bindings are null.")
   
@@ -114,4 +115,12 @@ object BindingsAtom {
   
   /** The special form tag. */
   val tag = Literal('binds)
+  
+  /**
+   * Extract the parts of this atom.
+   * 
+   * @param ba    The bindings atom.
+   * @return  The bindings.
+   */
+  def unapply(ba: BindingsAtom) = Some((ba.mybinds))
 }

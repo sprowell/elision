@@ -46,7 +46,6 @@ import ornl.elision.core.OperatorRef
 import ornl.elision.core.RewriteRule
 import ornl.elision.core.SymbolicOperator
 import ornl.elision.core.TypedSymbolicOperator
-import ornl.elision.core.AtomWalker
 import ornl.elision.core.Literal
 import ornl.elision.core.MapPair
 import ornl.elision.core.SymbolLiteral
@@ -99,8 +98,13 @@ extends ElisionException(Loc.internal, msg)
  *  - An instance of [[ornl.elision.core.OperatorLibrary]].
  *  - Rulesets.
  *  - "Automatic" rewriting of atoms using rules.
+ *  
+ * @param builder   A builder to evaluate and construct atoms.  If not
+ *                  specified, the [[ornl.elision.context.StandardBuilder]]
+ *                  is used.
  */
-class Context extends PropertyManager with Fickle with Mutable with Cache {
+class Context(val builder: Builder = StandardBuilder)
+extends PropertyManager with Fickle with Mutable with Cache {
   
   override def clone = {
     val clone = new Context
@@ -109,6 +113,9 @@ class Context extends PropertyManager with Fickle with Mutable with Cache {
     clone.ruleLibrary = this.ruleLibrary.clone
     clone
   }
+  
+  /** Provide a binder to rewrite atoms. */
+  val binder = new Binder(builder)
   
   //======================================================================
   // The settings.

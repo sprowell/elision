@@ -280,7 +280,7 @@ package object core {
    * @return	The new bindings atom.
    */
   implicit def wrapBindingsAtom(binds: Bindings) =
-    new BindingsAtom(binds)
+    new BindingsAtom(Loc.internal, binds)
   
   /**
    * Where needed, convert a bindings atom to a simple bindings object (unwrap).

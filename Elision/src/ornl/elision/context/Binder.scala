@@ -51,6 +51,7 @@ import ornl.elision.core.FloatLiteral
 import ornl.elision.util.ElisionException
 import ornl.elision.core.Variable
 import ornl.elision.core.NamedRootType
+import ornl.elision.core.OpApply
 
 /**
  * Apply a binding to an atom, replacing instances of bound variables with
@@ -89,6 +90,8 @@ class Binder(builder: Builder) {
       case lit: FloatLiteral => rewrite(lit, binds)
       
       case ap: AlgProp => rewrite(ap, binds)
+      
+      case opapp: OpApply => rewrite(opapp, binds)
 
       case app: Apply => rewrite(app, binds)
         
@@ -211,6 +214,44 @@ class Binder(builder: Builder) {
           ident._1), true)
     } else {
       (ap, false)
+    }
+  }
+  
+  /**
+   * Rewrite an operator application.  These are special, since the operator
+   * is never rewritten, and there may be cached rewrites.
+   * 
+   * @param atom    The atom to rewrite.
+   * @param binds   The bindings.
+   * @return  A pair consisting of the result atom and a flag that is true
+   *          iff any rewriting was performed.
+   */
+  def rewrite(opapp: OpApply, binds: Bindings) = {
+    // TODO Does caching rewrites here actually yield any performance?
+    // TODO Should all rewrites be cached?
+    
+    // We have bindings. Rewrite the operator.
+    // See if we have already rewritten this operator with these
+    // bindings.
+    (binds.rewrites get opapp) match {
+      // We have already done this rewrite.
+      case Some(rewrite) =>
+        rewrite
+      
+      // We don't have a cached rewrite.
+      case None =>
+        // Rewrite the argument, but not the operator.  In reality, operators
+        // should protect their arguments using De Bruijn indices, but that's
+        // not implemented.
+        val pair = apply(opapp.arg, binds)
+        if (pair._2) {
+          val newApply = builder.newApply(Loc.internal, opapp.op, pair._1)
+          binds.rewrites(opapp) = (newApply, true) 
+          (newApply, true) 
+        } else {
+          binds.rewrites(opapp) = (opapp, false) 
+          (this, false)
+        }
     }
   }
   

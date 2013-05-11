@@ -149,6 +149,7 @@ extends BasicAtom(loc) {
  * Provide more convenient ways to construct and extract literals.
  */
 object Literal {
+  
   /**
    * Make an integer literal from a big integer.
    * 
