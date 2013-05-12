@@ -47,9 +47,8 @@ import ornl.elision.core.Variable
 import ornl.elision.core.knownExecutor
 import ornl.elision.util.Debugger
 import scala.annotation.tailrec
-import ornl.elision.context.Context
-import ornl.elision.context.ApplyBuilder
-import ornl.elision.context.Context
+import ornl.elision.context.Builder
+import ornl.elision.util.Loc
 
 /**
  * Match two sequences whose elements can be re-ordered or re-grouped.  That is,
@@ -66,7 +65,7 @@ object ACMatcher {
    * 
    * @param plist	      The pattern list.
    * @param slist	      The subject list.
-   * @param context     The context needed to build atoms.
+   * @param builder     The builder needed to build atoms.
    * @param binds	      Bindings that must be honored in any match.
    * @param op		      An optional operator to apply to sublists.
    * @param exhaustive  Whether to perform an exhaustive search of the space,
@@ -75,7 +74,7 @@ object ACMatcher {
    *                    not specified.
    * @return	The match outcome.
    */
-  def tryMatch(plist: AtomSeq, slist: AtomSeq, context: Context,
+  def tryMatch(plist: AtomSeq, slist: AtomSeq, builder: Builder,
       binds: Bindings, op: Option[OperatorRef],
       exhaustive: Boolean = exhaustiveDefault): Outcome = {
     // Check the length.
@@ -95,7 +94,7 @@ object ACMatcher {
     // If there are the same number, then this is a simple case of commutative
     // matching.
     if (plist.length == slist.length) {
-      return CMatcher.tryMatch(plist, slist, context, binds)
+      return CMatcher.tryMatch(plist, slist, builder, binds)
     }
       
     // If there is exactly one pattern then match it immediately.
@@ -104,11 +103,11 @@ object ACMatcher {
       // the single pattern against the result.
       return Matcher(plist.atoms(0), op match {
         case Some(opref) =>
-          ApplyHandler(opref, slist, context)
+          builder.newApply(Loc.internal, opref, slist)
 
         case None =>
           slist
-      }, context, binds)
+      }, builder, binds)
     }
 
     // Conduct a test to see if matching is even possible.  Try to match
@@ -146,7 +145,7 @@ object ACMatcher {
       var _sindex = 0
       var _matched = false
       while ((!_matched) && (_sindex < slist.length)) {
-        Matcher(plist(_pindex), slist(_sindex), context, binds) match {
+        Matcher(plist(_pindex), slist(_sindex), builder, binds) match {
           case fail:Fail =>
           case m1:Match => _matched = true
           case m2:Many => _matched = true
@@ -166,7 +165,7 @@ object ACMatcher {
     // atoms that are not variables, and so their matching is much more
     // restrictive.  We obtain an iterator over these, and then combine it
     // with the iterator for "everything else."
-    var um = new UnbindableMatcher(patterns, subjects, context, binds)
+    var um = new UnbindableMatcher(patterns, subjects, builder, binds)
     
     // This is not so simple.  We need to perform the match.  Build the
     // iterator.
@@ -185,8 +184,10 @@ object ACMatcher {
         }
       } else {
         // Get the patterns and subjects that remain.
-        val pats = AtomSeq(plist.props, bindings.patterns.getOrElse(patterns))
-        val subs = AtomSeq(slist.props, bindings.subjects.getOrElse(subjects))
+        val pats = builder.newAtomSeq(Loc.internal, plist.props,
+            bindings.patterns.getOrElse(patterns))
+        val subs = builder.newAtomSeq(Loc.internal, slist.props,
+            bindings.subjects.getOrElse(subjects))
 
         // Are we trying to aggressively fail ACMatching at the risk of not
         // matching something that could match?
@@ -197,11 +198,11 @@ object ACMatcher {
           if (pats.atoms.length == 1) {
             Matcher(pats.atoms(0), op match {
               case Some(opref) =>
-                ApplyHandler(opref, subs, context)
+                builder.newApply(Loc.internal, opref, subs)
 
               case None =>
                 subs
-            }, context, (bindings ++ binds))
+            }, builder, (bindings ++ binds))
           }
         }
 
@@ -323,10 +324,9 @@ object ACMatcher {
                 newSubs = newSubs :+ sub
               }
             } // Loop over subjects.
-            
-            val pats1 = AtomSeq(plist.props, newPats)
-            val subs1 = AtomSeq(slist.props, newSubs)
-            new ACMatchIterator(pats1, subs1, context, newBinds, op)
+            val pats1 = builder.newAtomSeq(Loc.internal, plist.props, newPats)
+            val subs1 = builder.newAtomSeq(Loc.internal, slist.props, newSubs)
+            new ACMatchIterator(pats1, subs1, builder, newBinds, op)
           } else {
             // This set of bindings can never match. Return an empty iterator.
             new MatchIterator {
@@ -357,7 +357,7 @@ object ACMatcher {
   private class ACMatchIterator(
       patterns: AtomSeq,
       subjects: AtomSeq,
-      context: Context,
+      builder: Builder,
       binds: Bindings,
       op: Option[OperatorRef]) extends MatchIterator {
     /** An iterator over all permutations of the subjects. */
@@ -377,8 +377,9 @@ object ACMatcher {
       else {
         _local = null
 	      if (_perms.hasNext)
-	        AMatcher.tryMatch(patterns, AtomSeq(subjects.props, _perms.next),
-	            context, binds, op) match {
+	        AMatcher.tryMatch(patterns,
+	            builder.newAtomSeq(Loc.internal, subjects.props, _perms.next),
+	            builder, binds, op) match {
 	          case fail:Fail =>
 	            // We ignore this case.  We only fail if we exhaust all attempts.
 	            Debugger("matching", fail.toString)

@@ -32,6 +32,7 @@ package ornl.elision.matcher
 import ornl.elision.core.Variable
 import ornl.elision.core.BasicAtom
 import ornl.elision.core.Bindings
+import ornl.elision.context.Builder
 
 /**
  * Generate bindings by attempting to bind a variable to an atom.  The
@@ -50,10 +51,12 @@ object Binder {
    * @param binds     The initial bindings.
    * @param variable  The variable to bind.
    * @param atom      The atom to which to bind the variable.
+   * @param builder   A builder to construct atoms.
    * @return  The outcome of the binding attempt, which may be either a match
    *          or a failure.
    */
-  def bind(binds: Bindings, variable: Variable, atom: BasicAtom): Outcome = {
+  def bind(binds: Bindings, variable: Variable, atom: BasicAtom,
+      builder: Builder): Outcome = {
     // If this is a by-name variable, reject immediately if the subject is not
     // a variable of the same name.
     if (variable.byName) {
@@ -72,7 +75,7 @@ object Binder {
     } else {
       // Compute the bindings and check the guard.
       val newbinds = binds + (variable.name -> atom)
-      val newterm = variable.guard.rewrite(newbinds)._1
+      val newterm = builder.rewrite(variable.guard, newbinds)._1
       if (newterm.isTrue) {
         return Match(newbinds)
       } else {

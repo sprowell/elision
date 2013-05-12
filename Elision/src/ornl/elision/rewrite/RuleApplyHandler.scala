@@ -27,7 +27,7 @@
  * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package ornl.elision.context
+package ornl.elision.rewrite
 
 import ornl.elision.core.BasicAtom
 import ornl.elision.core.Bindings
@@ -37,7 +37,8 @@ import ornl.elision.matcher.Matcher
 import ornl.elision.matcher.Many
 import ornl.elision.matcher.Match
 import ornl.elision.matcher.Fail
-import ornl.elision.rewrite.RewriteEngine
+import ornl.elision.context.Builder
+import ornl.elision.core.wrapBindingsAtom
 
 /**
  * Apply a rule to another atom.
@@ -47,33 +48,22 @@ object RuleApplyHandler {
   /**
    * Apply the given rule to the provided atom.  A set of initial bindings
    * to honor is included, along with a hint to provide during matching. 
-   * Finally, a context is provided to allow atoms to be created.
+   * Finally, a builder is provided to allow atoms to be created.
    * 
-   * @param rule    The rewrite rule.
-   * @param atom    The atom.
-   * @param binds   The bindings.
-   * @param hint    The optional hint.
-   * @param context The context.
+   * @param rule      The rewrite rule.
+   * @param atom      The atom.
+   * @param binds     The bindings.
+   * @param hint      The optional hint.
+   * @param builder   The builder.
+   * @param strategy  The strategy to use to rewrite guards.
    * @return  The result of applying the rule to the atom, packaged as a pair
    *          whose first element is the final atom, and whose second element
    *          is true iff the rule was successfully applied.
    */
   def apply(rule: RewriteRule, atom: BasicAtom, binds: Bindings,
-      hint: Option[Any], context: Context) = {
+      hint: Option[Any], builder: Builder, strategy: GuardStrategy) = {
     // Try to apply the rewrite rule.  Whatever we get back is the result.
-    _tryRewrite(rule, atom, binds, hint, context)
-  }
-  
-  /**
-   * Cause the default guard rewrite strategy to be applied to the given
-   * guard.  This is a stopgap measure until we have a better way to specify
-   * the guard strategy.
-   * 
-   * @param guard   The guard to rewrite.
-   * @return  The result of rewriting the guard.
-   */
-  private def _applyGuardStrategy(guard: BasicAtom, context: Context) = {
-    new RewriteEngine(context)(guard)
+    _tryRewrite(rule, atom, binds, hint, builder, strategy)
   }
   
   /**
@@ -88,9 +78,10 @@ object RuleApplyHandler {
    * If all guards are true, then the bindings are applied to the rewrite and
    * the result is returned.
    * 
-   * @param subject The subject to test.
-   * @param binds   Bindings to honor.
-   * @param hint    An optional hint to pass along during matching.
+   * @param subject   The subject to test.
+   * @param binds     Bindings to honor.
+   * @param hint      An optional hint to pass along during matching.
+   * @param strategy  The strategy to use to rewrite guards.
    * @return  A pair consisting of an atom and a boolean.  The boolean is
    *          true if the rewrite yielded a new atom, and is false otherwise.
    */
@@ -99,12 +90,13 @@ object RuleApplyHandler {
       subject: BasicAtom,
       binds: Bindings,
       hint: Option[Any],
-      context: Context): (BasicAtom, Boolean) = {
+      builder: Builder,
+      strategy: GuardStrategy): (BasicAtom, Boolean) = {
     // Local function to check the guards.
     def checkGuards(candidate: Bindings): Boolean = {
       for (guard <- rule.guards) {
-        val (newguard, _) = guard.rewrite(candidate)
-        val (newguard1, _) = _applyGuardStrategy(newguard, context)
+        val (newguard, _) = builder.rewrite(guard, candidate)
+        val (newguard1, _) = strategy(newguard)
         if (!newguard1.isTrue) return false
       }
       true
@@ -115,12 +107,12 @@ object RuleApplyHandler {
     def doRuleRewrite(candidate: Bindings) = {
       Debugger("rewrite", "Applied rule: " + rule.toParseString +
           " to: " + candidate.toParseString + "")
-      (rule.rewrite.rewrite(candidate)._1, true)
+      (builder.rewrite(rule.rewrite, candidate)._1, true)
     }
     
     // First we try to match the given atom against the pattern.
     Debugger("rulematch", "Trying rule: " + rule.toParseString)
-    Matcher(rule.pattern, subject, context, binds, hint) match {
+    Matcher(rule.pattern, subject, builder, binds, hint) match {
       case fail:Fail =>
         Debugger("rulematch", "Rule does not match subject: " + fail)
         return (subject, false)

@@ -42,9 +42,9 @@ import ornl.elision.core.SpecialForm
 import scala.math.BigInt.int2bigInt
 import scala.math.BigInt.long2bigInt
 import ornl.elision.context.Context
-import ornl.elision.context.RuleApplyHandler
 import ornl.elision.core.Bindings
 import ornl.elision.context.ApplyBuilder
+import ornl.elision.util.Loc
 
 /**
  * Hold defaults for all rewrite engine instances.
@@ -67,12 +67,13 @@ object RewriteEngine {
    * rulesets.  This is limited by the rewrite limit and timeout, if set.
    * 
    * @param atom      The atom to rewrite.
-   * @param con       The context providing the rule library, console, and
+   * @param context   The context providing the rule library, console, and
    *                  memoization cache.
    * @return  The rewritten atom, and true iff any rules were successfully
    *          applied.
    */
-  def apply(atom: BasicAtom, con: Context) = new RewriteEngine(con)(atom)
+  def apply(atom: BasicAtom, context: Context) =
+    new RewriteEngine(context)(atom)
 }
 
 /**
@@ -88,7 +89,7 @@ object RewriteEngine {
  * @param context The context providing the rule library, console, and
  *                memoization cache.
  */
-class RewriteEngine(context: Context) {
+class RewriteEngine(context: Context) extends GuardStrategy {
   
   //======================================================================
   // Configuration.
@@ -380,7 +381,7 @@ class RewriteEngine(context: Context) {
       }      
       Debugger("rewrite", "Trying rule: " + rule.toParseString)
       val (newatom, applied) =
-        RuleApplyHandler(rule, atom, Bindings(), None, context)
+        RuleApplyHandler(rule, atom, Bindings(), None, context.builder, this)
       if (applied) {
         // Return the rewrite result.
         Debugger("rewrite", "Rewrote to: " + newatom.toParseString)
@@ -428,13 +429,17 @@ class RewriteEngine(context: Context) {
             newatom
           }
           // Return the result.
-          if (flag) (AtomSeq(newProps, newAtoms), true) else (atom, false)
+          if (flag) {
+            (context.builder.newAtomSeq(Loc.internal, newProps, newAtoms), true)
+          } else {
+            (atom, false)
+          }
         
         case Apply(lhs, rhs) =>
           val newlhs = _rewritechild(lhs, rulesets)
           val newrhs = _rewritechild(rhs, rulesets)
           if (newlhs._2 || newrhs._2) {
-            (ApplyHandler(newlhs._1, newrhs._1, context), true)
+            (context.builder.newApply(Loc.internal, newlhs._1, newrhs._1), true)
           } else {
             (atom, false)
           }
@@ -446,7 +451,8 @@ class RewriteEngine(context: Context) {
           }
           val newbody = _rewritechild(body, rulesets)
           if (newparam._2 || newbody._2) {
-            (Lambda(newparam._1, newbody._1), true)
+            (context.builder.newLambda(Loc.internal, newparam._1,
+                newbody._1), true)
           } else {
             (atom, false)
           }
@@ -455,7 +461,8 @@ class RewriteEngine(context: Context) {
           val newlhs = _rewritechild(tag, rulesets)
           val newrhs = _rewritechild(content, rulesets)
           if (newlhs._2 || newrhs._2) {
-            (SpecialForm(atom .loc, newlhs._1, newrhs._1), true)
+            (context.builder.newSpecialForm(Loc.internal, newlhs._1,
+                newrhs._1), true)
           } else {
             (atom, false)
           }

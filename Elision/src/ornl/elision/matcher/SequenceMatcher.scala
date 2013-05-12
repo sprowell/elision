@@ -44,7 +44,7 @@ import ornl.elision.core.wrapBindingsAtom
 import ornl.elision.util.Debugger
 import ornl.elision.util.OmitSeq
 import ornl.elision.util.OmitSeq.fromIndexedSeq
-import ornl.elision.context.Context
+import ornl.elision.context.Builder
 
 /**
  * Match two sequences of atoms.
@@ -68,12 +68,12 @@ object SequenceMatcher {
    * 
    * @param patterns	The patterns.
    * @param subjects	The subjects.
-   * @param context   The context needed to create atoms.
+   * @param builder   The builder needed to create atoms.
    * @param binds			Bindings to honor in any match.  This can be omitted.
    * @return	The result of the match.
    */
   def tryMatch(patterns: OmitSeq[BasicAtom], subjects: OmitSeq[BasicAtom],
-      context: Context, binds: Bindings = Bindings()): Outcome = {
+      builder: Builder, binds: Bindings = Bindings()): Outcome = {
     Debugger("matching") {
       Debugger("matching", "Sequence Matcher called: ")
       Debugger("matching", "    Patterns: " + patterns.mkParseString("",",",""))
@@ -83,31 +83,10 @@ object SequenceMatcher {
     if (patterns.length != subjects.length) {
       Fail("Sequences are not the same length.")
     } else {
-      _tryMatch(patterns, subjects, context, binds, 0)
+      _tryMatch(patterns, subjects, builder, binds, 0)
     }
   }
   
-  /**
-   * Rewrite a sequence of atoms by applying the given bindings to each.
-   * 
-   * @param subjects	The atoms to rewrite.
-   * @param binds			The bindings to apply.
-   * @return	A pair consisting of the rewritten sequence of atoms and a flag
-   * 					that is true if any rewrites succeeded.
-   */
-  def rewrite(subjects: OmitSeq[BasicAtom], binds: Bindings) = {
-    var changed = false
-    var index = 0
-    var newseq = OmitSeq[BasicAtom]()
-    while (index < subjects.size) {
-      val (newatom, change) = subjects(index).rewrite(binds)
-      changed |= change
-      newseq :+= newatom
-      index += 1
-    } // Rewrite the subjects.
-    if (changed) (newseq, changed) else (subjects, false)
-  }
-
   /**
    * Match two sequences of atoms, in order.
    * 
@@ -119,7 +98,7 @@ object SequenceMatcher {
    * @return	The result of the match.
    */
   private def _tryMatch(patterns: OmitSeq[BasicAtom],
-      subjects: OmitSeq[BasicAtom], context: Context,
+      subjects: OmitSeq[BasicAtom], builder: Builder,
       binds: Bindings, position: Int): Outcome = {
     // Watch for the basis case.  If the patterns list is empty, we are done
     // and return a successful match.
@@ -128,7 +107,7 @@ object SequenceMatcher {
     // Try to match the heads of the list.  This generates one of three
     // possible outcomes, and we figure out what to do based on the particular
     // outcome.
-    Matcher(patterns.head, subjects.head, context, binds, None) match {
+    Matcher(patterns.head, subjects.head, builder, binds, None) match {
       case fail:Fail =>
         // The atoms do not match.  There is nothing further to try; the
         // entire match can be rejected at this point, so return failure.
@@ -137,7 +116,7 @@ object SequenceMatcher {
       case Match(newbinds) =>
         // We found exactly one way in which the pattern could match, given the
         // bindings we received.  This is easy; proceed to the next element.
-        _tryMatch(patterns.tail, subjects.tail, context, (newbinds++binds),
+        _tryMatch(patterns.tail, subjects.tail, builder, (newbinds++binds),
             position+1)
       case Many(miter) =>
         // Matching returned a match iterator.  This is the nontrivial case.
@@ -147,7 +126,7 @@ object SequenceMatcher {
         val (pt, st) = (patterns.tail, subjects.tail)
           Many(MatchIterator(
               (newbinds: Bindings) =>
-                _tryMatch(pt, st, context, (newbinds++binds), position+1),
+                _tryMatch(pt, st, builder, (newbinds++binds), position+1),
                 miter))
     }
   }

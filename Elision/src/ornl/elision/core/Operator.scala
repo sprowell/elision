@@ -173,38 +173,6 @@ abstract class CaseOperator protected[elision] (
     detail: String,
     evenMeta: Boolean) extends Operator(loc, content, name, typ, cases,
         description, detail, evenMeta) {
-  
-  /**
-   * Alternate constructor for an operator omitting the special form content
-   * binding.
-   * 
-   * @param loc           The location.
-   * @param name          The operator name.
-   * @param typ           The operator type.
-   * @param cases         The definition.
-   * @param description   An optional short description for the operator.
-   * @param detail        Optional detailed help for the operator.
-   * @param evenMeta      Apply this operator even when the arguments contain
-   *                      meta-terms.  This is not advisable, and you should
-   *                      probably leave this with the default value of false.
-   */
-  def this(
-      loc: Loc,
-      name: String,
-      typ: BasicAtom,
-      cases: AtomSeq,
-      description: String,
-      detail: String,
-      evenMeta: Boolean) = {
-    this(loc, new BindingsAtom(loc, Bindings {
-      "name" -> new SymbolLiteral(Loc.internal, Symbol(name))
-      "type" -> typ
-      "cases" -> cases
-      "description" -> new StringLiteral(Loc.internal, description)
-      "detail" -> new StringLiteral(Loc.internal, detail)
-      "evenmeta" -> new BooleanLiteral(Loc.internal, evenMeta)
-    }), name, typ, cases, description, detail, evenMeta)
-  }
 
   /** The type of the operator is the provided type. */
   override val theType = typ
@@ -260,42 +228,6 @@ abstract class TypedSymbolicOperator protected[elision] (
     evenMeta: Boolean,
     handlertxt: Option[String]) extends SymbolicOperator(loc, content, name,
         optype, params, description, detail, evenMeta, handlertxt) {
-  
-  /**
-   * Alternate constructor for an operator omitting the special form content
-   * binding.
-   * 
-   * @param loc           The location.
-   * @param name          The operator name.
-   * @param typ           The type of the fully-applied operator (codomain).
-   * @param optype        The type of the operator.
-   * @param params        The operator parameters.
-   * @param description   An optional short description for the operator.
-   * @param detail        Optional detailed help for the operator.
-   * @param evenMeta      Apply this operator even when the arguments contain
-   *                      meta-terms.  This is not advisable, and you should
-   *                      probably leave this with the default value of false.
-   * @param handlertxt    The text for an optional native handler.
-   */
-  def this(
-      loc: Loc,
-      name: String,
-      typ: BasicAtom,
-      optype: BasicAtom,
-      params: AtomSeq,
-      description: String,
-      detail: String,
-      evenMeta: Boolean,
-      handlertxt: Option[String]) = {
-    this(loc, new BindingsAtom(loc, Bindings {
-      "name" -> new SymbolLiteral(Loc.internal, Symbol(name))
-      "type" -> typ
-      "params" -> params
-      "description" -> new StringLiteral(Loc.internal, description)
-      "detail" -> new StringLiteral(Loc.internal, detail)
-      "evenmeta" -> new BooleanLiteral(Loc.internal, evenMeta)
-    }), name, typ, optype, params, description, detail, evenMeta, handlertxt)
-  }
   
   /**
    * The type of an operator is a mapping from the operator domain to the

@@ -52,21 +52,27 @@ import ornl.elision.util.ElisionException
 import ornl.elision.core.Variable
 import ornl.elision.core.NamedRootType
 import ornl.elision.core.OpApply
+import ornl.elision.util.OmitSeq
 
 /**
+ * An evaluator adds the logic for doing rewriting and replacement to the
+ * atom builder.  As such, it is just an intermediate class and is not
+ * necessarily of interest unless you wish to make guarantees about the
+ * result of rewriting something - that is, that applying bindings to an
+ * atom sequence will always yield an atom sequence.
+ * 
  * Apply a binding to an atom, replacing instances of bound variables with
  * their corresponding binding, and evaluating the result.  This class also
  * provides a more general - and dangerous - method to replace one atom with
  * another.
  * 
- * To use this, make an instance and provide a builder.  Then invoke either
+ * To use this, make an instance and then invoke either
  * the `apply` method to rewrite an atom, or the `replace` method to replace
  * atoms.  If you care about the specific result, you might try one of the
- * `rewrite` methods.  These make guarantees about the return value's type.
- * 
- * @param builder A builder to construct atoms as needed.
+ * type-specific `rewriteAs` methods.  These make guarantees about the return
+ * value's type.
  */
-class Binder(builder: Builder) {
+class Evaluator extends Builder {
 
   /**
    * Rewrite the provided atom, replacing instances of variables bound (by
@@ -171,6 +177,27 @@ class Binder(builder: Builder) {
   //======================================================================
   
   /**
+   * Rewrite a sequence of atoms by applying the given bindings to each.
+   * 
+   * @param subjects  The atoms to rewrite.
+   * @param binds     The bindings to apply.
+   * @return  A pair consisting of the rewritten sequence of atoms and a flag
+   *          that is true if any rewrites succeeded.
+   */
+  def rewrite(subjects: OmitSeq[BasicAtom], binds: Bindings) = {
+    var changed = false
+    var index = 0
+    var newseq = OmitSeq[BasicAtom]()
+    while (index < subjects.size) {
+      val (newatom, change) = apply(subjects(index), binds)
+      changed |= change
+      newseq :+= newatom
+      index += 1
+    } // Rewrite the subjects.
+    if (changed) (newseq, changed) else (subjects, false)
+  }
+  
+  /**
    * Rewrite the provided atom, replacing instances of variables bound (by
    * name) in the bindings with the bound values.
    * 
@@ -210,7 +237,7 @@ class Binder(builder: Builder) {
     val absor = _rewrite(ap.absorber)
     val ident = _rewrite(ap.identity)
     if (assoc._2 || commu._2 || idemp._2 || absor._2 || ident._2) {
-      (builder.newAlgProp(Loc.internal, assoc._1, commu._1, idemp._1, absor._1,
+      (newAlgProp(Loc.internal, assoc._1, commu._1, idemp._1, absor._1,
           ident._1), true)
     } else {
       (ap, false)
@@ -245,9 +272,9 @@ class Binder(builder: Builder) {
         // not implemented.
         val pair = apply(opapp.arg, binds)
         if (pair._2) {
-          val newApply = builder.newApply(Loc.internal, opapp.op, pair._1)
-          binds.rewrites(opapp) = (newApply, true) 
-          (newApply, true) 
+          val napply = newApply(Loc.internal, opapp.op, pair._1)
+          binds.rewrites(opapp) = (napply, true) 
+          (napply, true) 
         } else {
           binds.rewrites(opapp) = (opapp, false) 
           (this, false)
@@ -268,7 +295,7 @@ class Binder(builder: Builder) {
     val (nop, nof) = apply(app.op, binds)
     val (narg, naf) = apply(app.arg, binds)
     if (nof || naf) {
-      (builder.newApply(Loc.internal, nop, narg), true)
+      (newApply(Loc.internal, nop, narg), true)
     } else { 
       (app, false)
     }
@@ -298,7 +325,7 @@ class Binder(builder: Builder) {
     
     // If anything changed, make a new sequence.
     if (pchanged || schanged) {
-      (builder.newAtomSeq(Loc.internal, newprop, newseq), true)
+      (newAtomSeq(Loc.internal, newprop, newseq), true)
     } else {
       (as, false)
     }
@@ -323,7 +350,7 @@ class Binder(builder: Builder) {
     } // Rewrite all bindings.
     
     if (changed) {
-      (builder.newBindingsAtom(Loc.internal, newmap), true) 
+      (newBindingsAtom(Loc.internal, newmap), true) 
     } else {
       (ba, false)
     }
@@ -345,7 +372,7 @@ class Binder(builder: Builder) {
     val newbinds = binds - lam.lvar.name
     apply(lam.body, newbinds) match {
       case (newatom, changed) if changed => 
-        (builder.newLambda(Loc.internal, lam.lvar, newatom), true)
+        (newLambda(Loc.internal, lam.lvar, newatom), true)
         
       case _ => 
         (lam, false)
@@ -365,7 +392,7 @@ class Binder(builder: Builder) {
       binds: Bindings): (IntegerLiteral, Boolean) = {
     apply(lit.theType, binds) match {
       case (newtype, true) =>
-        (builder.newLiteral(Loc.internal, newtype, lit.value), true)
+        (newLiteral(Loc.internal, newtype, lit.value), true)
         
       case _ =>
         (lit, false)
@@ -384,7 +411,7 @@ class Binder(builder: Builder) {
   def rewrite(lit: SymbolLiteral, binds: Bindings): (SymbolLiteral, Boolean) = {
     apply(lit.theType, binds) match {
       case (newtype, true) =>
-        (builder.newLiteral(Loc.internal, newtype, lit.value), true)
+        (newLiteral(Loc.internal, newtype, lit.value), true)
         
       case _ =>
         (lit, false)
@@ -403,7 +430,7 @@ class Binder(builder: Builder) {
   def rewrite(lit: StringLiteral, binds: Bindings): (StringLiteral, Boolean) = {
     apply(lit.theType, binds) match {
       case (newtype, true) =>
-        (builder.newLiteral(Loc.internal, newtype, lit.value), true)
+        (newLiteral(Loc.internal, newtype, lit.value), true)
         
       case _ =>
         (lit, false)
@@ -423,7 +450,7 @@ class Binder(builder: Builder) {
       binds: Bindings): (BitStringLiteral, Boolean) = {
     apply(lit.theType, binds) match {
       case (newtype, true) =>
-        (builder.newLiteral(Loc.internal, newtype, lit.bits, lit.len), true)
+        (newLiteral(Loc.internal, newtype, lit.bits, lit.len), true)
         
       case _ =>
         (lit, false)
@@ -442,7 +469,7 @@ class Binder(builder: Builder) {
   def rewrite(lit: FloatLiteral, binds: Bindings): (FloatLiteral, Boolean) = {
     apply(lit.theType, binds) match {
       case (newtype, true) =>
-        (builder.newLiteral(Loc.internal, newtype, lit.significand,
+        (newLiteral(Loc.internal, newtype, lit.significand,
             lit.exponent, lit.radix), true)
         
       case _ =>
@@ -463,7 +490,7 @@ class Binder(builder: Builder) {
     val newleft = apply(map.left, binds)
     val newright = apply(map.right, binds)
     if (newleft._2 || newright._2) {
-      (builder.newMapPair(Loc.internal, newleft._1, newright._2), true)
+      (newMapPair(Loc.internal, newleft._1, newright._2), true)
     } else {
       (map, false)
     }
@@ -497,7 +524,7 @@ class Binder(builder: Builder) {
     val newtag = apply(sf.tag, binds)
     val newcontent = apply(sf.content, binds)
     if (newtag._2 || newcontent._2) {
-      (builder.newSpecialForm(Loc.internal, newtag._1, newcontent._1), true)
+      (newSpecialForm(Loc.internal, newtag._1, newcontent._1), true)
     } else {
       (sf, false)
     }
@@ -528,7 +555,7 @@ class Binder(builder: Builder) {
           // rewritten.
           apply(vari.theType, binds) match {
             case (newtype, true) =>
-              (builder.newTermVariable(Loc.internal, newtype, vari.name,
+              (newTermVariable(Loc.internal, newtype, vari.name,
                   vari.guard, vari.labels, vari.byName), true)
             
             case _ => {
@@ -565,7 +592,7 @@ class Binder(builder: Builder) {
           // rewritten.
           apply(vari.theType, binds) match {
             case (newtype, true) =>
-              (builder.newMetaVariable(Loc.internal, newtype, vari.name,
+              (newMetaVariable(Loc.internal, newtype, vari.name,
                   vari.guard, vari.labels, vari.byName), true)
             
             case _ => {
@@ -601,7 +628,7 @@ class Binder(builder: Builder) {
         val (newB, flagB) = _replace(ap.absorber)
         val (newD, flagD) = _replace(ap.identity)
         if (flagA || flagC || flagI || flagB || flagD) {
-          (builder.newAlgProp(Loc.internal, newA, newC, newI, newB, newD), true)
+          (newAlgProp(Loc.internal, newA, newC, newI, newB, newD), true)
         } else {
           (ap, false)
         }
@@ -617,7 +644,7 @@ class Binder(builder: Builder) {
         val (newop, flag1) = replace(app.op, map)
         val (newarg, flag2) = replace(app.arg, map)
         if (flag1 || flag2) {
-          (builder.newApply(Loc.internal, newop, newarg), true)
+          (newApply(Loc.internal, newop, newarg), true)
         } else {
           (app, false)
         }
@@ -644,7 +671,7 @@ class Binder(builder: Builder) {
           case _ => (as.props, false)
         }
         if (flag1 || flag2) {
-          (builder.newAtomSeq(Loc.internal, newprops, newatoms), true)
+          (newAtomSeq(Loc.internal, newprops, newatoms), true)
         } else {
           (as, false)
         }
@@ -664,7 +691,7 @@ class Binder(builder: Builder) {
             (bind._1, newbind)
         }
         if (flag) {
-          (builder.newBindingsAtom(Loc.internal, newbinds), true)
+          (newBindingsAtom(Loc.internal, newbinds), true)
         } else {
           (ba, false)
         }
@@ -682,7 +709,7 @@ class Binder(builder: Builder) {
             (newvar.asInstanceOf[Variable], flag) else (lam.lvar, false))
         val (newbody, flag2) = replace(lam.body, map)
         if (flag1 || flag2) {
-          (builder.newLambda(Loc.internal, newlvar, newbody), true)
+          (newLambda(Loc.internal, newlvar, newbody), true)
         } else {
           (lam, false)
         }
@@ -696,7 +723,7 @@ class Binder(builder: Builder) {
       case None =>
         val (newtype, flag) = replace(lit.theType, map)
         if (flag) {
-          (builder.newLiteral(Loc.internal, newtype, lit.value), true)
+          (newLiteral(Loc.internal, newtype, lit.value), true)
         } else {
           (lit, false)
         }
@@ -710,7 +737,7 @@ class Binder(builder: Builder) {
       case None =>
         val (newtype, flag) = replace(lit.theType, map)
         if (flag) {
-          (builder.newLiteral(Loc.internal, newtype, lit.value), true)
+          (newLiteral(Loc.internal, newtype, lit.value), true)
         } else {
           (lit, false)
         }
@@ -724,7 +751,7 @@ class Binder(builder: Builder) {
       case None =>
         val (newtype, flag) = replace(lit.theType, map)
         if (flag) {
-          (builder.newLiteral(Loc.internal, newtype, lit.value), true)
+          (newLiteral(Loc.internal, newtype, lit.value), true)
         } else {
           (lit, false)
         }
@@ -738,7 +765,7 @@ class Binder(builder: Builder) {
       case None =>
         val (newtype, flag) = replace(lit.theType, map)
         if (flag) {
-          (builder.newLiteral(Loc.internal, newtype, lit.bits, lit.len), true)
+          (newLiteral(Loc.internal, newtype, lit.bits, lit.len), true)
         } else {
           (lit, false)
         }
@@ -752,7 +779,7 @@ class Binder(builder: Builder) {
       case None =>
         val (newtype, flag) = replace(lit.theType, map)
         if (flag) {
-          (builder.newLiteral(Loc.internal, newtype, lit.significand,
+          (newLiteral(Loc.internal, newtype, lit.significand,
               lit.exponent, lit.radix), true)
         } else {
           (lit, false)
@@ -769,7 +796,7 @@ class Binder(builder: Builder) {
         val (newleft, flag1) = replace(mp.left, map)
         val (newright, flag2) = replace(mp.right, map)
         if (flag1 || flag2) {
-          (builder.newMapPair(Loc.internal, newleft, newright), true)
+          (newMapPair(Loc.internal, newleft, newright), true)
         } else {
           (mp, false)
         }
@@ -792,7 +819,7 @@ class Binder(builder: Builder) {
         val (newtag, flag1) = replace(sf.tag, map)
         val (newcontent, flag2) = replace(sf.content, map)
         if (flag1 || flag2) {
-          (builder.newSpecialForm(Loc.internal, newtag, newcontent), true)
+          (newSpecialForm(Loc.internal, newtag, newcontent), true)
         } else {
           (sf, false)
         }
@@ -811,7 +838,7 @@ class Binder(builder: Builder) {
         val (newtype, flag1) = replace(vari.theType, map)
         val (newguard, flag2) = replace(vari.guard, map)
         if (flag1 || flag2) {
-          (builder.newTermVariable(Loc.internal, newtype, vari.name, newguard,
+          (newTermVariable(Loc.internal, newtype, vari.name, newguard,
               vari.labels, vari.byName), true)
         } else {
           (vari, false)
@@ -831,7 +858,7 @@ class Binder(builder: Builder) {
         val (newtype, flag1) = replace(vari.theType, map)
         val (newguard, flag2) = replace(vari.guard, map)
         if (flag1 || flag2) {
-          (builder.newMetaVariable(Loc.internal, newtype, vari.name, newguard,
+          (newMetaVariable(Loc.internal, newtype, vari.name, newguard,
               vari.labels, vari.byName), true)
         } else {
           (vari, false)

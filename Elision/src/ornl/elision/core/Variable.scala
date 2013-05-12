@@ -46,6 +46,21 @@ import ornl.elision.matcher.Match
 import ornl.elision.util.Loc
 
 /**
+ * Companion object to match variables.
+ */
+object Variable {
+  
+  /**
+   * Extract the parts of a variable.
+   * 
+   * @param vx  The variable.
+   * @return  The type, name, guard, labels, and by-name status.
+   */
+  def unapply(vx: Variable) = Some((vx.theType, vx.name, vx.guard,
+      vx.labels, vx.byName))
+}
+
+/**
  * Common base class for both term- and meta-variables.
  * 
  * @param loc     Location of the atom's declaration.
@@ -114,23 +129,9 @@ abstract class Variable(
 }
 
 /**
- * Companion object to make and match metavariables.
+ * Companion object to match metavariables.
  */
 object TermVariable {
-  
-  /**
-   * Make a new term variable instance.
-   *
-   * @param loc     Location of the atom's declaration. 
-   * @param typ     The variable type.
-   * @param name    The variable name.
-   * @param guard   The variable's guard.  Default is true.
-   * @param labels  Labels for this variable.  Default is none.
-   * @param byName  If true, this is a "by name" variable.  Default is false.
-   */
-  def apply(loc: Loc, typ: BasicAtom, name: String,
-      guard: BasicAtom = Literal.TRUE, labels: Set[String] = Set[String](),
-      byName: Boolean) = new TermVariable(loc, typ, name, guard, labels, byName)
   
   /**
    * Extract the parts of a term variable.
@@ -238,23 +239,9 @@ class TermVariable protected[elision] (
 }
 
 /**
- * Companion object to make and match metavariables.
+ * Companion object to match metavariables.
  */
 object MetaVariable {
-  
-  /**
-   * Make a new metavariable instance.
-   * 
-   * @param loc     Location of the atom's declaration.
-   * @param typ     The variable type.
-   * @param name    The variable name.
-   * @param guard   The variable's guard.  Default is true.
-   * @param labels  Labels for this variable.  Default is none.
-   * @param byName  If true, this is a "by name" variable.  Default is false.
-   */
-  def apply(loc: Loc, typ: BasicAtom, name: String,
-      guard: BasicAtom = Literal.TRUE, labels: Set[String] = Set[String](),
-      byName: Boolean) = new MetaVariable(loc, typ, name, guard, labels, byName)
   
   /**
    * Extract the parts of a metavariable.

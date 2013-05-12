@@ -122,6 +122,16 @@ class AtomSeq protected[elision] (
    */
   val atoms = AtomSeq.process(props, xatoms)
 
+  /**
+   * The constant map provides quick access to those elements of the sequence
+   * that are constants.  It is used during matching to rapidly match and
+   * remove constants from sequences, which that is appropriate.  Because it
+   * is not always used, it is lazily constructed.
+   */
+  lazy val constantMap =
+    (for (index <- atoms.indices if atoms(index).isConstant)
+      yield (atoms(index) -> index)).toMap
+  
   lazy val isConstant = atoms.forall(_.isConstant)
   lazy val isTerm = atoms.forall(_.isTerm)
   lazy val deBruijnIndex = atoms.foldLeft(0)(_ max _.deBruijnIndex)

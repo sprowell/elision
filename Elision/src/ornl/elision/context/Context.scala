@@ -54,13 +54,13 @@ import ornl.elision.core.Variable
 import ornl.elision.dialects.ScalaGenerator
 import ornl.elision.dialects.ElisionGenerator
 import ornl.elision.util.Cache
+import ornl.elision.util.PropertyManager
 import ornl.elision.util.Version
 import ornl.elision.util.Version.build
 import ornl.elision.util.Version.major
 import ornl.elision.util.Version.minor
 import ornl.elision.util.toQuotedString
 import ornl.elision.core.Dialect
-import ornl.elision.util.PropertyManager
 import ornl.elision.util.Console
 import ornl.elision.util.PrintConsole
 import ornl.elision.util.ElisionException
@@ -113,9 +113,6 @@ extends PropertyManager with Fickle with Mutable with Cache {
     clone.ruleLibrary = this.ruleLibrary.clone
     clone
   }
-  
-  /** Provide a binder to rewrite atoms. */
-  val binder = new Binder(builder)
   
   //======================================================================
   // The settings.
@@ -255,7 +252,7 @@ extends PropertyManager with Fickle with Mutable with Cache {
    * @return	The current rule library.
    */
   def ruleLibrary = {
-    if (_rulelib == null) { _rulelib = new RuleLibrary(memo, this) }
+    if (_rulelib == null) { _rulelib = new RuleLibrary(memo) }
     _rulelib
   }
 
@@ -313,7 +310,7 @@ extends PropertyManager with Fickle with Mutable with Cache {
       op
       
     case rule: RewriteRule =>
-      ruleLibrary.add(rule)
+      ruleLibrary.add(rule, builder)
       rule
       
     case MapPair(vari: Variable, value: BasicAtom) =>

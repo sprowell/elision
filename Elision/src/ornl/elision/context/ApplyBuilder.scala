@@ -51,6 +51,7 @@ import ornl.elision.core.OperatorRef
 import ornl.elision.core.Literal
 import ornl.elision.core.Strategy
 import ornl.elision.core.StringLiteral
+import ornl.elision.rewrite.RuleApplyHandler
 
 /**
  * A lambda variable does not match the argument.
@@ -97,31 +98,31 @@ object ApplyBuilder {
    * 
    * @param strat     The strategy to apply.
    * @param arg       The argument.
-   * @param context   The context needed to build atoms.
+   * @param builder   The builder needed to build atoms.
    * @return  The pair of result atom and flag.
    */
   private def test(strat: Strategy, arg: BasicAtom,
-      context: Context): (BasicAtom, Boolean) = {
+      builder: Builder): (BasicAtom, Boolean) = {
     strat match {
       case op_mappair: MapPair =>
         // Handle the case of a map pair.  A map pair is a primitive sort of
         // rewrite rule that consists of a pattern and a rewrite, and nothing
         // else.
-        Matcher(op_mappair.left, arg, context, Bindings(), None) match {
+        Matcher(op_mappair.left, arg, builder, Bindings(), None) match {
           case file:Fail => 
             (arg, false)
             
           case Match(binds) =>
-            (context.binder.apply(op_mappair.right, binds)._1, true)
+            (builder.rewrite(op_mappair.right, binds)._1, true)
             
           case Many(iter) =>
-            (context.binder.apply(op_mappair.right, iter.next)._1, true)
+            (builder.rewrite(op_mappair.right, iter.next)._1, true)
         }
 
       case op_rule: RewriteRule =>
         // A rewrite rule generalizes both the match atom and the map pair
         // as a package (a special form) to perform controlled rewriting.
-        RuleApplyHandler(op_rule, arg, Bindings(), None, context)
+        RuleApplyHandler(op_rule, arg, Bindings(), None, builder)
         
       case c =>
         // We come here if we find an unsupported strategy class.

@@ -117,9 +117,8 @@ extends ElisionException(loc, msg)
  * rewriting.
  * 
  * @param memo      The memoization cache to use.
- * @param context   The context needed to build atoms.
  */
-class RuleLibrary(memo: Memo, context: Context) extends Fickle with Mutable {
+class RuleLibrary(memo: Memo) extends Fickle with Mutable {
   
   /**
    * Create a shallow clone of this rule library.  This returns a new rule
@@ -129,7 +128,7 @@ class RuleLibrary(memo: Memo, context: Context) extends Fickle with Mutable {
    * @return  The clone.
    */
   override def clone: RuleLibrary = {
-    val clone = new RuleLibrary(memo, context)
+    val clone = new RuleLibrary(memo)
     
     clone._kind2rules.clear
     for(mapping <- this._kind2rules) {
@@ -327,12 +326,14 @@ class RuleLibrary(memo: Memo, context: Context) extends Fickle with Mutable {
   /**
    * Add a rewrite rule to this library.
    * 
-   * @param rule	The rewrite rule to add.
+   * @param rule    The rewrite rule to add.
+   * @param builder The builder needed to build atoms.  This is required
+   *                because of rule completion.
    * @throws	NoSuchRulesetException
    * 					At least one ruleset mentioned in the rule has not been declared,
    * 					and undeclared rulesets are not allowed.
    */
-  def add(rule: RewriteRule) = {
+  def add(rule: RewriteRule, builder: Builder) = {
     // A rule whose left-hand side is either bindable is not allowed.
     if (rule.pattern.isBindable) {
       throw new BindablePatternException(rule.loc,
@@ -348,7 +349,7 @@ class RuleLibrary(memo: Memo, context: Context) extends Fickle with Mutable {
     }
     
     // Complete the rule.
-    val rules = Completor.complete(rule, context)
+    val rules = Completor.complete(rule, builder)
     
     // Rules can have names, and adding a rule with the same name as a
     // previously-added rule replaces the prior rule.  This is a novel
@@ -369,7 +370,7 @@ class RuleLibrary(memo: Memo, context: Context) extends Fickle with Mutable {
     }
     
     // Add the rules.
-    for (rule2 <- rules) doAdd(rule2)
+    for (rule2 <- rules) doAdd(rule2, builder)
     this
   }
 
@@ -377,11 +378,13 @@ class RuleLibrary(memo: Memo, context: Context) extends Fickle with Mutable {
    * Add a rewrite rule to this library.
    * 
    * @param rule	The rewrite rule to add.
+   * @param builder The builder needed to build atoms.  This is required
+   *                because of rule completion.
    * @throws	NoSuchRulesetException
    * 					At least one ruleset mentioned in the rule has not been declared,
    * 					and undeclared rulesets are not allowed.
    */
-  private def doAdd(rule: RewriteRule) = {
+  private def doAdd(rule: RewriteRule, builder: Builder) = {
     // Make sure the rule is not (or does not appear to be) an identity.
     if (rule.pattern == rule.rewrite) {
       throw new IdentityRuleException(rule.loc,
@@ -534,12 +537,12 @@ private object Completor {
    * @param rule    The provided rule.
    * @param op      The operator.
    * @param as      The atom sequence.
-   * @param context The context needed to build atoms.
+   * @param builder The builder needed to build atoms.
    * @return  A list of rules, including the original rule and any synthetic
    *          rules.
    */
   private def _complete(rule: RewriteRule, op: Operator, as: AtomSeq,
-      context: Context): List[RewriteRule] = {
+      builder: Builder): List[RewriteRule] = {
     // Make the list
     var list = List[RewriteRule](rule)
     
@@ -561,14 +564,19 @@ private object Completor {
     // The operator is associative.  We must at least add an argument on
     // the right-hand side.  Make and add the argument, and then add the
     // synthetic rule.
-    var right = Variable(as(0).theType, "::R")
+    var right = builder.newTermVariable(Loc.internal, as(0).theType, "::R")
     var newpatternlist = as.atoms :+ right
     var newrewritelist = OmitSeq[BasicAtom](rewrite) :+ right
-    val newRule = RewriteRule(rule.loc,
-        ApplyBuilder(op, AtomSeq(props, newpatternlist), context),
-        ApplyBuilder(op, AtomSeq(props, newrewritelist), context),
+    val newRule = builder.newRewriteRule(rule.loc,
+        builder.newApply(Loc.internal, op,
+            builder.newAtomSeq(Loc.internal, props, newpatternlist)),
+        builder.newApply(Loc.internal, op,
+            builder.newAtomSeq(Loc.internal, props, newrewritelist)),
         rule.guards,
         rule.rulesets,
+        None,
+        "",
+        "",
         true)
     list :+= newRule
     
@@ -582,21 +590,35 @@ private object Completor {
     }
     
     // Repeat the above to add an argument on the left-hand side.
-    var left = Variable(as(0).theType, "::L")
+    var left = builder.newTermVariable(Loc.internal, as(0).theType, "::L")
     newpatternlist = left +: as.atoms
     newrewritelist = left +: OmitSeq[BasicAtom](rewrite)
-    list :+= RewriteRule(rule.loc,
-        ApplyBuilder(op, AtomSeq(props, newpatternlist), context),
-        ApplyBuilder(op, AtomSeq(props, newrewritelist), context),
-        rule.guards, rule.rulesets, true)
+    list :+= builder.newRewriteRule(rule.loc,
+        builder.newApply(Loc.internal, op,
+            builder.newAtomSeq(Loc.internal, props, newpatternlist)),
+        builder.newApply(Loc.internal, op,
+            builder.newAtomSeq(Loc.internal, props, newrewritelist)),
+        rule.guards,
+        rule.rulesets,
+        None,
+        "",
+        "",
+        true)
         
     // And again add the argument on the right-hand side.
     newpatternlist = newpatternlist :+ right
     newrewritelist = newrewritelist :+ right
-    list :+= RewriteRule(rule.loc,
-        ApplyBuilder(op, AtomSeq(props, newpatternlist), context),
-        ApplyBuilder(op, AtomSeq(props, newrewritelist), context),
-        rule.guards, rule.rulesets, true)
+    list :+= builder.newRewriteRule(rule.loc,
+        builder.newApply(Loc.internal, op,
+            builder.newAtomSeq(Loc.internal, props, newpatternlist)),
+        builder.newApply(Loc.internal, op,
+            builder.newAtomSeq(Loc.internal, props, newrewritelist)),
+        rule.guards,
+        rule.rulesets,
+        None,
+        "",
+        "",
+        true)
         
     // Done.
     for (rule <- list) {
@@ -611,16 +633,18 @@ private object Completor {
    * synthetic rules.
    * 
    * @param rule	The provided rule.
-   * @param context The context needed to build atoms.
+   * @param builder The builder needed to build atoms.
    * @return	A list of rules, including the original rule and any synthetic
    * 					rules.
    */
-  def complete(rule: RewriteRule, context: Context): List[RewriteRule] = {
+  def complete(rule: RewriteRule, builder: Builder): List[RewriteRule] = {
     rule.pattern match {
       case Apply(op: OperatorRef, as: AtomSeq) =>
-        _complete(rule, op.operator, as, context)
+        _complete(rule, op.operator, as, builder)
+        
       case Apply(op: Operator, as: AtomSeq) =>
-        _complete(rule, op, as, context)
+        _complete(rule, op, as, builder)
+        
       case _ =>
         List[RewriteRule](rule)
     }

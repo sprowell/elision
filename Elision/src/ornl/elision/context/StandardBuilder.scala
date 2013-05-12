@@ -253,7 +253,7 @@ object StandardBuilderComponents {
 /**
  * Build atoms using a default evaluation.
  */
-object StandardBuilder extends Builder {
+object StandardBuilder extends Evaluator {
   
   /**
    * Apply one atom to another.

@@ -51,7 +51,8 @@ import ornl.elision.core.MapPair
 import ornl.elision.core.OperatorRef
 import ornl.elision.core.Operator
 import scala.compat.Platform
-import ornl.elision.context.Context
+import ornl.elision.context.Builder
+import ornl.elision.util.Loc
 
 /**
  * Perform matching of two atoms, and return the result.
@@ -86,13 +87,13 @@ object Matcher {
    * 
    * @param pattern   The pattern to match.
    * @param subject   The subject.
-   * @param context   The context necessary to build atoms.
+   * @param builder   The builder necessary to build atoms.
    * @param binds     Bindings to honor on any match.
    * @param hints     Hints to the matcher.
    * @param endtick   Stop matching if the current time is later than this.
    * @return  The result of the match.
    */
-  def apply(pattern: BasicAtom, subject: BasicAtom, context: Context,
+  def apply(pattern: BasicAtom, subject: BasicAtom, builder: Builder,
       binds: Bindings = Bindings(), hints: Option[Any] = None,
       endtick: Long = -1): Outcome = {
     // ANY and NONE are special cases.
@@ -119,7 +120,7 @@ object Matcher {
     }
         
     // Perform the match.
-    val outcome = _doMatch(pattern, subject, context, binds, hints, endtick)
+    val outcome = _doMatch(pattern, subject, builder, binds, hints, endtick)
     Debugger("matching") {
       // Write out information about the result of the match attempt.
       outcome match {
@@ -149,23 +150,23 @@ object Matcher {
    *
    * @param pattern The pattern atom.
    * @param subject The subject atom.
-   * @param context The context necessary to build atoms.
+   * @param builder The builder necessary to build atoms.
    * @param binds   The bindings to observe.
    * @param hints   Optional hints.
    * @param endtick Time at which matching must stop.
    * @return  The outcome of the match.
    */
   private def _matchTypes(pattern: BasicAtom, subject: BasicAtom,
-      context: Context, binds: Bindings, hints: Option[Any],
+      builder: Builder, binds: Bindings, hints: Option[Any],
       endtick: Long): Outcome = {
     // The type universe is a special case, and the basis case, for matching
     // types.
     if (pattern == TypeUniverse) {
       // Done.  Match without types.
-      return _tryMatchWithoutTypes(pattern, subject, context, binds, hints,
+      return _tryMatchWithoutTypes(pattern, subject, builder, binds, hints,
           endtick)
     } else {
-      apply(pattern.theType, subject.theType, context, binds, hints,
+      apply(pattern.theType, subject.theType, builder, binds, hints,
           endtick) match {
         case mat: Match => mat
         case many: Many => many
@@ -180,14 +181,14 @@ object Matcher {
    * 
    * @param pattern The pattern atom.
    * @param subject The subject atom.
-   * @param context The context necessary to build atoms.
+   * @param builder The builder necessary to build atoms.
    * @param binds   The bindings to observe.
    * @param hints   Optional hints.
    * @param endtick The time at which to stop matching.
    * @return  The outcome of the match.
    */
   private def _doMatch(pattern: BasicAtom, subject: BasicAtom,
-      context: Context, binds: Bindings, hints: Option[Any], endtick: Long) = {
+      builder: Builder, binds: Bindings, hints: Option[Any], endtick: Long) = {
     if (subject == ANY && !pattern.isBindable) {
       // Any pattern is allowed to match the subject ANY.  In the matching
       // implementation for ANY, any subject is allowed to match ANY.
@@ -211,16 +212,16 @@ object Matcher {
       // We didn't find a fast way to match, so we need to actually perform
       // the match.  First we try to match the types.  If this succeeds, then
       // we invoke the implementation of tryMatchWithoutTypes.
-      _matchTypes(pattern, subject, context, binds, hints, endtick) match {
+      _matchTypes(pattern, subject, builder, binds, hints, endtick) match {
         case fail: Fail => 
           fail
           
         case mat: Match =>
-          _tryMatchWithoutTypes(pattern, subject, context, mat.binds, hints,
+          _tryMatchWithoutTypes(pattern, subject, builder, mat.binds, hints,
               endtick)
           
         case Many(submatches) =>
-          Many(MatchIterator(_tryMatchWithoutTypes(pattern, subject, context,
+          Many(MatchIterator(_tryMatchWithoutTypes(pattern, subject, builder,
               _, hints, endtick), submatches))
       }
     }
@@ -233,14 +234,14 @@ object Matcher {
    *
    * @param pattern The pattern atom.
    * @param subject The subject atom.
-   * @param context The context necessary to build atoms.
+   * @param builder The builder necessary to build atoms.
    * @param binds   Any bindings that must be observed.
    * @param hints   Optional hints.
    * @param endtick The time at which matching must be stopped.
    * @return  The matching outcome.
    */
   private def _tryMatchWithoutTypes(pattern: BasicAtom, subject: BasicAtom,
-      context: Context, binds: Bindings, hints: Option[Any],
+      builder: Builder, binds: Bindings, hints: Option[Any],
       endtick: Long): Outcome = {
     // Check for timeout now.  If we time out, we fail the match.
     if (endtick >= 0 && Platform.currentTime > endtick) {
@@ -249,34 +250,34 @@ object Matcher {
     } else {
       pattern match {
         case patap: AlgProp =>
-          _apply(patap, subject, context, binds, hints, endtick)
+          _apply(patap, subject, builder, binds, hints, endtick)
           
         case patapply: Apply =>
-          _apply(patapply, subject, context, binds, hints, endtick)
+          _apply(patapply, subject, builder, binds, hints, endtick)
           
         case patseq: AtomSeq =>
-          _apply(patseq, subject, context, binds, hints, endtick)
+          _apply(patseq, subject, builder, binds, hints, endtick)
           
         case patbinds: BindingsAtom =>
-          _apply(patbinds, subject, context, binds, hints, endtick)
+          _apply(patbinds, subject, builder, binds, hints, endtick)
           
         case patlam: Lambda =>
-          _apply(patlam, subject, context, binds, hints, endtick)
+          _apply(patlam, subject, builder, binds, hints, endtick)
           
         case nrt: NamedRootType =>
-          _apply(nrt, subject, context, binds, hints, endtick)
+          _apply(nrt, subject, builder, binds, hints, endtick)
           
         case patlit: Literal[_] =>
-          _apply(patlit, subject, context, binds, hints, endtick)
+          _apply(patlit, subject, builder, binds, hints, endtick)
           
         case patmap: MapPair =>
-          _apply(patmap, subject, context, binds, hints, endtick)
+          _apply(patmap, subject, builder, binds, hints, endtick)
           
         case patsf: SpecialForm =>
-          _apply(patsf, subject, context, binds, hints, endtick)
+          _apply(patsf, subject, builder, binds, hints, endtick)
           
         case patvar: Variable =>
-          _apply(patvar, subject, context, binds, hints, endtick)
+          _apply(patvar, subject, builder, binds, hints, endtick)
           
         case _ =>
           Fail("No matching method is defined for the pattern.", pattern,
@@ -294,23 +295,23 @@ object Matcher {
    * 
    * @param pat     The pattern.
    * @param sub     The subject.
-   * @param context The context necessary to build atoms.
+   * @param builder The builder necessary to build atoms.
    * @param binds   The bindings.
    * @param endtick The time at which matching must be stopped.
    * @return  The outcome.
    */
   private def _match(pat: Option[BasicAtom], sub: Option[BasicAtom],
-      context: Context, binds: Bindings, endtick: Long) = pat match {
+      builder: Builder, binds: Bindings, endtick: Long) = pat match {
     case None =>
       Match(binds)
       
     case Some(pattern) =>
       sub match {
         case None =>
-          Matcher(pattern, ANY, context, binds, None, endtick)
+          Matcher(pattern, ANY, builder, binds, None, endtick)
           
         case Some(subject) =>
-          Matcher(pattern, subject, context, binds, None, endtick)
+          Matcher(pattern, subject, builder, binds, None, endtick)
     }
   }
   
@@ -320,31 +321,31 @@ object Matcher {
    * 
    * @param plist   The pattern list.
    * @param slist   The subject list.
-   * @param context The context necessary to build atoms.
+   * @param builder The builder necessary to build atoms.
    * @param binds   Bindings to honor in any match.
    * @param endtick The time at which matching must be stopped.
    * @return  The outcome.
    */
   private def _matchAll(plist: List[Option[BasicAtom]],
-      slist: List[Option[BasicAtom]], context: Context,
+      slist: List[Option[BasicAtom]], builder: Builder,
       binds: Bindings, endtick: Long): Outcome =
     if (plist.length == 0) {
       Match(binds)
     } else {
-      _match(plist.head, slist.head, context, binds, endtick) match {
+      _match(plist.head, slist.head, builder, binds, endtick) match {
         case fail: Fail =>
           fail
           
         case Match(newbinds) =>
-          _matchAll(plist.tail, slist.tail, context, newbinds, endtick)
+          _matchAll(plist.tail, slist.tail, builder, newbinds, endtick)
           
         case Many(iter) =>
           Many(iter ~> ((newbinds: Bindings) =>
-            _matchAll(plist.tail, slist.tail, context, newbinds, endtick)))
+            _matchAll(plist.tail, slist.tail, builder, newbinds, endtick)))
       }
     }
 
-  private def _apply(patap: AlgProp, subject: BasicAtom, context: Context,
+  private def _apply(patap: AlgProp, subject: BasicAtom, builder: Builder,
       binds: Bindings, hints: Option[Any], endtick: Long) = {
     patap match {
       case ap: AlgProp =>
@@ -353,19 +354,19 @@ object Matcher {
               patap.absorber, patap.identity),
           List(ap.associative, ap.commutative, ap.idempotent, ap.absorber,
               ap.identity),
-          context, binds, endtick)
+          builder, binds, endtick)
         
       case _ => Fail("Properties only match other properties.", patap, subject)
     }
   }
   
-  private def _apply(patapply: Apply, subject: BasicAtom, context: Context,
+  private def _apply(patapply: Apply, subject: BasicAtom, builder: Builder,
       binds: Bindings, hints: Option[Any], endtick: Long) = {
     subject match {
       case Apply(oop, oarg) =>
         // Try to match the operators, and then the arguments.  If both match,
         // then this matches.  If not, then this does not match.
-        Matcher(patapply, oop, context, binds, Some(patapply.op),
+        Matcher(patapply, oop, builder, binds, Some(patapply.op),
             endtick) match {
           case fail: Fail =>
             Fail("Operators do not match.", patapply, subject, Some(fail))
@@ -374,17 +375,17 @@ object Matcher {
             // The operators match.  Now try to match the arguments.
             patapply.arg match {
               case as:AtomSeq =>
-                Matcher(as, oarg, context, newbinds, Some(patapply.op), endtick)
+                Matcher(as, oarg, builder, newbinds, Some(patapply.op), endtick)
                 
               case _ =>
-                Matcher(patapply.arg, oarg, context, newbinds, Some(patapply.op),
+                Matcher(patapply.arg, oarg, builder, newbinds, Some(patapply.op),
                     endtick)
             }
           
           case Many(matches) =>
             // The operators match in multiple ways.  This seems unlikely, but
             // we consider it here anyway.
-            Many(MatchIterator(Matcher(patapply.arg, oarg, context, _,
+            Many(MatchIterator(Matcher(patapply.arg, oarg, builder, _,
                 Some(patapply.op), endtick), matches))
         }
       
@@ -393,17 +394,24 @@ object Matcher {
     }
   }
   
-  private def _apply(patseq: AtomSeq, subject: BasicAtom, context: Context,
+  private def _apply(patseq: AtomSeq, subject: BasicAtom, builder: Builder,
       binds: Bindings, hints: Option[Any], endtick: Long) = {
     // We only care if the hint is an operator.  We do this in two steps, since
     // the "obvious" way to do it doesn't work because of type erasure.  Boo!
     val operator = hints match {
       case Some(value) => value match {
-        case oper: Operator => Some(OperatorRef(oper))
-        case oper: OperatorRef => Some(oper)
-        case _ => None
+        case oper: Operator =>
+          Some(builder.newOperatorRef(Loc.internal, oper))
+          
+        case oper: OperatorRef =>
+          Some(oper)
+          
+        case _ =>
+          None
       }
-      case _ => None
+      
+      case _ =>
+        None
     }
       
     // Atom sequences only match other atom sequences.
@@ -418,21 +426,21 @@ object Matcher {
           // too, to use the matched properties.
           if (patseq.associative) {
             if (patseq.commutative) {
-              ACMatcher.tryMatch(patseq, as, context, usebinds, operator)
+              ACMatcher.tryMatch(patseq, as, builder, usebinds, operator)
             } else {
-              AMatcher.tryMatch(patseq, as, context, usebinds, operator)
+              AMatcher.tryMatch(patseq, as, builder, usebinds, operator)
             }
           } else {
             if (patseq.commutative) {
-              CMatcher.tryMatch(patseq, as, context, usebinds)
+              CMatcher.tryMatch(patseq, as, builder, usebinds)
             } else {
-              SequenceMatcher.tryMatch(patseq, as, context, usebinds)
+              SequenceMatcher.tryMatch(patseq, as, builder, usebinds)
             }
           }
         }
       
         // Match properties.  This may alter the bindings.
-        Matcher(patseq, as.props, context, binds, None, endtick) match {
+        Matcher(patseq, as.props, builder, binds, None, endtick) match {
           case fail: Fail =>
             Fail("Sequence properties do not match.", patseq, subject,
                 Some(fail))
@@ -452,7 +460,7 @@ object Matcher {
   }
   
   private def _apply(patbinds: BindingsAtom, subject: BasicAtom,
-      context: Context, binds: Bindings, hints: Option[Any], endtick: Long) = {
+      builder: Builder, binds: Bindings, hints: Option[Any], endtick: Long) = {
     subject match {
       case BindingsAtom(obinds) =>
         // The bindings must bind the same variables.  Check that first.
@@ -468,7 +476,7 @@ object Matcher {
             mine :+= value
             theirs :+= obinds(key)
           } // Build lists of atoms.
-          SequenceMatcher.tryMatch(mine, theirs, context, binds)
+          SequenceMatcher.tryMatch(mine, theirs, builder, binds)
         }
         
       case _ =>
@@ -476,12 +484,12 @@ object Matcher {
     }
   }
   
-  private def _apply(patlam: Lambda, subject: BasicAtom, context: Context,
+  private def _apply(patlam: Lambda, subject: BasicAtom, builder: Builder,
       binds: Bindings, hints: Option[Any], endtick: Long) = {
     subject match {
       case Lambda(olvar, obody) =>
         if (olvar == patlam.lvar) {
-          Matcher(patlam.body, obody, context, binds, hints, endtick) match {
+          Matcher(patlam.body, obody, builder, binds, hints, endtick) match {
             case fail: Fail =>
               Fail("Lambda bodies do not match.", patlam, subject)
             case mat: Match => mat
@@ -493,14 +501,14 @@ object Matcher {
     }
   }
   
-  private def _apply(nrt: NamedRootType, subject: BasicAtom, context: Context,
+  private def _apply(nrt: NamedRootType, subject: BasicAtom, builder: Builder,
       binds: Bindings, hints: Option[Any], endtick: Long) = {
     // A root type matches only itself.
     if (nrt == subject) Match(binds)
     else Fail("This type matches only itself.", nrt, subject)
   }
   
-  private def _apply(patlit: Literal[_], subject: BasicAtom, context: Context,
+  private def _apply(patlit: Literal[_], subject: BasicAtom, builder: Builder,
       binds: Bindings, hints: Option[Any], endtick: Long) = {
     subject match {
       case lit: Literal[_] if patlit.value == lit.value => Match(binds)
@@ -508,19 +516,19 @@ object Matcher {
     }
   }
   
-  private def _apply(patmap: MapPair, subject: BasicAtom, context: Context,
+  private def _apply(patmap: MapPair, subject: BasicAtom, builder: Builder,
       binds: Bindings, hints: Option[Any], endtick: Long) = {
     subject match {
       case MapPair(oleft, oright) =>
         SequenceMatcher.tryMatch(Vector(patmap.left, patmap.right),
-            Vector(oleft, oright), context, binds)
+            Vector(oleft, oright), builder, binds)
                                  
       case _ =>
         Fail("Subject of match is not a pair.", patmap, subject)
     }
   }
   
-  private def _apply(pator: OperatorRef, subject: BasicAtom, context: Context,
+  private def _apply(pator: OperatorRef, subject: BasicAtom, builder: Builder,
       binds: Bindings, hints: Option[Any], endtick: Long) = {
     if (subject == pator) {
       Match(binds)
@@ -536,19 +544,19 @@ object Matcher {
     }
   }
   
-  private def _apply(patsf: SpecialForm, subject: BasicAtom, context: Context,
+  private def _apply(patsf: SpecialForm, subject: BasicAtom, builder: Builder,
       binds: Bindings, hints: Option[Any], endtick: Long) = {
     subject match {
       case sf:SpecialForm =>
-        Matcher(patsf.tag, sf.tag, context, Bindings(), None) match {
+        Matcher(patsf.tag, sf.tag, builder, Bindings(), None) match {
           case fail:Fail =>
             Fail("Tags do not match.", patsf.tag, sf.tag, Some(fail))
             
           case Match(newbinds) =>
-            Matcher(patsf.content, sf.content, context, newbinds, hints, endtick)
+            Matcher(patsf.content, sf.content, builder, newbinds, hints, endtick)
             
           case Many(matches) =>
-            Many(MatchIterator(Matcher(patsf.content, sf.content, context, _, hints,
+            Many(MatchIterator(Matcher(patsf.content, sf.content, builder, _, hints,
                 endtick), matches))
         }
         
@@ -557,7 +565,7 @@ object Matcher {
     }
   }
   
-  private def _apply(patvar: Variable, subject: BasicAtom, context: Context,
+  private def _apply(patvar: Variable, subject: BasicAtom, builder: Builder,
       binds: Bindings, hints: Option[Any], endtick: Long) = {
     // if the variable allows binding, and it is not already bound to a
     // different atom.  We also allow the variable to match ANY.
@@ -566,10 +574,10 @@ object Matcher {
         // This is tricky.  We bind if we match against ANY.  Are
         // there unforseen consequences to this decision?  Otherwise we have
         // to add a binding of the variable name to the subject.
-        Binder.bind(binds, patvar, subject)
+        Binder.bind(binds, patvar, subject, builder)
       case Some(ANY) =>
         // We should re-bind this variable now.
-        Binder.bind(binds, patvar, subject)
+        Binder.bind(binds, patvar, subject, builder)
       case Some(atom) if subject == ANY || atom == subject =>
         // The variable is already bound, and it is bound to the subject, so
         // the match succeeds with the bindings as they are.

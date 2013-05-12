@@ -45,7 +45,7 @@ import ornl.elision.util.Debugger
 import ornl.elision.util.OmitSeq
 import ornl.elision.util.OmitSeq.fromIndexedSeq
 import scala.annotation.tailrec
-import ornl.elision.context.Context
+import ornl.elision.context.Builder
 
 /**
  * Match two sequences whose elements can be re-ordered.  That is, the lists are
@@ -58,11 +58,11 @@ object CMatcher {
    * 
    * @param plist	  The pattern list.
    * @param slist	  The subject list.
-   * @param context The context needed to build atoms.
+   * @param builder The builder needed to build atoms.
    * @param binds	  Bindings that must be honored in any match.
    * @return	The match outcome.
    */
-  def tryMatch(plist: AtomSeq, slist: AtomSeq, context: Context,
+  def tryMatch(plist: AtomSeq, slist: AtomSeq, builder: Builder,
       binds: Bindings): Outcome = {
     // Check the length.
     if (plist.length != slist.length)
@@ -84,7 +84,7 @@ object CMatcher {
     // atoms that are not variables, and so their matching is much more
     // restrictive.  We obtain an iterator over these, and then combine it
     // with the iterator for the reorderings to get the entire match iterator.
-    val um = new UnbindableMatcher(patterns, subjects, context, binds)
+    val um = new UnbindableMatcher(patterns, subjects, builder, binds)
     
     // Step three is to re-order the subjects and match until we succeed, or we
     // exhaust the search space.  We have to do this with a match iterator, but
@@ -116,7 +116,7 @@ object CMatcher {
         if (pats.length == 0) {
           MatchIterator((bindings ++ binds).set(pats, subs))
         } else {
-          new CMatchIterator(pats, subs, context,
+          new CMatchIterator(pats, subs, builder,
               (bindings ++ binds).set(pats, subs))
         }
       }
@@ -143,11 +143,11 @@ object CMatcher {
    * 
    * @param patterns	The patterns.
    * @param subjects	The subjects.
-   * @param context   The context needed to build atoms.
+   * @param builder   The builder needed to build atoms.
    * @param binds			Bindings to honor.
    */
   private class CMatchIterator(patterns: OmitSeq[BasicAtom],
-      subjects: OmitSeq[BasicAtom], context: Context,
+      subjects: OmitSeq[BasicAtom], builder: Builder,
       binds: Bindings) extends MatchIterator {
     /** An iterator over all permutations of the subjects. */
     private val _perms = subjects.permutations
@@ -167,7 +167,7 @@ object CMatcher {
       } else {
         _local = null
         if (_perms.hasNext) {
-          SequenceMatcher.tryMatch(patterns, _perms.next, context,
+          SequenceMatcher.tryMatch(patterns, _perms.next, builder,
               binds) match {
             case fail:Fail =>
               // We ignore this case.  We only fail if we exhaust all attempts.
