@@ -85,7 +85,6 @@ trait PropertyManager {
       onchange: (PropertyManager => Unit) = null) = {
     val defclass = default.getClass
     if (!clazzes.exists(defclass.isAssignableFrom(_))) {
-      
       throw new CacheException("Unsupported data type for property " +
           toQuotedString(name) + ".  " + "Got " +
           defclass + ", but require " +
