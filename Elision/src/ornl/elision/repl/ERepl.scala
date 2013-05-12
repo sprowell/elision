@@ -203,8 +203,6 @@ object ReplMain {
    */
   def runRepl(settings: CLI.CLIState) {
     val erepl = new ERepl(settings)
-    ornl.elision.core.knownExecutor = erepl
-    
     ReplActor.start
     ReplActor.history = erepl
     ReplActor.console = erepl.context.console
@@ -245,7 +243,13 @@ object ReplMain {
  * @param state   State data from parsing the command line.
  */
 class ERepl(state: CLI.CLIState = CLI.CLIState())
-extends Processor(state.settings) {
+extends Processor(state.settings, {
+  val re = new RewriteEngine
+  val builder = new StandardBuilder
+  new Context(re, builder)
+}) {
+}
+  
   import ornl.elision.core._
   import scala.tools.jline.console.history.FileHistory
   import scala.tools.jline.console.ConsoleReader
@@ -401,8 +405,7 @@ extends Processor(state.settings) {
           showatom("", atom)
         }
         if (context.getProperty("applybinds")) {
-          val na = atom.rewrite(context.binds)
-          Some(atom.rewrite(context.binds)._1)
+          Some(context.builder.rewrite(atom, context.binds)._1)
         } else {
           Some(atom)
         }
@@ -424,11 +427,11 @@ extends Processor(state.settings) {
       override def handleAtom(atom: BasicAtom) = {
         atom match {
           case op: Operator if context.getProperty("autoop") =>
-            context.operatorLibrary.add(op)
+            context.operatorLibrary.add(op, context.builder)
             context.console.emitln("Declared operator " + op.name + ".")
             None
           case rule: RewriteRule if context.getProperty("autorule") =>
-            context.ruleLibrary.add(rule)
+            context.ruleLibrary.add(rule, context.builder)
             context.console.emitln("Declared rule.")
             None
           case _ =>

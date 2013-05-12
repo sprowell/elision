@@ -38,7 +38,6 @@ import scala.tools.nsc.Settings
 import ornl.elision.util.Debugger
 import ornl.elision.util.Loc
 import ornl.elision.core.BasicAtom
-import ornl.elision.core.knownExecutor
 import ornl.elision.core.toEString
 import ornl.elision.core.toESymbol
 
@@ -53,6 +52,7 @@ trait HandlerClass {
  * Manage an in-memory cache (a "stash") for the native compiler.
  */
 object NativeCompiler {
+  
   /**
    * Store local overrides.  The compiler checks here before it checks the
    * cache, so this provides an "in memory" cache.

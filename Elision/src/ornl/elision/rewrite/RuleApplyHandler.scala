@@ -61,9 +61,9 @@ object RuleApplyHandler {
    *          is true iff the rule was successfully applied.
    */
   def apply(rule: RewriteRule, atom: BasicAtom, binds: Bindings,
-      hint: Option[Any], builder: Builder, strategy: GuardStrategy) = {
+      hint: Option[Any], builder: Builder) = {
     // Try to apply the rewrite rule.  Whatever we get back is the result.
-    _tryRewrite(rule, atom, binds, hint, builder, strategy)
+    _tryRewrite(rule, atom, binds, hint, builder)
   }
   
   /**
@@ -81,7 +81,6 @@ object RuleApplyHandler {
    * @param subject   The subject to test.
    * @param binds     Bindings to honor.
    * @param hint      An optional hint to pass along during matching.
-   * @param strategy  The strategy to use to rewrite guards.
    * @return  A pair consisting of an atom and a boolean.  The boolean is
    *          true if the rewrite yielded a new atom, and is false otherwise.
    */
@@ -90,13 +89,12 @@ object RuleApplyHandler {
       subject: BasicAtom,
       binds: Bindings,
       hint: Option[Any],
-      builder: Builder,
-      strategy: GuardStrategy): (BasicAtom, Boolean) = {
+      builder: Builder): (BasicAtom, Boolean) = {
     // Local function to check the guards.
     def checkGuards(candidate: Bindings): Boolean = {
       for (guard <- rule.guards) {
         val (newguard, _) = builder.rewrite(guard, candidate)
-        val (newguard1, _) = strategy(newguard)
+        val (newguard1, _) = builder.guardStrategy(newguard)
         if (!newguard1.isTrue) return false
       }
       true

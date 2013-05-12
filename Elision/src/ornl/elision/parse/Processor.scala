@@ -86,13 +86,13 @@ trait TraceableParse {
  * via the `trace` field.
  * 
  * @param settings  The settings from the command line parser.
- * @param context		The context to use; if none is provided, use an empty one.
+ * @param context		The context to use.
  */
-class Processor(val settings: Map[String, String],
-    var context: Context = new Context)
+class Processor(val settings: Map[String, String], var context: Context)
 extends TraceableParse
 with Timeable
 with HasHistory {
+  
   // Set up the stacktrace property.
   context.declareProperty("stacktrace",
       "Print a stack trace on all (non-Elision) exceptions.", false)
@@ -104,6 +104,15 @@ with HasHistory {
       "Whether to use the class path to locate files.", true)
   context.declareProperty("path",
       "The search path to use to locate files.", FileResolver.defaultPath)
+  
+  // Determine whether to do risky (but fast) equality checking.
+  context.declareProperty("risky_equality_check",
+      "Whether to do fast, but risky, equality checking of atoms.",
+      ornl.elision.core._riskyEqual,
+      (pm: PropertyManager) => {
+        ornl.elision.core._riskyEqual =
+          pm.getProperty[Boolean]("risky_equality_check").asInstanceOf[Boolean]
+      })
 
   // Atom rewrite timeout property used in BasicAtom. We need to make sure
   // that all executors know about this property, which is why we are declaring
@@ -543,7 +552,7 @@ with HasHistory {
         case success: Success =>
           context.console.emitln("Successfully reloaded context.")
           context.console.emitln("Rebuilding context...")
-          context = new Context()
+          context = new Context(context.guardStrategy, context.builder)
           val prior = context.console.quiet
           context.console.quiet = 1
           _execute(success)

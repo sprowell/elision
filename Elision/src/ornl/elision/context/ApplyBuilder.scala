@@ -175,7 +175,7 @@ object ApplyBuilder {
         //
         // Try to rewrite the argument using the bindings and whatever we get
         // back is the result.
-        arg.rewrite(op_bind.mybinds)._1
+        builder.rewrite(arg, op_bind.mybinds)._1
 
       case op_lambda: Lambda =>
         // Handle the case of applying a lambda to an atom.  A lambda is a
@@ -193,11 +193,13 @@ object ApplyBuilder {
             case fail:Fail =>
               throw new LambdaVariableMismatchException(arg.loc,
                   "Lambda argument does not match parameter: " + fail.theReason)
+              
             case Match(binds) =>
               // Great!  Now rewrite the body with the bindings.
-              op_lambda.body.rewrite(binds)._1
+              builder.rewrite(op_lambda.body, binds)._1
+              
             case Many(iter) =>
-              op_lambda.body.rewrite(iter.next)._1
+              builder.rewrite(op_lambda.body, iter.next)._1
           }
         } catch {
           case ex:java.lang.StackOverflowError =>

@@ -65,6 +65,7 @@ import ornl.elision.util.Console
 import ornl.elision.util.PrintConsole
 import ornl.elision.util.ElisionException
 import ornl.elision.util.Loc
+import ornl.elision.rewrite.GuardStrategy
 
 /**
  * A requested setting is not present.
@@ -98,16 +99,17 @@ extends ElisionException(Loc.internal, msg)
  *  - An instance of [[ornl.elision.core.OperatorLibrary]].
  *  - Rulesets.
  *  - "Automatic" rewriting of atoms using rules.
- *  
- * @param builder   A builder to evaluate and construct atoms.  If not
- *                  specified, the [[ornl.elision.context.StandardBuilder]]
- *                  is used.
+ * 
+ * @param guardStrategy The strategy to use to evaluate guards on rules.
+ * @param builder       A builder to evaluate and construct atoms.
  */
-class Context(val builder: Builder = StandardBuilder)
+class Context(
+    val guardStrategy: GuardStrategy,
+    val builder: Builder)
 extends PropertyManager with Fickle with Mutable with Cache {
   
   override def clone = {
-    val clone = new Context
+    val clone = new Context(guardStrategy, builder)
     clone.binds = this.binds.clone
     clone.operatorLibrary = this.operatorLibrary.clone
     clone.ruleLibrary = this.ruleLibrary.clone
@@ -214,7 +216,7 @@ extends PropertyManager with Fickle with Mutable with Cache {
 
   /** The current operator library. */
   private var _oplib: OperatorLibrary = _
-
+  
   /**
    * Get the current operator library.  If none has explicitly been set, then
    * a default instance is created and returned.
@@ -222,7 +224,14 @@ extends PropertyManager with Fickle with Mutable with Cache {
    * @return	The current operator library.
    */
   def operatorLibrary = {
-    if (_oplib == null) { _oplib = new OperatorLibrary(this) }
+    if (_oplib == null) {
+      // Make a new operator library and then install the primitives required
+      // by the builder, if any.
+      _oplib = new OperatorLibrary(this)
+      for (prim <- builder.primitiveOperators) {
+        _oplib.add(prim)
+      } // Install primitives required by the builder.
+    }
     _oplib
   }
 
@@ -306,7 +315,7 @@ extends PropertyManager with Fickle with Mutable with Cache {
    */
   def declare(atom: BasicAtom) = atom match {
     case op: Operator =>
-      operatorLibrary.add(op)
+      operatorLibrary.add(op, builder)
       op
       
     case rule: RewriteRule =>

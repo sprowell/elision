@@ -72,13 +72,6 @@ package object core {
   
   /** Provide a fancy name for the type universe. */
   val `^TYPE` = TypeUniverse
-  
-  /**
-   * Maintain an executor to use.  The provided default executor always
-   * throws an exception when invoked from a native handler, so you must
-   * replace this with something rational as soon as reasonable.
-   */
-  implicit var knownExecutor: Processor = new Processor(Map(), new Context())
 
   /**
    * Turn a string into a properly-escaped symbol.  Symbols must start with a
@@ -148,19 +141,6 @@ package object core {
    * Whether to compute equality faster but in a riskier fashion.
    */
   var _riskyEqual: Boolean = true;
-
-  /** 
-   * Declare the Elision property for setting whether to do risky
-   * equality checking. 
-   */
-  knownExecutor.context.declareProperty("risky_equality_check",
-      "Whether to do fast, but risky, equality checking of atoms.",
-      _riskyEqual,
-      (pm: PropertyManager) => {
-        _riskyEqual =
-          pm.getProperty[Boolean]("risky_equality_check").asInstanceOf[Boolean]
-      })
-
 
   /**
    * Perform "fast equality checking" on two atoms.  This performs basic

@@ -29,32 +29,24 @@
  */
 package ornl.elision.context
 
-import ornl.elision.core.BasicAtom
-import scala.collection.Seq
-import ornl.elision.util.Loc
-import scala.collection.immutable.Set
-import scala.math.BigInt
-import ornl.elision.core.SpecialForm
-import ornl.elision.core.MatchAtom
-import ornl.elision.core.SymbolLiteral
-import ornl.elision.core.SpecialFormException
-import ornl.elision.core.Bindings
-import ornl.elision.core.Operator
 import ornl.elision.core.ANY
-import ornl.elision.core.SpecialFormException
+import ornl.elision.core.AtomSeq
+import ornl.elision.core.BINDING
+import ornl.elision.core.BasicAtom
+import ornl.elision.core.Bindings
 import ornl.elision.core.BindingsAtom
-import ornl.elision.core.SpecialFormException
-import ornl.elision.core.toESymbol
-import ornl.elision.core.StringLiteral
 import ornl.elision.core.BooleanLiteral
 import ornl.elision.core.Literal
-import ornl.elision.core.AtomSeq
-import ornl.elision.core.TypedSymbolicOperator
-import ornl.elision.core.CaseOperator
-import ornl.elision.core.NoProps
 import ornl.elision.core.MapPair
+import ornl.elision.core.MatchAtom
 import ornl.elision.core.RewriteRule
-import ornl.elision.core.BINDING
+import ornl.elision.core.SpecialForm
+import ornl.elision.core.SpecialFormException
+import ornl.elision.core.StringLiteral
+import ornl.elision.core.SymbolLiteral
+import ornl.elision.core.toESymbol
+import ornl.elision.util.Loc
+import ornl.elision.rewrite.GuardStrategy
 
 object StandardBuilderComponents {
   
@@ -252,8 +244,10 @@ object StandardBuilderComponents {
 
 /**
  * Build atoms using a default evaluation.
+ * 
+ * @param guardStrategy The required strategy to use when rewriting guards.
  */
-object StandardBuilder extends Evaluator {
+class StandardBuilder(val guardStrategy: GuardStrategy) extends Evaluator {
   
   /**
    * Apply one atom to another.

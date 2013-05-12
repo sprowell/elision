@@ -69,6 +69,7 @@ extends ElisionException(loc, msg)
  * Additional constants and support methods for native handlers.
  */
 object ApplyData {
+  
   /** A special literal that we never show, or save as a binding. */
   val _no_show = Literal(Symbol(" NO SHOW "))
 }
@@ -76,9 +77,6 @@ object ApplyData {
 /**
  * Data block and special functions provided to a native handler.  A native
  * handler takes an instance of this class and hands back an atom.
- * 
- * Certain information is populated based on the current __implicit__
- * `Executor` instance.  This is done at construction time.
  *
  * @param op      The operator.
  * @param args    The argument list.
@@ -88,11 +86,12 @@ object ApplyData {
 class ApplyData(val op: SymbolicOperator, val args: AtomSeq,
     val binds: Bindings, val context: Context)
     extends SymbolicOperator.AbstractApplyData {
+  
   /** Provide fast access to the console from the executor. */
   val console = context.console
 
   /** Just preserve the apply as it is. */
-  def as_is = ApplyBuilder(op, args, context, true)
+  def as_is = ApplyBuilder(op, args, context.builder, true)
 }
 
 /**

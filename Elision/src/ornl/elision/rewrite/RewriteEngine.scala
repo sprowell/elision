@@ -50,6 +50,7 @@ import ornl.elision.util.Loc
  * Hold defaults for all rewrite engine instances.
  */
 object RewriteEngine {
+  
   /** The maximum number of rewrites allowed.  Negative values disable this. */
   var limit: BigInt = -1
   
@@ -207,6 +208,20 @@ class RewriteEngine(context: Context) extends GuardStrategy {
    * @return  True if the rewriting limit has been reached.
    */
   def limitExceeded = _limitExceeded
+  
+  //======================================================================
+  // Define a rewrite task.
+  //======================================================================
+  
+  /**
+   * A rewrite task is a structure that holds information about the current
+   * rewriting task.  This allows passing a single object on the stack by
+   * reference instead of having to pass multiple objects, and also packages
+   * the information in a single place.
+   */
+  class RewriteTask {
+    
+  }
   
   //======================================================================
   // Rewriting.
@@ -381,7 +396,7 @@ class RewriteEngine(context: Context) extends GuardStrategy {
       }      
       Debugger("rewrite", "Trying rule: " + rule.toParseString)
       val (newatom, applied) =
-        RuleApplyHandler(rule, atom, Bindings(), None, context.builder, this)
+        RuleApplyHandler(rule, atom, Bindings(), None, context.builder)
       if (applied) {
         // Return the rewrite result.
         Debugger("rewrite", "Rewrote to: " + newatom.toParseString)
