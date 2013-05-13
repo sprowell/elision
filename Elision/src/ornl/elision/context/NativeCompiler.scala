@@ -41,6 +41,7 @@ import ornl.elision.core.BasicAtom
 import ornl.elision.core.knownExecutor
 import ornl.elision.core.toEString
 import ornl.elision.core.toESymbol
+import ornl.elision.util.ElisionException
 
 /**
  * Trait for all handlers.
@@ -50,9 +51,20 @@ trait HandlerClass {
 }
 
 /**
+ * The native handler could not be parsed, or some other issue occurred
+ * regarding compiling or locating native handlers.
+ *
+ * @param loc Location of the bad operator or native handler.
+ * @param msg The human-readable message describing the problem.
+ */
+class NativeHandlerException(loc: Loc, msg: String)
+extends ElisionException(loc, msg)
+
+/**
  * Manage an in-memory cache (a "stash") for the native compiler.
  */
 object NativeCompiler {
+  
   /**
    * Store local overrides.  The compiler checks here before it checks the
    * cache, so this provides an "in memory" cache.
@@ -163,12 +175,16 @@ object NativeCompiler {
  * @param context   The context needed to build atoms.
  */
 class NativeCompiler(context: Context) {
+  
   import NativeCompiler.{getKey, makeObject, makeMethod}
   
   /** Location of the native cache. */
   private val _cache = new File(context.getSetting("elision.cache"))
   if (!_cache.exists) {
-    _cache.mkdir
+    if (_cache.mkdir) {
+      throw new NativeHandlerException(Loc.internal,
+          "Unable to create cache folder: " + _cache.toString)
+    }
   }
 
   // Get the path separator and then use it to build the classpath as a string.

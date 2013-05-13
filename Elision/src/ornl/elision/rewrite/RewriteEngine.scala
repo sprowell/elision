@@ -45,6 +45,8 @@ import ornl.elision.context.Context
 import ornl.elision.core.Bindings
 import ornl.elision.context.ApplyBuilder
 import ornl.elision.util.Loc
+import ornl.elision.context.GuardStrategy
+import ornl.elision.context.RuleApplyHandler
 
 /**
  * Hold defaults for all rewrite engine instances.

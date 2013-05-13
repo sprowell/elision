@@ -116,9 +116,11 @@ abstract class Builder {
    * @param loc           Location of this atom's declaration.
    * @param operator      The operator.
    * @param argument      The argument.
+   * @param bypass        Whether to bypass native handlers.  False by default.
    * @return  The result.
    */
-  def newApply(loc: Loc, operator: BasicAtom, argument: BasicAtom): BasicAtom
+  def newApply(loc: Loc, operator: BasicAtom, argument: BasicAtom,
+      bypass: Boolean = false): BasicAtom
   
   /**
    * Make a new atom collection.

@@ -27,7 +27,7 @@
  * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package ornl.elision.rewrite
+package ornl.elision.context
 
 import ornl.elision.core.BasicAtom
 import ornl.elision.core.Bindings
@@ -37,7 +37,6 @@ import ornl.elision.matcher.Matcher
 import ornl.elision.matcher.Many
 import ornl.elision.matcher.Match
 import ornl.elision.matcher.Fail
-import ornl.elision.context.Builder
 import ornl.elision.core.wrapBindingsAtom
 
 /**

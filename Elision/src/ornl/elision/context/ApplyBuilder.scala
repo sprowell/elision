@@ -51,7 +51,6 @@ import ornl.elision.core.OperatorRef
 import ornl.elision.core.Literal
 import ornl.elision.core.Strategy
 import ornl.elision.core.StringLiteral
-import ornl.elision.rewrite.RuleApplyHandler
 
 /**
  * A lambda variable does not match the argument.
@@ -78,8 +77,13 @@ extends ElisionException(loc, msg)
  * 
  * This object provides the rules to interpret the application based on the
  * choice of atoms.
+ * 
+ * @param ophandler     A class that understands how to handle an operator
+ *                      application.  These are special since they may involve
+ * @param guardstrategy The strategy to use to rewrite rule guards.
+ *                    
  */
-object ApplyBuilder {
+class ApplyBuilder(ophandler: OperatorApplyHandler, guardstrat: GuardStrategy) {
 
   /**
    * Turn a pair into a binding to be returned from a strategy.  This turns
@@ -122,7 +126,7 @@ object ApplyBuilder {
       case op_rule: RewriteRule =>
         // A rewrite rule generalizes both the match atom and the map pair
         // as a package (a special form) to perform controlled rewriting.
-        RuleApplyHandler(op_rule, arg, Bindings(), None, builder)
+        RuleApplyHandler(op_rule, arg, Bindings(), None, builder, guardstrat)
         
       case c =>
         // We come here if we find an unsupported strategy class.
@@ -175,7 +179,7 @@ object ApplyBuilder {
         //
         // Try to rewrite the argument using the bindings and whatever we get
         // back is the result.
-        arg.rewrite(op_bind.mybinds)._1
+        builder.rewrite(arg, op_bind.mybinds)._1
 
       case op_lambda: Lambda =>
         // Handle the case of applying a lambda to an atom.  A lambda is a
@@ -195,9 +199,9 @@ object ApplyBuilder {
                   "Lambda argument does not match parameter: " + fail.theReason)
             case Match(binds) =>
               // Great!  Now rewrite the body with the bindings.
-              op_lambda.body.rewrite(binds)._1
+              builder.rewrite(op_lambda.body, binds)._1
             case Many(iter) =>
-              op_lambda.body.rewrite(iter.next)._1
+              builder.rewrite(op_lambda.body, iter.next)._1
           }
         } catch {
           case ex:java.lang.StackOverflowError =>
@@ -220,7 +224,7 @@ object ApplyBuilder {
         // An operator can be applied to another atom, potentially resulting
         // in a new atom being instantiated.
         try {
-          OperatorApplyHandler(op_op, arg, builder, bypass)
+          ophandler(op_op, arg, builder, bypass)
         } catch {
           case ex: StackOverflowError =>
             // Trapped unbounded recursion... probably.

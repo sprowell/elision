@@ -306,7 +306,7 @@ extends PropertyManager with Fickle with Mutable with Cache {
    */
   def declare(atom: BasicAtom) = atom match {
     case op: Operator =>
-      operatorLibrary.add(op)
+      operatorLibrary.add(op, builder)
       op
       
     case rule: RewriteRule =>
