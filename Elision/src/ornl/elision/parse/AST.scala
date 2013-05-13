@@ -88,6 +88,7 @@ abstract class AST[+TYPE <: BasicAtom] {
  * Create abstract syntax tree nodes.
  */
 object AST {
+  
   /** Quick reference for an abstract syntax tree node holding a `BasicAtom`. */
   type BA = AST[BasicAtom]
   

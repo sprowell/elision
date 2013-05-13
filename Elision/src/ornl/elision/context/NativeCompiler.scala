@@ -38,7 +38,6 @@ import scala.tools.nsc.Settings
 import ornl.elision.util.Debugger
 import ornl.elision.util.Loc
 import ornl.elision.core.BasicAtom
-import ornl.elision.core.knownExecutor
 import ornl.elision.core.toEString
 import ornl.elision.core.toESymbol
 import ornl.elision.util.ElisionException
@@ -79,9 +78,10 @@ object NativeCompiler {
    * @param operator  The operator name.
    * @param handler   The handler.
    * @param obj       The object to stash.
+   * @return	The key for the object stored.
    */
   def stash(source: String, operator: String, handler: String,
-      obj: HandlerClass) {
+      obj: HandlerClass) = {
     // Compute the key and store the object.
     val key = getKey(source, operator, handler)
     _override += (key -> obj)

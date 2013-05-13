@@ -63,11 +63,17 @@ import ornl.elision.core.STRING
 import ornl.elision.core.BOOLEAN
 import ornl.elision.core.SYMBOL
 import ornl.elision.core.BooleanLiteral
+import ornl.elision.rewrite.GuardStrategy
 
 /**
  * Construct atoms, first applying any evaluation logic.
  */
 abstract class Builder {
+  
+  /**
+   * A strategy to use to rewrite guards.
+   */
+  val guardStrategy: GuardStrategy
   
   /**
    * Rewrite the provided atom by applying the replacements defined in the
@@ -113,10 +119,10 @@ abstract class Builder {
   /**
    * Apply one atom to another.
    * 
-   * @param loc           Location of this atom's declaration.
+   * @param loc           Location of this specification.
    * @param operator      The operator.
    * @param argument      The argument.
-   * @param bypass        Whether to bypass native handlers.  False by default.
+   * @param bypass        If true, bypass native handler.  Default is false.
    * @return  The result.
    */
   def newApply(loc: Loc, operator: BasicAtom, argument: BasicAtom,
@@ -655,6 +661,13 @@ abstract class Builder {
   //======================================================================
   // Define the necessary primitive operators to bootstrap operator typing.
   //======================================================================
+  
+  /**
+   * The primitive operators defined by this builder.  If you extend and
+   * need to add any, override this and add to the list, but do not remove
+   * the ones already present (unless you want to override them).
+   */  
+  val primitiveOperators = List(MAP, xx, LIST)
   
   /**
    * The well-known MAP operator.  This is needed to define the types of

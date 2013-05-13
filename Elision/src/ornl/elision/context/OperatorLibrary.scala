@@ -45,7 +45,6 @@ import ornl.elision.core.Operator
 import ornl.elision.core.OperatorRef
 import ornl.elision.core.SymbolicOperator
 import ornl.elision.core.giveMkParseString
-import ornl.elision.core.knownExecutor
 import ornl.elision.core.toESymbol
 import ornl.elision.util.ElisionException
 import ornl.elision.util.Loc
@@ -157,8 +156,8 @@ extends Fickle with Mutable {
  	 * Add an operator to this library.
  	 * 
  	 * @param op		  The operator to add.
- 	 * @param builder The builder needed to make atoms.  This is required for
- 	 *                making operator references.
+ 	 * @param builder A builder needed to make atoms.  This is required so that
+ 	 *                an operator reference can be made.
  	 * @return	The operator just added, to enable chaining if desired.
  	 * @throws OperatorRedefinitionError
  	 * 					The operator is already defined and redefinitions are not allowed.
@@ -182,6 +181,34 @@ extends Fickle with Mutable {
  	  _opRefList = ref :: _opRefList
     _nameToOperator += (name -> ref)
  	  ref
+ 	}
+ 	
+ 	/**
+ 	 * Add an operator to this library.
+ 	 * 
+   * @param op      The operator reference to add.
+   * @return  The operator just added, to enable chaining if desired.
+   * @throws OperatorRedefinitionError
+   *          The operator is already defined and redefinitions are not allowed.
+ 	 */
+ 	def add(opref: OperatorRef) = {
+ 	  val name = opref.name
+    if (_nameToOperator.contains(name))
+      if (allowRedefinition) {
+        val oldop = _nameToOperator(name).operator
+        context.console.warn(opref.loc,
+            "Redefining operator " + opref.name + ".")
+        context.console.warn(oldop.loc,
+            "Prior definition: " + oldop.toParseString)
+      } else {
+        // Reject this!  The operator is already defined.
+        throw new OperatorRedefinitionException(opref.loc,
+            "Attempt to re-define known operator " + name + ".")
+      }
+    // Accept this and store it in the map.  Return the operator reference.
+    _opRefList = opref :: _opRefList
+    _nameToOperator += (name -> opref)
+    opref
  	}
  	
  	/**

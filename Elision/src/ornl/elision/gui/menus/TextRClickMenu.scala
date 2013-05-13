@@ -100,7 +100,7 @@ object EvaClipboard extends ClipboardOwner {
             contents.getTransferData(DataFlavor.stringFlavor) match {
                 case str : String => 
                     str
-                case _ =>
+                case _: Throwable =>
                     ""
             }
         }
