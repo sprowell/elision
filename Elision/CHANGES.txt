@@ -7,6 +7,11 @@ Version 0.5 to Present
   of bits.  There is a library bootstrap/Bitstring.eli that can process these
   as signed / unsigned numbers in two's complement, construct and manipulate
   them in various ways.
+* The entire Elision source tree has been massively refactored to eliminate
+  loops in the use hierarchy.  In particular, the "knownExecutor" is gone, and
+  Context and related important instances must be passed (dependency injection)
+  where needed.
+* Every atom tries to set its location.
 
 Version 0.4 to Version 0.5
 --------------------------

@@ -228,7 +228,7 @@ class TermVariable protected[elision] (
    * Make a non-meta version of this metavariable.
    * @return  The new variable.
    */
-  override def asVariable = this
+  override def asTermVariable = this
   
   /**
    * Make a meta version of this metavariable.  I.e., do nothing.
@@ -298,7 +298,7 @@ class MetaVariable protected[elision] (
    * Make a non-meta version of this metavariable.
    * @return  The new variable.
    */
-  override def asVariable =
+  override def asTermVariable =
     new TermVariable(loc, typ, name, guard, labels, byName)
   
   /**

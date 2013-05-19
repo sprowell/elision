@@ -56,17 +56,6 @@ object TypeUniverse extends SymbolLiteral(Loc.internal, null, Symbol("^TYPE")) {
   
   /** The type of the type universe is itself. */
   override val theType = this
-
-  /**
-   * The root types cannot be rewritten, as they do not have children.
-   */
-  override def rewrite(binds: Bindings) = (this, false)
-  
-  override def replace(map: Map[BasicAtom, BasicAtom]) =
-    map.get(this) match {
-      case None => (this, false)
-      case Some(atom) => (atom, true)
-    }
     
   /** Compute the hash code. */
   override lazy val hashCode = toParseString.hashCode

@@ -55,7 +55,7 @@ object RewriteEngine {
   
   private var reNormalizeChildren: RewriteEngine = new RewriteEngine()
   private var re: RewriteEngine = new RewriteEngine() {
-    override val _rewritechild = _rewriteOnce _
+    override protected[elision] val _rewritechild = _rewriteOnce _
   }
   
   /**
@@ -114,7 +114,7 @@ class RewriteEngine protected[elision] () {
    */
   
   /** The method to use to normalize a child. */
-  private val _rewritechild: (BasicAtom, RewriteTask) => (BasicAtom, Boolean) =
+  protected[elision] val _rewritechild: (BasicAtom, RewriteTask) => (BasicAtom, Boolean) =
     _rewrite _
   
   /**

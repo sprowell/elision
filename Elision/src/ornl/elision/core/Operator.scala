@@ -94,7 +94,7 @@ object Operator {
  * 										by default, and you should probably leave it alone.
  */
 abstract class Operator(
-    val loc: Loc,
+    loc: Loc,
     content: => BasicAtom,
     val name: String,
     val typ: BasicAtom,
@@ -281,7 +281,7 @@ class SymbolicOperator protected[elision] (
     loc: Loc,
     content: => BasicAtom,
     name: String,
-    val typ: BasicAtom,
+    typ: BasicAtom,
     val params: AtomSeq,
     description: String = "no description",
     detail: String = "no detail",
