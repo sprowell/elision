@@ -46,7 +46,7 @@ import ornl.elision.core.StringLiteral
 import ornl.elision.core.SymbolLiteral
 import ornl.elision.core.toESymbol
 import ornl.elision.util.Loc
-import ornl.elision.rewrite.GuardStrategy
+import ornl.elision.core.GuardStrategy
 
 object StandardBuilderComponents {
   
@@ -157,10 +157,11 @@ object StandardBuilderComponents {
    * @param tag       Tag for the special form, included for consistency.
    * @param content   The content.
    * @param builder   The builder to make atoms.
+   * @param strategy  The strategy to rewrite rule guards.
    * @return  The new rule.
    */
   def buildRule(loc: Loc, tag: BasicAtom, content: BasicAtom,
-      builder: Builder) = {
+      builder: Builder, strategy: GuardStrategy) = {
     // The content is a binding.
     val binds = content.asInstanceOf[BindingsAtom].mybinds
     val name = if (binds.contains("name")) {
@@ -189,7 +190,7 @@ object StandardBuilderComponents {
     } toSet
     val guards = getAs[AtomSeq](loc, tag, binds, "if", Some(builder.EmptySeq))
     new RewriteRule(loc, content, map.left, map.right, guards, rulesets,
-        name, description, detail)
+        strategy, name, description, detail)
   }
   
   /**
@@ -245,9 +246,9 @@ object StandardBuilderComponents {
 /**
  * Build atoms using a default evaluation.
  * 
- * @param guardStrategy The required strategy to use when rewriting guards.
+ * @param appbuilder  The apply builder to use.
  */
-class StandardBuilder(val guardStrategy: GuardStrategy) extends Evaluator {
+class StandardBuilder(appbuilder: ApplyBuilder) extends Evaluator {
   
   /**
    * Apply one atom to another.
@@ -260,7 +261,7 @@ class StandardBuilder(val guardStrategy: GuardStrategy) extends Evaluator {
    */
   def newApply(loc: Loc, operator: BasicAtom, argument: BasicAtom,
       bypass: Boolean = false): BasicAtom = {
-    ApplyBuilder(operator, argument, this, bypass)
+    appbuilder(operator, argument, this, bypass)
   }
   
   /**
@@ -269,10 +270,11 @@ class StandardBuilder(val guardStrategy: GuardStrategy) extends Evaluator {
    * @param loc           Location of this specification.
    * @param tag           The special form tag.
    * @param content       The content.
+   * @param strategy      The strategy to use to rewrite rule guards.
    * @return  The new special form.
    */
-  def newSpecialForm(loc: Loc, tag: BasicAtom,
-      content: BasicAtom): SpecialForm = {
+  def newSpecialForm(loc: Loc, tag: BasicAtom, content: BasicAtom,
+      strategy: GuardStrategy): SpecialForm = {
     // The specific kind of special form made depends on the interpretation
     // from the tag.
     tag match {
@@ -291,7 +293,8 @@ class StandardBuilder(val guardStrategy: GuardStrategy) extends Evaluator {
                 StandardBuilderComponents.buildOperator(loc, tag, content, this)
                 
               case 'rule =>
-                StandardBuilderComponents.buildRule(loc, tag, content, this)
+                StandardBuilderComponents.buildRule(loc, tag, content, this,
+                    strategy)
                 
               case 'match =>
                 StandardBuilderComponents.buildMatch(loc, tag, content, this)

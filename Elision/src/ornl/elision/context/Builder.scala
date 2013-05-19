@@ -63,17 +63,12 @@ import ornl.elision.core.STRING
 import ornl.elision.core.BOOLEAN
 import ornl.elision.core.SYMBOL
 import ornl.elision.core.BooleanLiteral
-import ornl.elision.rewrite.GuardStrategy
+import ornl.elision.core.GuardStrategy
 
 /**
  * Construct atoms, first applying any evaluation logic.
  */
 abstract class Builder {
-  
-  /**
-   * A strategy to use to rewrite guards.
-   */
-  val guardStrategy: GuardStrategy
   
   /**
    * Rewrite the provided atom by applying the replacements defined in the
@@ -301,6 +296,7 @@ abstract class Builder {
    * @param rewrite     The rewrite to apply on match.
    * @param guards      Guards that must be true to accept a match.
    * @param rulesets    The rulesets that contain this rule.
+   * @param strategy    The guard strategy to use.
    * @param name        Optional rule name.
    * @param description Optional rule description.
    * @param detail      Optional detailed rule description.
@@ -314,12 +310,13 @@ abstract class Builder {
       rewrite: BasicAtom,
       guards: Seq[BasicAtom],
       rulesets: Set[String],
+      strategy: GuardStrategy,
       name: Option[String] = None,
       description: String = "",
       detail: String = "",
       synthetic: Boolean = false) = {
-    new RewriteRule(loc, content, pattern, rewrite, guards, rulesets, name,
-        description, detail, synthetic)
+    new RewriteRule(loc, content, pattern, rewrite, guards, rulesets, strategy,
+        name, description, detail, synthetic)
   }
   
   
@@ -331,6 +328,7 @@ abstract class Builder {
    * @param rewrite     The rewrite to apply on match.
    * @param guards      Guards that must be true to accept a match.
    * @param rulesets    The rulesets that contain this rule.
+   * @param strategy    The guard strategy to use.
    * @param name        Optional rule name.
    * @param description Optional rule description.
    * @param detail      Optional detailed rule description.
@@ -343,6 +341,7 @@ abstract class Builder {
       rewrite: BasicAtom,
       guards: Seq[BasicAtom],
       rulesets: Set[String],
+      strategy: GuardStrategy,
       name: Option[String] = None,
       description: String = "",
       detail: String = "",
@@ -358,7 +357,7 @@ abstract class Builder {
       content += ("name" -> newLiteral(Loc.internal, SYMBOL, Symbol(name.get)))
     }
     new RewriteRule(loc, content,
-        pattern, rewrite, guards, rulesets, name,
+        pattern, rewrite, guards, rulesets, strategy, name,
         description, detail, synthetic)
   }
 

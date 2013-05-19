@@ -81,6 +81,7 @@ object RewriteRule {
  * @param rewrite			The rewrite to apply on match.
  * @param guards			Guards that must be true to accept a match.
  * @param rulesets		The rulesets that contain this rule.
+ * @param strategy    The strategy to use to evaluate guards.
  * @param name        Optional rule name.
  * @param description Optional rule description.
  * @param detail      Optional detailed rule description.
@@ -93,6 +94,7 @@ class RewriteRule protected[elision] (
     val rewrite: BasicAtom,
     val guards: Seq[BasicAtom],
     val rulesets: Set[String],
+    val strategy: GuardStrategy,
     val name: Option[String] = None,
     val description: String = "",
     val detail: String = "",

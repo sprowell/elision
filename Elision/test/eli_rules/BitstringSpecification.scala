@@ -42,7 +42,7 @@ import ornl.elision.cli.CLI.CLIState
 import ornl.elision.parse.Processor._
 import ornl.elision.core.BasicAtom
 import util.ProcessorUtil
-import ornl.elision.core.Dialect
+import ornl.elision.dialects.Dialect
 
 /**
  * @author James Black

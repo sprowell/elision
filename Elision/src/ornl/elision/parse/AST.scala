@@ -73,8 +73,9 @@ import ornl.elision.context.ApplyBuilder
  * Base class for abstract syntax tree nodes.
  * 
  * @param TYPE  The type of `BasicAtom` held in this abstract syntax tree node.
+ * @param loc   Location of the atom's declaration, if known.
  */
-abstract class AST[+TYPE <: BasicAtom] {
+abstract class AST[+TYPE <: BasicAtom](val loc: Loc) {
   /**
    * Interpret this AST node to produce an atom of the specified type.
    * @param context   The context providing rulesets and operators.
@@ -101,7 +102,7 @@ object AST {
    * @param atom  The atom to store.
    * @return  The AST node.
    */
-  def known[KIND <: BasicAtom](atom: KIND) = new AST[KIND] {
+  def known[KIND <: BasicAtom](atom: KIND) = new AST[KIND](Loc.internal) {
     def interpret(context: Context) = atom
   }
   
@@ -110,9 +111,10 @@ object AST {
    * root type names, or the special literals `true` or `false`.
    * 
    * @param value   Value of the symbol.
+   * @param loc     The location where this node arose.
    * @return  The resulting AST.
    */
-  def sym(value: String) = new BA with Naked {
+  def sym(value: String, loc: Loc) = new BA(loc) with Naked {
     def interpret(context: Context) = {
       value match {
         case "true" => true
@@ -121,7 +123,7 @@ object AST {
           val lookup = (if (value == "_") "ANY" else value)
           NamedRootType.get(lookup) match {
             case Some(nrt) => nrt
-            case _ => SymbolLiteral(SYMBOL, Symbol(value))
+            case _ => context.builder.newLiteral(loc, SYMBOL, Symbol(value))
           }
       }
     }
@@ -132,29 +134,43 @@ object AST {
    * 
    * @param value   Value of the symbol.
    * @param typ     The type AST.
+   * @param loc     The location where this node arose.
    * @return  The new symbol AST.
    */
-  def sym(value: String, typ: BA) = new BA {
+  def sym(value: String, typ: BA, loc: Loc) = new BA(loc) {
     def interpret(context: Context) = {
       // Check for Boolean literals here.
       typ.interpret(context) match {
         case BOOLEAN if value == "true" => true
         case BOOLEAN if value == "false" => false
-        case t:Any => Literal(t, Symbol(value))
+        case t:Any => context.builder.newLiteral(loc, t, Symbol(value))
       }
     }
   }
   
   /**
-   * Quick method to make a string AST.
+   * Make a string literal AST.
    * 
    * @param value   Value of the string.
-   * @param typ     The type AST.  If omitted, it is `STRING`.
+   * @param loc     The location where this node arose.
    * @return  The new string AST.
    */
-  def string(value: String, typ: BA = known(STRING)) = new AST[StringLiteral] {
+  def string(value: String, loc: Loc) = new AST[StringLiteral](loc) {
     def interpret(context: Context) =
-      StringLiteral(typ.interpret(context), value)
+      context.builder.newLiteral(loc, STRING, value)
+  }
+  
+  /**
+   * Make a string literal AST.
+   * 
+   * @param value   Value of the string.
+   * @param typ     The type AST.
+   * @param loc     The location where this node arose.
+   * @return  The new string AST.
+   */
+  def string(value: String, typ: BA, loc: Loc) = new AST[StringLiteral](loc) {
+    def interpret(context: Context) =
+      context.builder.newLiteral(loc, typ.interpret(context), value)
   }
   
   /**
@@ -164,14 +180,15 @@ object AST {
    * @param bits    An integer to interpret as the bits.
    * @param len     The length.
    * @param otyp    The overriding type for the bit string.
+   * @param loc     The location where this node arose.
    * @return  The constructed literal AST node.
    */
-  def bitstring(oflag: Option[Boolean], bits: (Int, String),
-      len: (Int, String), otyp: Option[BA]) = new AST[Literal[_]] {
+  def bitstring(oflag: Option[Boolean], bits: (Int, String), len: (Int, String),
+      otyp: Option[BA], loc: Loc) = new AST[Literal[_]](loc) {
     def interpret(context: Context) = {
       val neg = oflag.getOrElse(false)
       val typ = otyp.getOrElse(known(BITSTRING)).interpret(context)
-      BitStringLiteral(typ,
+      context.builder.newLiteral(loc, typ,
           if (neg) -BigInt(bits._2, bits._1) else BigInt(bits._2, bits._1),
           Integer.parseInt(len._2, len._1))
     }
@@ -185,13 +202,15 @@ object AST {
    * @param frac    The fractional part of the number, as radix / digits.
    * @param exp     The exponent of the number, as negative flag / radix / digits.
    * @param otyp    The overriding type for the number.
+   * @param loc     The location where this node arose.
    * @return  The constructed literal, either an integer or a float literal.
    */
   def number(oflag: Option[Boolean],
       whole: (Int, String),
       frac: Option[(Int, String)],
       exp: Option[(Boolean, Int, String)],
-      otyp: Option[BA]) = new AST[Literal[_]] {
+      otyp: Option[BA],
+      loc: Loc) = new AST[Literal[_]](loc) {
     def interpret(context: Context) = {
       // Get flag.
       val neg = oflag.getOrElse(false)
@@ -200,7 +219,7 @@ object AST {
       if (frac.isEmpty && exp.isEmpty) {
         // Interpret this as an integer.
         val typ = otyp.getOrElse(known(INTEGER)).interpret(context)
-        IntegerLiteral(typ,
+        context.builder.newLiteral(loc, typ,
             if (neg) -BigInt(whole._2, whole._1)
             else BigInt(whole._2, whole._1))
       } else {
@@ -233,7 +252,7 @@ object AST {
         
         // Now interpret this as floating point literal.
         val typ = otyp.getOrElse(known(FLOAT)).interpret(context)
-        FloatLiteral(typ,
+        context.builder.newLiteral(loc, typ,
             if (neg) -BigInt(significand, whole._1)
             else BigInt(significand, whole._1), exponent, whole._1)
       }
@@ -253,83 +272,86 @@ object AST {
   /**
    * Make an AST for a map pair.
    * 
-   * @param left  Left AST of the map pair (the pattern).
-   * @param right Right AST of the map pair (the rewrite).
+   * @param left    Left AST of the map pair (the pattern).
+   * @param right   Right AST of the map pair (the rewrite).
+   * @param loc     The location where this node arose.
    * @return  The new map pair AST.
    */
-  def mappair(left: BA, right: BA) = new AST[MapPair] {
+  def mappair(left: BA, right: BA, loc: Loc) = new AST[MapPair](loc) {
     def interpret(context: Context) =
-      MapPair(left.interpret(context), right.interpret(context))
+      context.builder.newMapPair(loc, left.interpret(context),
+          right.interpret(context))
   }
   
   /**
    * Make an AST node for applying one atom to another.
    * 
-   * @param left  AST to left of applicative dot (the operator).
-   * @param right AST to right of applicative dot (the argument).
+   * @param left    AST to left of applicative dot (the operator).
+   * @param right   AST to right of applicative dot (the argument).
+   * @param loc     The location where this node arose.
    * @return  AST for the application.
    */
-  def apply(left: BA, right: BA) = new BA {
+  def apply(left: BA, right: BA, loc: Loc) = new BA(loc) {
     def interpret(context: Context) = {
       // If the left element is a naked symbol, then try to interpret it as
       // an operator.  Otherwise just interpret it.
       val op = left.interpret(context) match {
-        case SymbolLiteral(_, value) if left.isInstanceOf[Naked] =>
+        case SymbolLiteral(_, _, value) if left.isInstanceOf[Naked] =>
           context.operatorLibrary(value.name)
           
         case value: Any => value
       }
-      ApplyHandler(op, right.interpret(context), context)
+      context.builder.newApply(loc, op, right.interpret(context))
     }
   }
   
   /**
    * Make an absorber property AST.
    * 
-   * @param atom  AST for the absorber.
+   * @param atom    AST for the absorber.
    * @return  The new AST.
    */
-  def absorber(atom: BA) = new AST[AlgProp] {
+  def absorber(atom: BA) = new AST[AlgProp](atom.loc) {
     def interpret(context: Context) = Absorber(atom.interpret(context))
   }
   
   /**
    * Make an identity property AST.
    * 
-   * @param atom  AST for the identity.
+   * @param atom    AST for the identity.
    * @return  The new AST.
    */
-  def identity(atom: BA) = new AST[AlgProp] {
+  def identity(atom: BA) = new AST[AlgProp](atom.loc) {
     def interpret(context: Context) = Identity(atom.interpret(context))
   }
   
   /**
    * Make an associative property AST.
    * 
-   * @param atom  AST for the associative condition.
+   * @param atom    AST for the associative condition.
    * @return  The new AST.
    */
-  def associative(atom: BA) = new AST[AlgProp] {
+  def associative(atom: BA) = new AST[AlgProp](atom.loc) {
     def interpret(context: Context) = Associative(atom.interpret(context))
   }
   
   /**
    * Make a commutative property AST.
    * 
-   * @param atom  AST for the commutative condition.
+   * @param atom    AST for the commutative condition.
    * @return  The new AST.
    */
-  def commutative(atom: BA) = new AST[AlgProp] {
+  def commutative(atom: BA) = new AST[AlgProp](atom.loc) {
     def interpret(context: Context) = Commutative(atom.interpret(context))
   }
   
   /**
    * Make an idempotent property AST.
    * 
-   * @param atom  AST for the idempotent condition.
+   * @param atom    AST for the idempotent condition.
    * @return  The new AST.
    */
-  def idempotent(atom: BA) = new AST[AlgProp] {
+  def idempotent(atom: BA) = new AST[AlgProp](atom.loc) {
     def interpret(context: Context) = Idempotent(atom.interpret(context))
   }
   
@@ -342,16 +364,19 @@ object AST {
    * @param guard   The guard AST.
    * @param typ     The type AST.
    * @param tags    A list of tags for the variable.
+   * @param loc     The location where this node arose.
    * @return  The new variable AST.
    */
   def variable(meta: Boolean, name: String, byname: Boolean, guard: Option[BA],
-      typ: Option[BA], tags: List[String]) = new AST[Variable] {
+      typ: Option[BA], tags: List[String], loc: Loc) = new AST[Variable](loc) {
     def interpret(context: Context) = if (meta) {
-      MetaVariable(typ.getOrElse(any).interpret(context), name,
+      context.builder.newMetaVariable(loc,
+          typ.getOrElse(any).interpret(context), name,
           guard.getOrElse(known(true: BasicAtom)).interpret(context),
           tags.toSet, byname)
     } else {
-      Variable(typ.getOrElse(any).interpret(context), name,
+      context.builder.newTermVariable(loc,
+          typ.getOrElse(any).interpret(context), name,
           guard.getOrElse(known(true: BasicAtom)).interpret(context),
           tags.toSet, byname)
     }
@@ -362,11 +387,13 @@ object AST {
    * 
    * @param param   The parameter AST.
    * @param body    The body AST.
+   * @param loc     The location where this node arose.
    * @return  The new lambda AST.
    */
-  def lambda(param: AST[Variable], body: BA) = new AST[Lambda] {
+  def lambda(param: AST[Variable], body: BA, loc: Loc) = new AST[Lambda](loc) {
     def interpret(context: Context) =
-      Lambda(param.interpret(context), body.interpret(context))
+      context.builder.newLambda(loc, param.interpret(context),
+          body.interpret(context))
   }
   
   /**
@@ -377,9 +404,10 @@ object AST {
    * @param loc     The location where this node arose.
    * @return  The new special form AST.
    */
-  def special(tag: BA, content: BA, loc: Loc) = new BA {
+  def special(tag: BA, content: BA, loc: Loc) = new BA(loc) {
     def interpret(context: Context) =
-      SpecialForm(loc, tag.interpret(context), content.interpret(context))
+      context.builder.newSpecialForm(loc, tag.interpret(context),
+          content.interpret(context))
   }
   
   /**
@@ -388,7 +416,7 @@ object AST {
    * @param props   A list of algorithmic property AST's.
    * @return  The new algorithmic property AST.
    */
-  def algprop(props: List[AST[AlgProp]]) = new AST[AlgProp] {
+  def algprop(props: List[AST[AlgProp]]) = new AST[AlgProp](Loc.internal) {
     def interpret(context: Context) = props.foldLeft(NoProps: AlgProp) {
       (sofar, next) => sofar and next.interpret(context)
     }
@@ -402,11 +430,13 @@ object AST {
    * 
    * @param props   The algorithmic properties AST.
    * @param atoms   The sequence of atom AST's.
+   * @param loc     The location where this node arose.
    * @return  The new sequence AST.
    */
-  def atomseq(props: AST[AlgProp], atoms: List[BA]) = new AST[AtomSeq] {
+  def atomseq(props: AST[AlgProp], atoms: List[BA],
+      loc: Loc) = new AST[AtomSeq](loc) {
     def interpret(context: Context) =
-      AtomSeq(props.interpret(context),
+      context.builder.newAtomSeq(loc, props.interpret(context),
           atoms.map(_.interpret(context)).toIndexedSeq)
   }
   
@@ -416,7 +446,7 @@ object AST {
    * @param pairs   A list of pairs consisting of name (string) and value AST.
    * @return  The new bindings AST.
    */
-  def binding(pairs: List[(String, BA)]) = new AST[BindingsAtom] {
+  def binding(pairs: List[(String, BA)]) = new AST[BindingsAtom](Loc.internal) {
     def interpret(context: Context) = Bindings(pairs.map {
       (pair) => (pair._1, pair._2.interpret(context))
     }:_*)
@@ -428,7 +458,7 @@ object AST {
    * @param name    The name of the operator.
    * @return  The new AST.
    */
-  def opref(name: String) = new AST[OperatorRef] {
+  def opref(name: String) = new AST[OperatorRef](Loc.internal) {
     def interpret(context: Context) = context.operatorLibrary(name)
   }
 }

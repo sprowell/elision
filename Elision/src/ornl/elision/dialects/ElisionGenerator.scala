@@ -60,10 +60,10 @@ import ornl.elision.core.StringLiteral
 import ornl.elision.core.SymbolLiteral
 import ornl.elision.core.TypeUniverse
 import ornl.elision.core.Variable
-import ornl.elision.core.knownExecutor
 import ornl.elision.core.toEString
 import ornl.elision.core.toESymbol
 import ornl.elision.core.unwrapBindingsAtom
+import ornl.elision.context.Context
 
 /**
  * Generate the Elision code to create an atom.
@@ -79,12 +79,15 @@ object ElisionGenerator {
   /**
    * Generate the Elision-parseable string for a literal.
    * 
-   * @param atom    The literal atom.
-   * @param buf     A buffer to get the string.
-   * @param limit   The current nesting limit of this atom.
+   * @param atom      The literal atom.
+   * @param buf       A buffer to get the string.
+   * @param context   The optional context providing named semantics.  If this
+   *                  is `None`, different output may be generated.
+   * @param limit     The current nesting limit of this atom.
    * @return  The appendable, for chaining.
    */
-  private def _gen(atom: Literal[_], buf: Appendable, limit: Int): Appendable = {
+  private def _gen(atom: Literal[_], buf: Appendable, context: Option[Context],
+      limit: Int): Appendable = {
     atom match {
       case sl: SymbolLiteral => sl match {
         case ANY => buf.append("ANY")
@@ -119,14 +122,14 @@ object ElisionGenerator {
         // Handle anything else.
         case _ =>
           buf.append(toESymbol(sl.value.name))
-          apply(sl.typ, buf.append(":"), limit)
+          apply(sl.typ, buf.append(":"), context, limit)
       }
         
       // Process other literals.
       case IntegerLiteral(_, typ, value) =>
         buf.append(value.toString)
         if (typ != INTEGER || BasicAtom.printTypeInfo) {
-          apply(typ, buf.append(":"), limit)
+          apply(typ, buf.append(":"), context, limit)
         } else {
           buf
         }
@@ -134,7 +137,7 @@ object ElisionGenerator {
       case StringLiteral(_, typ, value) =>
         buf.append(toEString(value))
         if (typ != STRING || BasicAtom.printTypeInfo) {
-          apply(typ, buf.append(":"), limit)
+          apply(typ, buf.append(":"), context, limit)
         } else {
           buf
         }
@@ -142,7 +145,7 @@ object ElisionGenerator {
       case BooleanLiteral(_, typ, value) =>
         buf.append(value.toString)
         if (typ != BOOLEAN || BasicAtom.printTypeInfo) {
-          apply(typ, buf.append(":"), limit)
+          apply(typ, buf.append(":"), context, limit)
         } else {
           buf
         }
@@ -150,7 +153,7 @@ object ElisionGenerator {
       case fl:FloatLiteral =>
         buf.append(fl.numberString)
         if (fl.theType != FLOAT || BasicAtom.printTypeInfo) {
-          apply(fl.theType, buf.append(":"), limit)
+          apply(fl.theType, buf.append(":"), context, limit)
         } else {
           buf
         }
@@ -158,7 +161,7 @@ object ElisionGenerator {
         buf.append((if (bsl.neghint) bsl.signed else bsl.unsigned).toString).
           append("L").append(bsl.len.toString)
         if (bsl.typ != BITSTRING || BasicAtom.printTypeInfo) {
-          apply(bsl.typ, buf.append(":"), limit)
+          apply(bsl.typ, buf.append(":"), context, limit)
         } else {
           buf
         }
@@ -169,38 +172,41 @@ object ElisionGenerator {
    * Generate the Scala code required to create an `AlgProp`.  Certain
    * well-known properties are handled directly and simply.
    * 
-   * @param atom    The atom.
-   * @param buf     The buffer to get the result.
-   * @param limit   The current nesting limit of this atom.
-   * @return        The result.
+   * @param atom      The atom.
+   * @param buf       The buffer to get the result.
+   * @param context   The optional context providing named semantics.  If this
+   *                  is `None`, different output may be generated.
+   * @param limit     The current nesting limit of this atom.
+   * @return          The result.
    */
-  private def _gen(prop: AlgProp, buf: Appendable, limit: Int): Appendable = {
+  private def _gen(prop: AlgProp, buf: Appendable, context: Option[Context],
+      limit: Int): Appendable = {
     buf.append("%")
     prop.associative match {
       case Some(Literal.TRUE) => buf.append("A")
       case Some(Literal.FALSE) => buf.append("!A")
-      case Some(atom) => apply(atom, buf.append("A["), limit-1).append("]")
+      case Some(atom) => apply(atom, buf.append("A["), context, limit-1).append("]")
       case _ =>
     }
     prop.commutative match {
       case Some(Literal.TRUE) => buf.append("C")
       case Some(Literal.FALSE) => buf.append("!C")
-      case Some(atom) => apply(atom, buf.append("C["), limit-1).append("]")
+      case Some(atom) => apply(atom, buf.append("C["), context, limit-1).append("]")
       case _ =>
     }
     prop.idempotent match {
       case Some(Literal.TRUE) => buf.append("I")
       case Some(Literal.FALSE) => buf.append("!I")
-      case Some(atom) => apply(atom, buf.append("I["), limit-1).append("]")
+      case Some(atom) => apply(atom, buf.append("I["), context, limit-1).append("]")
       case _ =>
     }
     prop.absorber match {
       case None =>
-      case Some(atom) => apply(atom, buf.append("B["), limit-1).append("]")
+      case Some(atom) => apply(atom, buf.append("B["), context, limit-1).append("]")
     }
     prop.identity match {
       case None =>
-      case Some(atom) => apply(atom, buf.append("D["), limit-1).append("]")
+      case Some(atom) => apply(atom, buf.append("D["), context, limit-1).append("]")
     }
     buf
   }
@@ -209,12 +215,14 @@ object ElisionGenerator {
    * Generate the Scala code required to create a special form.  Certain
    * special forms get specialized processing.
    * 
-   * @param atom    The atom.
-   * @param buf     The buffer to get the result.
-   * @param limit   The current nesting limit of this atom.
-   * @return        The result.
+   * @param atom      The atom.
+   * @param buf       The buffer to get the result.
+   * @param context   The optional context providing named semantics.  If this
+   *                  is `None`, different output may be generated.
+   * @param limit     The current nesting limit of this atom.
+   * @return          The result.
    */
-  private def _gen(atom: SpecialForm, buf: Appendable,
+  private def _gen(atom: SpecialForm, buf: Appendable, context: Option[Context],
       limit: Int): Appendable = {
     if (atom.tag.isInstanceOf[SymbolLiteral] &&
         atom.content.isInstanceOf[BindingsAtom]) {
@@ -223,13 +231,13 @@ object ElisionGenerator {
       buf.append("{").append(toESymbol(kind))
       for (pair <- atom.content.asInstanceOf[BindingsAtom]) {
         buf.append(" #").append(toESymbol(pair._1))
-        apply(pair._2, buf.append("="), limit-1)
+        apply(pair._2, buf.append("="), context, limit-1)
       } // Write all bindings.
       buf.append("}")
     } else {
       // Use the pair form.
-      apply(atom.tag, buf.append("{:"), limit-1).append(" ")
-      apply(atom.content, buf, limit-1).append(":}")
+      apply(atom.tag, buf.append("{:"), context, limit-1).append(" ")
+      apply(atom.content, buf, context, limit-1).append(":}")
     }
   }
   
@@ -240,6 +248,8 @@ object ElisionGenerator {
    * @param atom    The atom.
    * @param buf     The buffer to get the result.  If not provided, one is
    *                created.
+   * @param context The optional context providing named semantics.  If this
+   *                is `None`, different output may be generated.
    * @param limit   The nesting limit of this atom.  If the limit is zero, then
    *                an ellipsis is printed instead of the atom.  Otherwise
    *                the limit is decreased for each parenthesized and bracketed
@@ -247,49 +257,51 @@ object ElisionGenerator {
    *                then there is effectively no limit.
    * @return        The result.
    */
-  def apply(atom: BasicAtom,
-      buf: Appendable = new StringBuffer(), limit: Int = -1): Appendable = {
+  def apply(atom: BasicAtom, buf: Appendable = new StringBuffer(),
+      context: Option[Context] = None, limit: Int = -1): Appendable = {
     if (limit == 0) return buf.append("...")
     atom match {
       // Process literals.
-      case lit: Literal[_] => _gen(lit, buf, limit)
+      case lit: Literal[_] => _gen(lit, buf, context, limit)
       
       // Process algebraic properties.
-      case ap: AlgProp => _gen(ap, buf, limit)
+      case ap: AlgProp => _gen(ap, buf, context, limit)
         
       // Process special forms.
-      case sf: SpecialForm => _gen(sf, buf, limit)
+      case sf: SpecialForm => _gen(sf, buf, context, limit)
       
       // Process specialized operators.
       case or: OperatorRef =>
         // If this is a known operator, then we can leave it as an operator
         // reference.  If it is not (or is no longer) then we have to emit
         // the entire operator.
-        val kop = knownExecutor.context.operatorLibrary.get(or.name)
-        if (kop.isDefined && kop.get == or) {
+        if (context.isDefined && {
+          val kop = context.get.operatorLibrary.get(or.name)
+          kop.isDefined && kop.get == or
+        }) {
           // This is a well-known operator.  We can simply use the name.
           buf.append(toESymbol(or.name)).append(":OPREF")
         } else {
           // This is not a well-known operator.  We must write out the
           // definition in full.
-          apply(or.operator, buf, limit-1)
+          apply(or.operator, buf, context, limit-1)
         }
         
       case Apply(or: OperatorRef, rhs) =>
-        _opapp(or, rhs, buf, limit)
+        _opapp(or, rhs, buf, context, limit)
         
       case Apply(lhs, rhs) =>
         buf.append("(")
         if (lhs.isInstanceOf[IntegerLiteral])
-          apply(lhs, buf.append("("), limit).append(")")
+          apply(lhs, buf.append("("), context, limit).append(")")
         else if (lhs.isInstanceOf[NamedRootType])
-          apply(lhs, buf, limit).append(": ^TYPE")
+          apply(lhs, buf, context, limit).append(": ^TYPE")
         else
-          apply(lhs, buf, limit)
-        apply(rhs, buf.append(".")).append(")")
+          apply(lhs, buf, context, limit)
+        apply(rhs, buf.append("."), context).append(")")
         
       case AtomSeq(props, atoms) =>
-        apply(props, buf, limit)
+        apply(props, buf, context, limit)
         buf.append("(")
         // If the limit will be exceeded by the argument list, don't print
         // several elipses separated by commas, but just one for the list.
@@ -299,7 +311,7 @@ object ElisionGenerator {
           var index = 0
           while (index < atoms.size) {
             if (index > 0) buf.append(",")
-            apply(atoms(index), buf, limit-1)
+            apply(atoms(index), buf, context, limit-1)
             index += 1
           } // Add all atoms.
         }
@@ -315,14 +327,14 @@ object ElisionGenerator {
           binds foreach {
             pair =>
               apply(pair._2, buf.append(toESymbol(pair._1)).append(" -> "),
-                  limit-1).append(" ")
+                  context, limit-1).append(" ")
           } // Add each individual bind pair.
         }
         buf.append("}")
         
       case Lambda(lvar, body) =>
-        apply(lvar, buf.append("\\"), limit)
-        apply(body, buf.append("."), limit)
+        apply(lvar, buf.append("\\"), context, limit)
+        apply(body, buf.append("."), context, limit)
         
       case MapPair(left, right) =>
         // If the limit will be exceeded by the map pair, don't print
@@ -330,8 +342,8 @@ object ElisionGenerator {
         if (limit == 1) {
           buf.append("(...)")
         } else {
-          apply(left, buf.append("("), limit-1)
-          apply(right, buf.append(" -> "), limit-1).append(")")
+          apply(left, buf.append("("), context, limit-1)
+          apply(right, buf.append(" -> "), context, limit-1).append(")")
         }
         
       case vari: Variable =>
@@ -339,10 +351,10 @@ object ElisionGenerator {
         buf.append(if (vari.byName) toEString(vari.name)
             else toESymbol(vari.name))
         if (vari.guard != Literal.TRUE) {
-          apply(vari.guard, buf.append("{"), limit-1).append("}")
+          apply(vari.guard, buf.append("{"), context, limit-1).append("}")
         }
         if ((vari.theType != ANY) || BasicAtom.printTypeInfo) {
-          apply(vari.theType, buf.append(":"), limit-1)
+          apply(vari.theType, buf.append(":"), context, limit-1)
         }
         vari.labels foreach {
           label =>
@@ -359,12 +371,16 @@ object ElisionGenerator {
    * @param op      The operator reference.
    * @param rhs     The argument.
    * @param buf     Buffer to get output.
+   * @param context The optional context providing named semantics.  If this
+   *                is `None`, different output may be generated.
    * @param limit   The current depth limit.
    */
   private def _opapp(op: OperatorRef, rhs: BasicAtom, buf: Appendable,
-      limit: Int): Appendable = {
-    val kop = knownExecutor.context.operatorLibrary.get(op.name)
-    if (kop.isDefined && kop.get == op) {
+      context: Option[Context], limit: Int): Appendable = {
+      if (context.isDefined && {
+        val kop = context.get.operatorLibrary.get(op.name)
+        kop.isDefined && kop.get == op
+      }) {
       // This is a known operator.  We don't have to do anything other
       // than mention its name.  Next we need to decide if the argument
       // list is an atom sequence or not.  If it is, then we can write
@@ -383,7 +399,7 @@ object ElisionGenerator {
             var index = 0
             while (index < as.atoms.size) {
               if (index > 0) buf.append(",")
-              apply(as.atoms(index), buf, limit-1)
+              apply(as.atoms(index), buf, context, limit-1)
               index += 1
             } // Add all atoms.
           }
@@ -394,12 +410,12 @@ object ElisionGenerator {
           // sequence.  Write out the argument as an operator reference
           // and then use the applicative dot.
           buf.append("(").append(toESymbol(op.name)).append(": OPREF.")
-          return apply(rhs, buf, limit-1).append(")")
+          return apply(rhs, buf, context, limit-1).append(")")
       }
     } else {
       // The operator is not known.  It must be written out in long form.
-      apply(op.operator, buf.append("("), limit-1)
-      return apply(rhs, buf.append("."), limit-1).append(")")
+      apply(op.operator, buf.append("("), context, limit-1)
+      return apply(rhs, buf.append("."), context, limit-1).append(")")
     }
   }
 }

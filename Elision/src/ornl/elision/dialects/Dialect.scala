@@ -27,13 +27,17 @@
  * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package ornl.elision.core
+package ornl.elision.dialects
 
 import scala.collection.immutable.Map
 import scala.io.Source
 import ornl.elision.util.ElisionException
 import ornl.elision.util.Loc
 import ornl.elision.util.Version
+import ornl.elision.context.Context
+import ornl.elision.core.BasicAtom
+import ornl.elision.core.toESymbol
+import ornl.elision.core.Fickle
 
 /**
  * Hold the registry of known dialects.  Also provide the classes that
@@ -98,36 +102,39 @@ object Dialect extends Fickle with Mutable {
    * @param dialect   Name of the dialect.
    * @param app       Appendable to get output.
    * @param atom      The basic atom to serialize.
+   * @param context   The optional context providing named semantics.  If this
+   *                  is not given, different output may be generated.
    * @param limit     A descent limit for the generator, if relevant to the
    *                  dialect.  The value -1 (the default) disables this.
    * @return  The appendable.
    */
   def serialize(dialect: Symbol, app: Appendable, atom: BasicAtom,
-      limit: Int = -1) = apply(dialect) match {
+      context: Option[Context] = None, limit: Int = -1) = apply(dialect) match {
     case None =>
       throw new NoSuchDialect(Loc.internal,
           "The dialect "+toESymbol(dialect.name)+" is not known.")
       
     case Some(dia) =>
-      dia.serialize(app, atom)
+      dia.serialize(app, atom, context)
   }
   
   /**
    * Parse a sequence of atoms from the given source.    If the dialect is
    * not known, an exception is generated.
    * 
-   * @param dialect The dialect to use for parsing.
-   * @param name    Name of the data source.
-   * @param source  The data source.
+   * @param dialect   The dialect to use for parsing.
+   * @param name      Name of the data source.
+   * @param source    The data source.
+   * @param context   The context providing the known (named) semantics.
    */
-  def parse(dialect: Symbol, name: String, source: Source) =
+  def parse(dialect: Symbol, name: String, source: Source, context: Context) =
     apply(dialect) match {
     case None =>
       throw new NoSuchDialect(Loc.internal,
           "The dialect "+toESymbol(dialect.name)+" is not known.")
       
     case Some(dia) =>
-      dia.parse(name, source)
+      dia.parse(name, source, context)
   }
   
   // Get the dialects now and configure the registry.  We need to load the
@@ -175,19 +182,23 @@ abstract class Dialect extends Fickle {
    * 
    * @param app       The appendable.
    * @param atom      The atom.
+   * @param context   The optional context providing named semantics.  If this
+   *                  is not given, different output may be generated.
    * @param limit     A descent limit for the generator, if relevant to the
    *                  dialect.  The value -1 (the default) disables this.
    * @return  The appendable.
    */
-  def serialize(app: Appendable, atom: BasicAtom, limit: Int = -1) = app
+  def serialize(app: Appendable, atom: BasicAtom,
+      context: Option[Context] = None, limit: Int = -1) = app
   
   /**
    * Parse from the named, provided source, and generate a result.
    * 
-   * @param name    Name of the source, for location information.
-   * @param source  The data source.
+   * @param name      Name of the source, for location information.
+   * @param source    The data source.
+   * @param context   The context providing the known (named) semantics.
    * @return  The result of parsing.
    */
-  def parse(name: String, source: Source): Dialect.Result =
+  def parse(name: String, source: Source, context: Context): Dialect.Result =
     Dialect.Failure(Loc.internal, "Parsing is not implemented for this dialect.")
 }

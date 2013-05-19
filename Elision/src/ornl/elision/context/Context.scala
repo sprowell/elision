@@ -60,12 +60,14 @@ import ornl.elision.util.Version.build
 import ornl.elision.util.Version.major
 import ornl.elision.util.Version.minor
 import ornl.elision.util.toQuotedString
-import ornl.elision.core.Dialect
+import ornl.elision.dialects.Dialect
 import ornl.elision.util.Console
 import ornl.elision.util.PrintConsole
 import ornl.elision.util.ElisionException
 import ornl.elision.util.Loc
-import ornl.elision.rewrite.GuardStrategy
+import ornl.elision.rewrite.RewriteTask
+import ornl.elision.rewrite.RewriteEngine
+import ornl.elision.core.GuardStrategy
 
 /**
  * A requested setting is not present.
@@ -100,21 +102,58 @@ extends ElisionException(Loc.internal, msg)
  *  - Rulesets.
  *  - "Automatic" rewriting of atoms using rules.
  * 
- * @param guardStrategy The strategy to use to evaluate guards on rules.
  * @param builder       A builder to evaluate and construct atoms.
  */
-class Context(
-    val guardStrategy: GuardStrategy,
-    val builder: Builder)
-extends PropertyManager with Fickle with Mutable with Cache {
+class Context extends PropertyManager with Fickle with Mutable with Cache {
   
   override def clone = {
-    val clone = new Context(guardStrategy, builder)
+    val clone = new Context
     clone.binds = this.binds.clone
     clone.operatorLibrary = this.operatorLibrary.clone
     clone.ruleLibrary = this.ruleLibrary.clone
     clone
   }
+  
+  //======================================================================
+  // Settings that may need to be overridden.
+  //======================================================================
+  
+  /* We take the rewrite engine and make it into a guard strategy here, so that
+   * it does not have to "know" about any of the parts of the context.  This
+   * helps restrict knowledge of the context (and break dependency chains)
+   * in the library.
+   */
+  
+  /**
+   * The strategy to use to rewrite guards.
+   */
+  val guardstrategy: GuardStrategy = new RewriteEngine with GuardStrategy {
+    def apply(atom: BasicAtom): (BasicAtom, Boolean) = {
+      val task: RewriteTask = RewriteTask(atom, ruleLibrary, memo, builder)
+      RewriteEngine(task)
+    }
+  }
+  
+  /* This sequence of initialization builds the pieces so that knowledge of the
+   * context (which is necessary for building native handlers) is restricted
+   * to the specialized version of the operator apply handler.
+   */
+  
+  /**
+   * The operator apply handler.
+   */
+  private val _ophandler: OperatorApplyHandler =
+    new StandardOperatorApplyHandler(this)
+  
+  /**
+   * The builder that makes applications.
+   */
+  val applybuilder: ApplyBuilder = new ApplyBuilder(_ophandler)
+  
+  /**
+   * The builder to use to make atoms.
+   */
+  val builder: Builder = new StandardBuilder(applybuilder)
   
   //======================================================================
   // The settings.

@@ -29,13 +29,8 @@
  */
 package ornl.elision.dialects
 
-import scala.io.Source
-
 import ornl.elision.core.BasicAtom
-import ornl.elision.core.Dialect
-import ornl.elision.parse.ElisionParser
-import ornl.elision.parse.Failure
-import ornl.elision.util.Loc
+import ornl.elision.context.Context
 
 /**
  * Provide the Scala dialect.  Atoms can be serlialized, but not parsed just
@@ -46,7 +41,8 @@ class ScalaDialect extends Dialect {
   override val canSerialize = true
   override val canParse = false
   
-  override def serialize(app: Appendable, atom: BasicAtom, limit: Int = -1) = {
+  override def serialize(app: Appendable, atom: BasicAtom,
+      context: Option[Context] = None, limit: Int = -1) = {
     ScalaGenerator.apply(atom, app, limit)
   }
 }

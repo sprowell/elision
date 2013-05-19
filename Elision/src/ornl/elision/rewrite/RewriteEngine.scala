@@ -45,7 +45,7 @@ import ornl.elision.context.Context
 import ornl.elision.core.Bindings
 import ornl.elision.context.ApplyBuilder
 import ornl.elision.util.Loc
-import ornl.elision.context.GuardStrategy
+import ornl.elision.core.GuardStrategy
 import ornl.elision.context.RuleApplyHandler
 
 /**
@@ -53,72 +53,10 @@ import ornl.elision.context.RuleApplyHandler
  */
 object RewriteEngine {
   
-  /** The maximum number of rewrites allowed.  Negative values disable this. */
-  var limit: BigInt = -1
-  
-  /** The rewrite timeout, in milliseconds.  Negative values disable this. */
-  var timeout: BigInt = -1
-  
-  /** Whether to descend into child atoms during rewriting. */
-  var descend = true
-  
-  /** Whether to normalize children completely during rewriting. */
-  var normalizeChildren = true
-  
-  /**
-   * Normalize the given atom, repeatedly applying the rules of the active
-   * rulesets.  This is limited by the rewrite limit and timeout, if set.
-   * 
-   * @param atom      The atom to rewrite.
-   * @param context   The context providing the rule library, console, and
-   *                  memoization cache.
-   * @return  The rewritten atom, and true iff any rules were successfully
-   *          applied.
-   */
-  def apply(atom: BasicAtom, context: Context) =
-    new RewriteEngine(context)(atom)
-}
-
-/**
- * Manage and perform rewriting of atoms.
- * 
- * This class controls the rewriting process, including timing out, descending
- * into child atoms, and interacting with the memoization cache.
- * 
- * To use this make an instance, configure it, and then hand an atom to the
- * `apply` method.  You can check condition flags at the end to see what
- * happened.
- * 
- * @param context The context providing the rule library, console, and
- *                memoization cache.
- */
-class RewriteEngine(context: Context) extends GuardStrategy {
-  
-  //======================================================================
-  // Configuration.
-  //======================================================================
-
-  /** The rewrite limit.  Negative numbers mean *no* limit. */
-  private var _limit = RewriteEngine.limit
-  
-  /** Remaining rewrites. */
-  private var _remain = _limit
-  
-  /**
-   * Set the rewrite limit.  Negative values mean no limit.
-   * 
-   * @param lim The rewrite limit.
-   * @return  This instance.
-   */
-  def limit_=(lim: BigInt) = {
-    Debugger("engine", "Set limit: "+lim)
-    _limit = lim
-    this
+  private var reNormalizeChildren: RewriteEngine = new RewriteEngine()
+  private var re: RewriteEngine = new RewriteEngine() {
+    override val _rewritechild = _rewriteOnce _
   }
-  
-  /** The method to use to normalize a child. */
-  private var _rewritechild: (BasicAtom, BitSet) => (BasicAtom, Boolean) =
-    _rewrite _
   
   /**
    * Set whether to normalize children when rewriting.  The alternative is to
@@ -136,127 +74,65 @@ class RewriteEngine(context: Context) extends GuardStrategy {
    * rules.
    * 
    * The default is to fully normalize children.
-   * 
-   * @param norm  Whether to normalize children.
-   * @return  This instance.
    */
-  def normalizeChildren_=(norm: Boolean) = {
-    Debugger("engine", "Normalize Children: " +
-        (if (norm) "enabled" else "disabled"))
-    if (norm) _rewritechild = _rewrite _
-    else _rewritechild = _rewriteOnce _
-    this
-  }
-  normalizeChildren_=(RewriteEngine.normalizeChildren)
-    
-  /** Iff true, normalize children. */
-  private var _descend = RewriteEngine.descend
+  var normalizeChildren = true
   
   /**
-   * Set whether to rewrite children recursively.  The default is to rewrite
-   * children.
+   * Obtain a rewrite engine.  Because rewrite engines are stateless, this
+   * actually returns an instance based on the setting of rewrite children,
+   * and will not construct an object.
    * 
-   * @param descend  Whether to rewrite children recursively.
-   * @return  This instance.
-   */
-  def descend_=(descend: Boolean) = {
-    Debugger("engine", "Descent: " +
-        (if (descend) "enabled" else "disabled"))
-    _descend = descend
-    this
-  }
-  
-  /** Maximum duration to allow rewriting to continue.  No limit if negative. */
-  private var _timeout: BigInt =
-    if (context.hasProperty("rewrite_timeout")) {
-      context.getProperty[BigInt]("rewrite_timeout")
-    } else {
-      -1
-    }
-  
-  /**
-   * Set the timeout for rewriting.  The default is to try to pull the timeout
-   * value from the property `rewrite_timeout`.  If this fails, -1 is used.
-   * 
-   * @param timeout The timeout duration, in milliseconds.
-   * @return  This instance.
-   */
-  def timeout_=(timeout: BigInt) = {
-    Debugger("engine", "Timeout: " + timeout)
-    _timeout = timeout
-    this
-  }
-  
-  //======================================================================
-  // Condition flags.
-  //======================================================================
-  
-  /** Has rewriting timed out? */
-  private var _timedOut = false
-  
-  /**
-   * Whether rewriting has timed out.
-   * 
-   * @return  True if rewriting timed out.
-   */
-  def timedOut = _timedOut
-  
-  /** Has the rewriting limit been? */
-  private var _limitExceeded = false
-  
-  /**
-   * Whether the rewriting limit has been reached.
-   * 
-   * @return  True if the rewriting limit has been reached.
-   */
-  def limitExceeded = _limitExceeded
-  
-  //======================================================================
-  // Define a rewrite task.
-  //======================================================================
-  
-  /**
-   * A rewrite task is a structure that holds information about the current
-   * rewriting task.  This allows passing a single object on the stack by
-   * reference instead of having to pass multiple objects, and also packages
-   * the information in a single place.
-   */
-  class RewriteTask {
-    
-  }
-  
-  //======================================================================
-  // Rewriting.
-  //======================================================================
-  
-  /** This, when non-negative, holds the time when the rewrite should stop. */
-  private var _endTick: BigInt = -1 
-  
-  /**
-   * Normalize the given atom, repeatedly applying the rules of the active
-   * rulesets.  This is limited by the rewrite limit and timeout, if set.
-   * 
-   * This method uses the memoization cache, if enabled.
-   * 
-   * @param atom      The atom to rewrite.
-   * @param rulesets  The rulesets to use, or `Set.empty` to use all enabled.
-   *                  All enabled is the default.
+   * @param task    The rewrite task.  This may be modified during rewrite.
    * @return  The rewritten atom, and true iff any rules were successfully
    *          applied.
    */
-  def apply(atom: BasicAtom, rulesets: Set[String] = Set.empty) = {
-    Debugger("rewrite", "Rewriting "+atom.toParseString+
-        ", timing out with "+_timeout+".")
-    _timedOut = false
-    _remain = _limit
-    val bits = (
-        if (rulesets.isEmpty) context.ruleLibrary.getRulesetBits()
-        else context.ruleLibrary.getRulesetBits(rulesets))
-    _endTick = (if (_timeout >= 0) Platform.currentTime + _timeout else -1)
-    _rewrite(atom, bits)
+  def apply(task: RewriteTask) = {
+    if (normalizeChildren) {
+      reNormalizeChildren(task)
+    } else {
+      re(task)
+    }
   }
+}
+
+/**
+ * Manage and perform rewriting of atoms.
+ * 
+ * This class controls the rewriting process, including timing out, descending
+ * into child atoms, and interacting with the memoization cache.
+ * 
+ * Obtain an instance through the companion object, not through the constructor.
+ * Then create a task object to perform rewriting.
+ * 
+ * This class is stateless so that a single instance can be used everywhere.
+ */
+class RewriteEngine protected[elision] () {
   
-  def doRewrite(atom: BasicAtom, hint: Option[Any] = None) = apply(atom)
+  /* Do not add state data to this class!  It must be stateless; that is the
+   * purpose of the task object.  If you need to keep information as you do
+   * the rewrite, that is the place (RewriteTask) to stash that information!
+   */
+  
+  /** The method to use to normalize a child. */
+  private val _rewritechild: (BasicAtom, RewriteTask) => (BasicAtom, Boolean) =
+    _rewrite _
+  
+  /**
+   * Normalize the given atom using the specified task parameters.
+   * 
+   * This method uses the memoization cache, if enabled.
+   *
+   * @param task    The rewrite task. 
+   * @return  The rewritten atom, and true iff any rules were successfully
+   *          applied.
+   */
+  def apply(task: RewriteTask) = {
+    Debugger("rewrite", "Rewriting "+task._atom.toParseString+
+        ", timing out with "+task._timeout+".")
+    task._endTick =
+      (if (task._timeout >= 0) Platform.currentTime + task._timeout else -1)
+    _rewrite(task._atom, task)
+  }
 
   /**
    * Rewrite the provided atom using the specified rulesets and the
@@ -266,23 +142,23 @@ class RewriteEngine(context: Context) extends GuardStrategy {
    * This method uses the memoization cache, if enabled.  This should be
    * the only method that references the cache.
    * 
-   * @param atom      The atom to rewrite.
-   * @param rulesets  The rulesets to use, as a bitstring.
+   * @param atom    The atom to rewrite.
+   * @param task    The rewrite task. 
    * @return  The rewritten atom, and true iff any rules were successfully
    *          applied.
    */
   private def _rewrite(atom: BasicAtom,
-      rulesets: BitSet): (BasicAtom, Boolean) = {
+      task: RewriteTask): (BasicAtom, Boolean) = {
     // Has rewriting timed out?
-    if (_endTick >= 0 && Platform.currentTime > _endTick) {
+    if (task._endTick >= 0 && Platform.currentTime > task._endTick) {
       Debugger("rewrite", "Rewriting timed out: " + atom.toParseString)
-      _timedOut = true
+      task._timedout = true
       return (atom, false)
     }
     
     // See if the atom is already "clean" with respect to the rulesets we are
     // using now.  If so, we are done.
-    if (rulesets.subsetOf(atom.cleanRulesets)) {
+    if (task._rulesets.subsetOf(atom.cleanRulesets)) {
       // The atom is already clean.
       Debugger("rewrite", "Atom "+atom.toParseString+" is clean.")
       return (atom, false)
@@ -290,7 +166,7 @@ class RewriteEngine(context: Context) extends GuardStrategy {
     
     // Now we can check the memoization cache.  If we find the atom in the
     // cache, we are done.
-    context.memo.get(atom, rulesets) match {
+    task._memo.get(atom, task._rulesets) match {
       case Some(pair) =>
         // The atom has been rewritten.
         Debugger("rewrite", "Got cached rewrite: "+atom.toParseString+
@@ -306,7 +182,7 @@ class RewriteEngine(context: Context) extends GuardStrategy {
         while (run) {
           // The rewrite once method checks for timeout, so we don't need to
           // do that here.
-          _rewriteOnce(finalatom, rulesets) match {
+          _rewriteOnce(finalatom, task) match {
             case (anatom, false) =>
               // No rewrite happened.  We are done.
               run = false
@@ -331,8 +207,8 @@ class RewriteEngine(context: Context) extends GuardStrategy {
         // Mark it clean with respect to the given rulesets.
         Debugger("rewrite", "Completed rewrite of "+atom.toParseString+
             " to "+finalatom.toParseString+".")
-        context.memo.put(atom, rulesets, finalatom, 0)
-        finalatom.cleanRulesets = finalatom.cleanRulesets.union(rulesets)
+        task._memo.put(atom, task._rulesets, finalatom, 0)
+        finalatom.cleanRulesets = finalatom.cleanRulesets.union(task._rulesets)
         return (finalatom, changed)
     }
   }
@@ -343,31 +219,31 @@ class RewriteEngine(context: Context) extends GuardStrategy {
    * 
    * Do not memoize this method.
    * 
-   * @param atom      The atom to rewrite.
-   * @param rulesets  The rulesets to use.
+   * @param atom    The atom to rewrite.
+   * @param task    The rewrite task. 
    * @return  The rewritten atom, and true iff any rules were successfully
    *          applied.
    */
   private def _rewriteOnce(atom: BasicAtom,
-      rulesets: BitSet): (BasicAtom, Boolean) = {
+      task: RewriteTask): (BasicAtom, Boolean) = {
     // Has rewriting timed out?
-    if (_endTick >= 0 && Platform.currentTime > _endTick) {
+    if (task._endTick >= 0 && Platform.currentTime > task._endTick) {
       Debugger("rewrite", "Rewriting timed out: " + atom.toParseString)
-      _timedOut = true
+      task._timedout = true
       return (atom, false)
     }
     // Decrement the allowed rewrite count.
-    if (_remain > 0) {
-      _remain -= 1
-      if (_remain <= 0) {
+    if (task._remain > 0) {
+      task._remain -= 1
+      if (task._remain <= 0) {
         Debugger("rewrite", "Rewrite limit exceeded: "+atom.toParseString)
-        _limitExceeded = true
+        task._limitexceeded = true
         return (atom, false)
       }
     }
-    var (newtop, appliedtop) = _rewriteTop(atom, rulesets)
-    if (_descend) {
-      var (newatom, applied) = _rewriteChildren(newtop, rulesets)     
+    var (newtop, appliedtop) = _rewriteTop(atom, task)
+    if (task._descend) {
+      var (newatom, applied) = _rewriteChildren(newtop, task)     
       (newatom, appliedtop || applied)
     } else {
       (newtop, appliedtop)
@@ -379,26 +255,26 @@ class RewriteEngine(context: Context) extends GuardStrategy {
    * 
    * Do not memoize this method.
    * 
-   * @param atom      The atom to rewrite.
-   * @param rulesets  The rulesets to use.
+   * @param atom    The atom to rewrite.
+   * @param task    The rewrite task. 
    * @return  The rewritten atom, and true iff any rules were successfully
    *          applied.
    */
   private def _rewriteTop(atom: BasicAtom,
-      rulesets: BitSet): (BasicAtom, Boolean) = {
+      task: RewriteTask): (BasicAtom, Boolean) = {
     // Now try every rule until one applies.
     Debugger("rewrite", "Rewriting atom: " + atom.toParseString)
-    for (rule <- context.ruleLibrary.getRules(atom, rulesets)) {
+    for (rule <- task._library.getRules(atom, task._rulesets)) {
       // Before applying the rule, check the timeout.  If we have timed out,
       // stop right now, put the ruleset down, and hand in our work.
-      if (_endTick >= 0 && Platform.currentTime > _endTick) {
+      if (task._endTick >= 0 && Platform.currentTime > task._endTick) {
         Debugger("rewrite", "Rewriting timed out: " + atom.toParseString)
-        _timedOut = true
+        task._timedout = true
         return (atom, false)
       }      
       Debugger("rewrite", "Trying rule: " + rule.toParseString)
       val (newatom, applied) =
-        RuleApplyHandler(rule, atom, Bindings(), None, context.builder)
+        RuleApplyHandler(rule, atom, Bindings(), None, task._builder)
       if (applied) {
         // Return the rewrite result.
         Debugger("rewrite", "Rewrote to: " + newatom.toParseString)
@@ -416,17 +292,17 @@ class RewriteEngine(context: Context) extends GuardStrategy {
    * 
    * Do not memoize this method.
    * 
-   * @param atom      The atom to rewrite.
-   * @param rulesets  The rulesets to use.
+   * @param atom    The atom to rewrite.
+   * @param task    The rewrite task. 
    * @return  The rewritten atom, and true iff any rules were successfully
    *          applied.
    */
   private def _rewriteChildren(atom: BasicAtom,
-      rulesets: BitSet): (BasicAtom, Boolean) = {
+      task: RewriteTask): (BasicAtom, Boolean) = {
     // Has rewriting timed out?
-    if (_endTick >= 0 && Platform.currentTime > _endTick) {
+    if (task._endTick >= 0 && Platform.currentTime > task._endTick) {
       Debugger("rewrite", "Rewriting timed out: " + atom.toParseString)
-      _timedOut = true
+      task._timedout = true
       return (atom, false)
     } else {
       atom match {
@@ -434,51 +310,51 @@ class RewriteEngine(context: Context) extends GuardStrategy {
           var flag = false
           // Rewrite the properties.  The result must still be a property spec.
           // If not, we keep the same properties.
-          val newProps = _rewritechild(props, rulesets) match {
+          val newProps = _rewritechild(props, task) match {
             case (ap: AlgProp, true) => flag = true; ap
             case _ => props
           }
           // Rewrite the atoms.
           val newAtoms = atoms.map {
             atom =>
-              val (newatom, applied) = _rewritechild(atom, rulesets)
+              val (newatom, applied) = _rewritechild(atom, task)
               flag ||= applied
             newatom
           }
           // Return the result.
           if (flag) {
-            (context.builder.newAtomSeq(Loc.internal, newProps, newAtoms), true)
+            (task._builder.newAtomSeq(Loc.internal, newProps, newAtoms), true)
           } else {
             (atom, false)
           }
         
         case Apply(lhs, rhs) =>
-          val newlhs = _rewritechild(lhs, rulesets)
-          val newrhs = _rewritechild(rhs, rulesets)
+          val newlhs = _rewritechild(lhs, task)
+          val newrhs = _rewritechild(rhs, task)
           if (newlhs._2 || newrhs._2) {
-            (context.builder.newApply(Loc.internal, newlhs._1, newrhs._1), true)
+            (task._builder.newApply(Loc.internal, newlhs._1, newrhs._1), true)
           } else {
             (atom, false)
           }
         
         case Lambda(param, body) =>
-          val newparam = _rewritechild(param, rulesets) match {
+          val newparam = _rewritechild(param, task) match {
             case (v: Variable, true) => (v, true)
               case _ => (param, false)
           }
-          val newbody = _rewritechild(body, rulesets)
+          val newbody = _rewritechild(body, task)
           if (newparam._2 || newbody._2) {
-            (context.builder.newLambda(Loc.internal, newparam._1,
+            (task._builder.newLambda(Loc.internal, newparam._1,
                 newbody._1), true)
           } else {
             (atom, false)
           }
 
         case SpecialForm(tag, content) =>
-          val newlhs = _rewritechild(tag, rulesets)
-          val newrhs = _rewritechild(content, rulesets)
+          val newlhs = _rewritechild(tag, task)
+          val newrhs = _rewritechild(content, task)
           if (newlhs._2 || newrhs._2) {
-            (context.builder.newSpecialForm(Loc.internal, newlhs._1,
+            (task._builder.newSpecialForm(Loc.internal, newlhs._1,
                 newrhs._1), true)
           } else {
             (atom, false)

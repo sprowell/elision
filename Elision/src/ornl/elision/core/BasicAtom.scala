@@ -39,10 +39,10 @@ package ornl.elision.core
 
 import scala.collection.mutable.BitSet
 import scala.collection.mutable.{HashSet => MutableHashSet}
-
 import ornl.elision.util.Debugger
 import ornl.elision.util.HasOtherHash
 import ornl.elision.util.Loc
+import ornl.elision.dialects.Dialect
 
 /**
  * This marker trait is used to frighten developers and strike fear into
@@ -250,7 +250,7 @@ abstract class BasicAtom(val loc: Loc = Loc.internal) extends HasOtherHash {
    * @return  The appendable.
    */
   def toParseString(app: Appendable, limit: Int = -1) =
-    Dialect.serialize('elision, new StringBuffer(), this, limit)
+    Dialect.serialize('elision, new StringBuffer(), this, limit=limit)
     
   /**
    * Generate a parseable string from this atom.
@@ -261,7 +261,7 @@ abstract class BasicAtom(val loc: Loc = Loc.internal) extends HasOtherHash {
    * @return  The string.
    */
   def toParseString(limit: Int) =
-    Dialect.serialize('elision, new StringBuffer(), this, limit).toString
+    Dialect.serialize('elision, new StringBuffer(), this, limit=limit).toString
   
   /**
    * Make a string that can be used to re-generate this atom.

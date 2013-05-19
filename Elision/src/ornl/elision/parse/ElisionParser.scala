@@ -84,7 +84,9 @@ extends Parser with AbstractParser {
   import AST._
   
   /**
-   * Transform a Parboiled context into a location.
+   * Transform a Parboiled context into a location.  This is done implicitly
+   * so that the receiver does not have to understand anything about Parboiled,
+   * or whatever parser system is used.
    * 
    * @param context The parboiled context.
    * @return The new location instance.
@@ -197,13 +199,13 @@ extends Parser with AbstractParser {
    */
   def Atom: Rule1[BA] = rule {
     FirstAtom ~ WS ~ (
-        "-> " ~ Atom ~~> {
-          (left: BA, right: BA) =>
-            mappair(left, right)
+        "-> " ~ Atom ~~> withContext {
+          (left: BA, right: BA, context) =>
+            mappair(left, right, context)
         } |
-        zeroOrMore(". " ~ FirstAtom) ~~> {
-          (first: BA, rest: List[BA]) =>
-            rest.foldLeft(first)(apply(_, _))
+        zeroOrMore(". " ~ FirstAtom) ~~> withContext {
+          (first: BA, rest: List[BA], context) =>
+            rest.foldLeft(first)(apply(_, _, context))
         }
     )
   }.label("an atom")
@@ -237,7 +239,7 @@ extends Parser with AbstractParser {
         
         "\\ " ~ ParsedVariable ~ ". " ~ FirstAtom ~~> withContext{
           (lvar, lbody, context) =>
-          (lambda(lvar, lbody))
+          (lambda(lvar, lbody, context))
         } |
         
         "{: " ~ Atom ~ Atom ~ ":} " ~~> withContext{
@@ -251,18 +253,22 @@ extends Parser with AbstractParser {
         zeroOrMore(
           "#" ~ ESymbol ~ (
               "= " ~ Atom |
-              ParsedRawAtomSeq ~~> {
+              ParsedRawAtomSeq ~~> withContext{
                 // Convert the sequence of atoms into a sequence atom.
-                atomseq(noprops, _)
+                  atomseq(noprops, _, _)
               }
           )
         ) ~ "} " ~~> withContext{
           // Add pairs to the body list for the parts that are specified by
           // the prototype.
           (proto, proplist, binds, context) =>
-            special(sym("operator"), binding(List(
+            special(sym("operator", Loc.internal), binding(List(
                 "name"->proto._1,
-                "params"->atomseq(algprop(proplist.getOrElse(List())), proto._2),
+                "params"->
+                  atomseq(
+                      algprop(
+                          proplist.getOrElse(List())),
+                          proto._2, Loc.internal),
                 "type"->proto._3) ++ binds), context)
         } |
         
@@ -270,33 +276,34 @@ extends Parser with AbstractParser {
             zeroOrMore(Atom) ~ zeroOrMore(
                 "#" ~ ESymbol ~ (
                     "= " ~ Atom |
-                    ParsedRawAtomSeq ~~> {
+                    ParsedRawAtomSeq ~~> withContext{
                       // Convert the sequence of atoms into a sequence atom.
-                      atomseq(noprops, _)
+                      atomseq(noprops, _, _)
                     }
                 )
-            ) ~~> {
+            ) ~~> withContext{
               // Combine the initial list with the remaining list of pairs.
-              (first: List[BA], second: List[(String,BA)]) => {
+              (first: List[BA], second: List[(String,BA)], context) => {
                 if (first.isEmpty) binding(second)
-                else binding(("", atomseq(noprops, first)) :: second)
+                else binding(("", atomseq(noprops, first, context)) :: second)
               }
             }
         ) ~ "} " ~~> withContext{
           // Build the special form using the tag and content.
-          (tag, binds, context) => (special(sym(tag), binds, context))
+          (tag, binds, context) =>
+            (special(sym(tag, Loc.internal), binds, context))
         } |
 
         "%" ~ ParsedAlgProp ~ WS ~ optional("( " ~ ParsedRawAtomSeq ~ ") ") ~~>
         withContext{
           (proplist, atoms, context) =>
             val props = algprop(proplist)
-            if (atoms.isEmpty) props else atomseq(props, atoms.get)
+            if (atoms.isEmpty) props else atomseq(props, atoms.get, context)
         } |
 
         ESymbol ~ optional(
-            "( " ~ ParsedRawAtomSeq ~ ") " ~~> {
-                (seq) => ('apply, atomseq(noprops, seq))
+            "( " ~ ParsedRawAtomSeq ~ ") " ~~> withContext{
+                (seq: List[BA], context) => ('apply, atomseq(noprops, seq, context))
             } |
             ": " ~ (
                 "OPREF " ~ push(('opref, any)) |
@@ -304,41 +311,42 @@ extends Parser with AbstractParser {
                   ('typed, _)
                 }
             )
-        ) ~~> {
+        ) ~~> withContext{
           // Decide what to do based on what symbol was passed along.
-          (name: String, opt: Option[(Symbol, BA)]) =>
+          (name: String, opt: Option[(Symbol, BA)], context) =>
             val data = opt.getOrElse(('plain, any))
             data._1 match {
-              case 'apply => apply(opref(name), data._2)
+              case 'apply => apply(opref(name), data._2, context)
               case 'opref => opref(name)
-              case 'typed => sym(name, data._2)
-              case 'plain => sym(name)
+              case 'typed => sym(name, data._2, context)
+              case 'plain => sym(name, context)
             }
         } |
 
-        (EVerb | EString) ~ optional(": " ~ FirstAtom) ~~> {
-          (name, otyp) => otyp match {
-            case Some(typ) => string(name, typ)
-            case None => string(name)
+        (EVerb | EString) ~ optional(": " ~ FirstAtom) ~~> withContext{
+          (name: String, otyp, context) => otyp match {
+            case Some(typ) => string(name, typ, context)
+            case None => string(name, context)
           }
         } |
         
-        BitString ~ optional(":" ~ FirstAtom) ~~> {
+        BitString ~ optional(":" ~ FirstAtom) ~~> withContext{
           // Construct the bit string from the pieces.
           (flag: Option[Boolean], bits: (Int, String), len: (Int, String),
-              otyp: Option[BA]) =>
-            bitstring(flag, bits, len, otyp)
+              otyp: Option[BA], context) =>
+            bitstring(flag, bits, len, otyp, context)
         } |
         
-        AnyNumber ~ optional(":" ~ FirstAtom) ~~> {
+        AnyNumber ~ optional(":" ~ FirstAtom) ~~> withContext{
           // Construct a number from all the pieces.  The number can be either
           // an integer or a float.
           (flag: Option[Boolean],
               whole: (Int, String),
               frac: Option[(Int, String)],
               exp: Option[(Boolean, Int, String)], 
-              otyp: Option[BA]) =>
-            number(flag, whole, frac, exp, otyp)
+              otyp: Option[BA],
+              context) =>
+            number(flag, whole, frac, exp, otyp, context)
         }
     )
   }.label("a simple atom")
@@ -357,7 +365,7 @@ extends Parser with AbstractParser {
   def OperatorPrototype = rule {
     ESymbol ~ "( " ~ ParsedRawAtomSeq ~ ") " ~ optional(": " ~ FirstAtom) ~~> {
       (name: String, params: List[BA], typ: Option[BA]) =>
-        (sym(name), params, typ.getOrElse(any))
+        (sym(name, Loc.internal), params, typ.getOrElse(any))
     }
   }
   
@@ -379,7 +387,11 @@ extends Parser with AbstractParser {
         optional("{ " ~ Atom ~ "} ") ~
         optional(": " ~ FirstAtom) ~
         zeroOrMore("@" ~ ESymbol)
-    ) ~~> (variable(_, _, _, _, _, _))
+    ) ~~> withContext{
+      (meta: Boolean, name: String, byname: Boolean, guard: Option[BA],
+          typ: Option[BA], tags: List[String], context) =>
+        variable(meta, name, byname, guard, typ, tags, context)
+    }
   }.label("a variable")
   
   //----------------------------------------------------------------------

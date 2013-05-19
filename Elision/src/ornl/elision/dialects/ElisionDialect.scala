@@ -31,11 +31,11 @@ package ornl.elision.dialects
 
 import scala.io.Source
 import ornl.elision.core.BasicAtom
-import ornl.elision.core.Dialect
 import ornl.elision.parse.ElisionParser
 import ornl.elision.parse.Failure
 import ornl.elision.util.Loc
 import ornl.elision.parse.Success
+import ornl.elision.context.Context
 
 /**
  * Provide the Elision dialect.  Atoms can be parsed and serlialized.
@@ -45,15 +45,15 @@ class ElisionDialect extends Dialect {
   override val canSerialize = true
   override val canParse = true
   
-  override def serialize(app: Appendable, atom: BasicAtom, limit: Int = -1) = {
-    ElisionGenerator.apply(atom, app, limit)
+  override def serialize(app: Appendable, atom: BasicAtom,
+      context: Option[Context] = None, limit: Int = -1) = {
+    ElisionGenerator.apply(atom, app, context, limit)
   }
   
-  override def parse(name: String, source: Source) =
+  override def parse(name: String, source: Source, context: Context) =
     (new ElisionParser(name, false)).parseAtoms(source) match {
     case Success(atoms) =>
-      Dialect.Success(atoms map
-          (_.interpret(ornl.elision.core.knownExecutor.context)))
+      Dialect.Success(atoms map (_.interpret(context)))
       
     case Failure(msg) =>
       Dialect.Failure(Loc.internal, msg)

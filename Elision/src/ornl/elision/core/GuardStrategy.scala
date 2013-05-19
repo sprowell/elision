@@ -27,14 +27,12 @@
  * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package ornl.elision.context
-
-import ornl.elision.core.BasicAtom
+package ornl.elision.core
 
 /**
  * The structure for any guard rewrite strategy.
  */
-abstract class GuardStrategy {
+trait GuardStrategy {
 
   /**
    * Apply this strategy to the given atom, and return the result.

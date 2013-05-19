@@ -41,7 +41,7 @@ import ornl.elision.util.HasHistory
 import ornl.elision.util.ElisionException
 import ornl.elision.util.Version
 import ornl.elision.util.Loc
-import ornl.elision.core.Dialect
+import ornl.elision.dialects.Dialect
 import ornl.elision.matcher.ACMatcher
 
 /**
@@ -552,7 +552,7 @@ with HasHistory {
         case success: Success =>
           context.console.emitln("Successfully reloaded context.")
           context.console.emitln("Rebuilding context...")
-          context = new Context(context.guardStrategy, context.builder)
+          context = new Context()
           val prior = context.console.quiet
           context.console.quiet = 1
           _execute(success)

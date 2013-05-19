@@ -44,7 +44,6 @@ import ornl.elision.core.BasicAtom
 import ornl.elision.core.Bindings
 import ornl.elision.core.OperatorRef
 import ornl.elision.core.Variable
-import ornl.elision.core.knownExecutor
 import ornl.elision.util.Debugger
 import scala.annotation.tailrec
 import ornl.elision.context.Builder

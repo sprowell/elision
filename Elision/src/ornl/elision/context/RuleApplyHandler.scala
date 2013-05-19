@@ -54,7 +54,6 @@ object RuleApplyHandler {
    * @param binds     The bindings.
    * @param hint      The optional hint.
    * @param builder   The builder.
-   * @param strategy  The strategy to use to rewrite guards.
    * @return  The result of applying the rule to the atom, packaged as a pair
    *          whose first element is the final atom, and whose second element
    *          is true iff the rule was successfully applied.
@@ -77,9 +76,11 @@ object RuleApplyHandler {
    * If all guards are true, then the bindings are applied to the rewrite and
    * the result is returned.
    * 
-   * @param subject   The subject to test.
-   * @param binds     Bindings to honor.
-   * @param hint      An optional hint to pass along during matching.
+   * @param rule      The rewrite rule.
+   * @param subject   The subject to match.
+   * @param binds     The bindings.
+   * @param hint      The optional hint.
+   * @param builder   The builder.
    * @return  A pair consisting of an atom and a boolean.  The boolean is
    *          true if the rewrite yielded a new atom, and is false otherwise.
    */
@@ -93,7 +94,7 @@ object RuleApplyHandler {
     def checkGuards(candidate: Bindings): Boolean = {
       for (guard <- rule.guards) {
         val (newguard, _) = builder.rewrite(guard, candidate)
-        val (newguard1, _) = builder.guardStrategy(newguard)
+        val (newguard1, _) = rule.strategy(newguard)
         if (!newguard1.isTrue) return false
       }
       true

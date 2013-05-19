@@ -106,7 +106,6 @@ class EliReplThread extends ReplThread {
 	/** Creates an instance of and begins running the new REPL */
 	def runNewRepl : Unit = {
 		myRepl = new ornl.elision.repl.ERepl(state)
-		ornl.elision.core.knownExecutor = myRepl
 		
 		myRepl.context.console = mainGUI.consolePanel.console
 		ReplActor.history = myRepl

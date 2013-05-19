@@ -281,7 +281,7 @@ class SymbolicOperator protected[elision] (
     loc: Loc,
     content: => BasicAtom,
     name: String,
-    typ: BasicAtom,
+    val typ: BasicAtom,
     val params: AtomSeq,
     description: String = "no description",
     detail: String = "no detail",

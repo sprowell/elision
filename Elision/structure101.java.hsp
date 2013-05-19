@@ -6,8 +6,8 @@
   <property name="detail-mode" value="true" />
   <property name="project-excluded" value="/Users/ysp/workspace/fx/bin" />
   <property name="project-type" value="eclipse_workspace" />
-  <property name="resolve-name-clashes" value="true" />
   <property name="action-set-mod" value="10" />
+  <property name="resolve-name-clashes" value="true" />
   <property name="hide-deprecated" value="false" />
   <property name="parse-archive-in-archive" value="false" />
   <classpath relativeto="/Users/ysp/workspace/Elision">
@@ -17,10 +17,14 @@
   <excludes>
     <exclude expression="*._*" active="true" />
     <exclude expression="ornl.elision.core.*&amp;" active="true" />
+    <exclude expression="eli_rules.BitStringSpecification" active="true" />
+    <exclude expression="util.ProcessorUtil" active="true" />
+    <exclude expression="ornl.elision.test.core.MemoTest" active="true" />
+    <exclude expression="ornl.elision.test.core.HashcodeTest" active="true" />
+    <exclude expression="ornl.elision.test.parse.ProcessorTest" active="true" />
   </excludes>
   <transformations>
     <transformation in="*" out="{jar}.*" />
-    <transformation in="*.matcher.*" out="{1}.{2}" />
   </transformations>
   <restructuring>
     <set version="2" name="List 1" hiview="Codemap" active="true" todo="false" />

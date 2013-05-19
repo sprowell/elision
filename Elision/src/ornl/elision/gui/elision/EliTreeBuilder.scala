@@ -40,12 +40,11 @@ package ornl.elision.gui.elision
 import scala.actors.Actor
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.Stack
-
-import ornl.elision.core.AtomWalker
 import ornl.elision.core.BasicAtom
 import ornl.elision.gui._
 import ornl.elision.gui.elision.sprites._
 import ornl.elision.gui.trees._
+import ornl.elision.context.AtomWalker
 
 /** A factory used to construct TreeSprite visualizations from Elision atoms. */
 class EliTreeBuilder(atoms : ListBuffer[(BasicAtom, String)], typ : Boolean) extends Thread {

@@ -46,6 +46,101 @@ import ornl.elision.matcher.SequenceMatcher
 import ornl.elision.util.Loc
 
 /**
+ * Improve matching of atom sequences as lists of atoms.
+ * 
+ * This is intended for use in matching.  The general form is:
+ * {{{
+ * args match {
+ *   case Args(item1: Lambda, item2: Variable) => //...
+ *   //...
+ * }
+ * }}}
+ */
+object Args {
+  
+  /**
+   * Allow matching of an atom sequence as a sequence.
+   * 
+   * @param seq The atom sequence.
+   * @return  The children as a matchable sequence.
+   */
+  def unapplySeq(seq: AtomSeq) = Some(seq.atoms)
+}
+
+/**
+ * Simplified construction and matching for atom sequences.
+ */
+object AtomSeq {
+  
+  /**
+   * Match an atom sequence's parts.
+   * 
+   * @param seq The sequence.
+   * @return  The properties and the atoms.
+   */
+  def unapply(seq: AtomSeq) = Some(seq.props, seq.atoms)
+  
+  /**
+   * Process the atoms and build the new sequence.  This reduces any included
+   * associative sequences, and incidentally makes sure the result is an
+   * `OmitSeq`.
+   * 
+   * This method is used during instance construction.
+   * 
+   * @param props The properties.
+   * @param atoms The atoms.
+   * @return  The possibly-new sequence.
+   */
+  private def process(props: AlgProp,
+      xatoms: IndexedSeq[BasicAtom]): OmitSeq[BasicAtom] = {
+    // If the list is associative, has an identity, or has an absorber, we
+    // process it.  Idempotency is handled at the very end.
+    val assoc = props.isA(false)
+    val ident = props.identity.getOrElse(null)
+    val absor = props.absorber.getOrElse(null)
+    var atoms: OmitSeq[BasicAtom] = xatoms
+    if (assoc || ident != null || absor != null) {
+      var index = 0
+      while (index < atoms.size) {
+        val atom = atoms(index)
+        if (absor == atom) {
+          // Found the absorber.  It must be the only thing in the sequence.
+          return OmitSeq[BasicAtom]() :+ atom
+        }
+        if (ident != atom) {
+          if (assoc) atom match {
+            case AtomSeq(oprops, args) if props == oprops =>
+              // Add the arguments directly to this list.  We can assume this
+              // list has already been processed, so no deeper checking is
+              // needed.
+              atoms = atoms.omit(index)
+              atoms = atoms.insert(index, args)
+            case _ =>
+              // Nothing to do in this case.
+          }          
+        }
+        index += 1
+      } // Run through all arguments.
+    }
+    
+    // Now handle idempotency.  If we change the sequence with idempotency,
+    // then we replace the old sequence with the new one, since we don't need
+    // to keep the old sequence around.  Othewise we leave as-is.
+    if (props.isI(false)) {
+      val testseq: OmitSeq[BasicAtom] = atoms.distinct
+      if (testseq.length != atoms.length) {
+        // Idempotency changed the sequence.  Replace the old one with the new
+        // one.
+        atoms = testseq
+      }
+    }
+    
+    // Done!
+    return atoms
+  }
+}
+
+/**
  * An atom sequence is just that: a sequence of atoms.
  * 
  * == Properties ==
@@ -175,99 +270,4 @@ class AtomSeq protected[elision] (
       case _ => false
     }
   }
-}
-
-/**
- * Simplified construction and matching for atom sequences.
- */
-object AtomSeq {
-  
-  /**
-   * Match an atom sequence's parts.
-   * 
-   * @param seq	The sequence.
-   * @return	The properties and the atoms.
-   */
-  def unapply(seq: AtomSeq) = Some(seq.props, seq.atoms)
-  
-  /**
-   * Process the atoms and build the new sequence.  This reduces any included
-   * associative sequences, and incidentally makes sure the result is an
-   * `OmitSeq`.
-   * 
-   * This method is used during instance construction.
-   * 
-   * @param props	The properties.
-   * @param atoms	The atoms.
-   * @return	The possibly-new sequence.
-   */
-  private def process(props: AlgProp,
-      xatoms: IndexedSeq[BasicAtom]): OmitSeq[BasicAtom] = {
-    // If the list is associative, has an identity, or has an absorber, we
-    // process it.  Idempotency is handled at the very end.
-    val assoc = props.isA(false)
-    val ident = props.identity.getOrElse(null)
-    val absor = props.absorber.getOrElse(null)
-    var atoms: OmitSeq[BasicAtom] = xatoms
-    if (assoc || ident != null || absor != null) {
-      var index = 0
-      while (index < atoms.size) {
-        val atom = atoms(index)
-        if (absor == atom) {
-          // Found the absorber.  It must be the only thing in the sequence.
-          return OmitSeq[BasicAtom]() :+ atom
-        }
-        if (ident != atom) {
-          if (assoc) atom match {
-            case AtomSeq(oprops, args) if props == oprops =>
-              // Add the arguments directly to this list.  We can assume this
-              // list has already been processed, so no deeper checking is
-              // needed.
-              atoms = atoms.omit(index)
-              atoms = atoms.insert(index, args)
-            case _ =>
-              // Nothing to do in this case.
-          }          
-        }
-        index += 1
-      } // Run through all arguments.
-    }
-    
-    // Now handle idempotency.  If we change the sequence with idempotency,
-    // then we replace the old sequence with the new one, since we don't need
-    // to keep the old sequence around.  Othewise we leave as-is.
-    if (props.isI(false)) {
-      val testseq: OmitSeq[BasicAtom] = atoms.distinct
-      if (testseq.length != atoms.length) {
-        // Idempotency changed the sequence.  Replace the old one with the new
-        // one.
-        atoms = testseq
-      }
-    }
-    
-    // Done!
-    return atoms
-  }
-}
-
-/**
- * Improve matching of atom sequences as lists of atoms.
- * 
- * This is intended for use in matching.  The general form is:
- * {{{
- * args match {
- *   case Args(item1: Lambda, item2: Variable) => //...
- *   //...
- * }
- * }}}
- */
-object Args {
-  
-  /**
-   * Allow matching of an atom sequence as a sequence.
-   * 
-   * @param seq	The atom sequence.
-   * @return	The children as a matchable sequence.
-   */
-  def unapplySeq(seq: AtomSeq) = Some(seq.atoms)
 }

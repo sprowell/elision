@@ -80,10 +80,9 @@ extends ElisionException(loc, msg)
  * 
  * @param ophandler     A class that understands how to handle an operator
  *                      application.  These are special since they may involve
- * @param guardstrategy The strategy to use to rewrite rule guards.
- *                    
+ *                      native dispatch.
  */
-class ApplyBuilder(ophandler: OperatorApplyHandler, guardstrat: GuardStrategy) {
+class ApplyBuilder(ophandler: OperatorApplyHandler) {
 
   /**
    * Turn a pair into a binding to be returned from a strategy.  This turns
@@ -98,14 +97,15 @@ class ApplyBuilder(ophandler: OperatorApplyHandler, guardstrat: GuardStrategy) {
   }
   
   /**
-   * Apply a strategy to the provided argument atom.
+   * Apply a strategy to the provided argument atom.  This method allows for
+   * testing (hence its name) whether the given strategy applies.
    * 
    * @param strat     The strategy to apply.
    * @param arg       The argument.
    * @param builder   The builder needed to build atoms.
    * @return  The pair of result atom and flag.
    */
-  private def test(strat: Strategy, arg: BasicAtom,
+  def test(strat: Strategy, arg: BasicAtom,
       builder: Builder): (BasicAtom, Boolean) = {
     strat match {
       case op_mappair: MapPair =>
@@ -126,7 +126,7 @@ class ApplyBuilder(ophandler: OperatorApplyHandler, guardstrat: GuardStrategy) {
       case op_rule: RewriteRule =>
         // A rewrite rule generalizes both the match atom and the map pair
         // as a package (a special form) to perform controlled rewriting.
-        RuleApplyHandler(op_rule, arg, Bindings(), None, builder, guardstrat)
+        RuleApplyHandler(op_rule, arg, Bindings(), None, builder)
         
       case c =>
         // We come here if we find an unsupported strategy class.
@@ -141,6 +141,7 @@ class ApplyBuilder(ophandler: OperatorApplyHandler, guardstrat: GuardStrategy) {
    * @param op        The operator.
    * @param arg       The argument.
    * @param builder   The builder necessary to create atoms.
+   * @param strategy  The strategy to use to rewrite guards in rules.
    * @param bypass    If true, bypass native handlers.
    * @return  The result of applying the operator to the argument.
    */

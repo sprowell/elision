@@ -41,7 +41,12 @@ import ornl.elision.parse.ProcessorControl
 import ornl.elision.util.Loc
 import ornl.elision.rewrite.RewriteEngine
 import ornl.elision.context.ApplyData
+import ornl.elision.core.GuardStrategy
+import ornl.elision.core.BasicAtom
+import ornl.elision.rewrite.RewriteTask
+import ornl.elision.context.StandardBuilder
 import scala.io.Source
+import ornl.elision.dialects.Dialect
 
 /**
  * Implement an interface to run the REPL from the prompt.
@@ -243,12 +248,7 @@ object ReplMain {
  * @param state   State data from parsing the command line.
  */
 class ERepl(state: CLI.CLIState = CLI.CLIState())
-extends Processor(state.settings, {
-  val re = new RewriteEngine
-  val builder = new StandardBuilder
-  new Context(re, builder)
-}) {
-}
+extends Processor(state.settings, new Context()) {
   
   import ornl.elision.core._
   import scala.tools.jline.console.history.FileHistory
@@ -450,7 +450,8 @@ extends Processor(state.settings, {
       }
       override def handleAtom(atom: BasicAtom) = {
         if (context.getProperty("autorewrite")) {
-          Some(new RewriteEngine(context)(atom)._1)
+          // By default we use the same general rewrite strategy as for guards.
+          Some(context.guardstrategy(atom)._1)
         } else {
           Some(atom)
         }
@@ -469,7 +470,7 @@ extends Processor(state.settings, {
         // Get the string.
         val string = atom.toParseString
         // Parse this string.
-        Dialect.parse('elision, "", Source.fromString(string)) match {
+        Dialect.parse('elision, "", Source.fromString(string), context) match {
           case Dialect.Failure(loc, msg) =>
             context.console.error(loc, "Round trip testing failed for atom:\n  " +
                 string + "\nParsing terminated with an error:\n  " + msg + "\n")

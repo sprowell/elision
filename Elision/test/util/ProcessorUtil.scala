@@ -38,7 +38,7 @@ import scala.collection.mutable.HashMap
 import ornl.elision.cli.CLI.CLIState
 import ornl.elision.parse.Processor._
 import ornl.elision.core.BasicAtom
-import ornl.elision.core.Dialect
+import ornl.elision.dialects.Dialect
 import ornl.elision.context.RewriteEngine
 /**
  * @author fxuser

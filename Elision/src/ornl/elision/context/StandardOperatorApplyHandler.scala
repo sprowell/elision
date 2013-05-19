@@ -39,6 +39,19 @@ import ornl.elision.core.AtomSeq
 import ornl.elision.core.OpApply
 import ornl.elision.core.Bindings
 import ornl.elision.core.Literal
+import ornl.elision.core.ArgumentListException
+import ornl.elision.core.toESymbol
+import ornl.elision.matcher.Matcher
+import ornl.elision.matcher.Fail
+import ornl.elision.matcher.Many
+import ornl.elision.matcher.Match
+import ornl.elision.matcher.SequenceMatcher
+import ornl.elision.core.SimpleApply
+import ornl.elision.core.Strategy
+import ornl.elision.core.Applicable
+import ornl.elision.util.Console
+import ornl.elision.core.OperatorRef
+import ornl.elision.core.ANY
 
 /**
  * Additional constants and support methods for native handlers.
@@ -58,7 +71,7 @@ object ApplyData {
  * @param op      The operator.
  * @param args    The argument list.
  * @param binds   Bindings of parameter to argument value.
- * @param exec    An executor.
+ * @param context A context to supply to the native handler.
  */
 class ApplyData(val op: SymbolicOperator, val args: AtomSeq,
     val binds: Bindings, val context: Context)
@@ -66,8 +79,11 @@ class ApplyData(val op: SymbolicOperator, val args: AtomSeq,
   /** Provide fast access to the console from the executor. */
   val console = context.console
 
-  /** Just preserve the apply as it is. */
-  def as_is = context.builder.newApply(op, args, context, true)
+  /**
+   * Just preserve the apply as it is.  The loc of the operator is used as the
+   * loc of the generated apply.
+   */
+  def as_is = context.builder.newApply(op.loc, op, args, true)
 }
 
 /**
@@ -154,7 +170,7 @@ extends OperatorApplyHandler {
           if (ident == atom) {
             newseq = newseq.omit(index)
           } else if (assoc) atom match {
-            case OpApply(opref, opargs, binds) if (opref.operator == this) =>
+            case OpApply(_, _, opref, opargs, binds) if (opref.operator == this) =>
               // Add the arguments directly to this list.  We can assume the
               // sub-list has already been processed, so no deeper checking
               // is needed.  This flattens associative lists, as required.
@@ -173,7 +189,8 @@ extends OperatorApplyHandler {
         // Handle actual operator application.
         def handleApply(binds: Bindings): BasicAtom = {
           // Re-package the arguments with the correct properties.
-          val newargs = AtomSeq(op.params.props, newseq)
+          val newargs =
+            context.builder.newAtomSeq(Loc.internal, op.params.props, newseq)
           // See if we are bypassing the native handler.
           if (!bypass) {
             // Run any native handler.
@@ -182,8 +199,13 @@ extends OperatorApplyHandler {
               return op.handler.get(ad)
             }
           }
-          // No native handler.
-          return OpApply(OperatorRef(op), newargs, binds)
+          // No native handler.  In this case the type of the apply must be
+          // obtained by rewriting the operator's type using the bindings.
+          // The "fully applied type" (the co-domain) must be used, and not
+          // the type for a typed symbolic operator (which is a MAP).
+          val appliedtype = context.builder.rewrite(op.typ, binds)._1
+          return new OpApply(Loc.internal, appliedtype,
+              context.builder.newOperatorRef(Loc.internal, op), newargs, binds)
         }
         
         // Check the argument length versus the parameter length.
@@ -230,16 +252,17 @@ extends OperatorApplyHandler {
             val atom = newseq(0)
             // Match the type of the atom against the type of the parameters.
             val param = op.params(0)
-            Matcher(param, atom, context) match {
+            Matcher(param, atom, context.builder) match {
               case Fail(reason, index) =>
                 // The argument is invalid.  Reject!
-                throw new ArgumentListException(atom.loc, "Incorrect argument " +
-                  "for operator " + toESymbol(op.name) + " at position 0: " +
-                  atom.toParseString + ".  " + reason())
-              case mat: Match => {
+                throw new ArgumentListException(atom.loc,
+                    "Incorrect argument for operator " + toESymbol(op.name) +
+                    " at position 0: " + atom.toParseString + ".  " + reason())
+
+              case mat: Match =>
                 // The argument matches.
                 return atom
-              }
+
               case many: Many => {
                 // The argument matches.
                 return atom
@@ -285,7 +308,7 @@ extends OperatorApplyHandler {
           // arguments/formal parameters have the same type, matching
           // 1 formal parameter with 1 argument gives us all the
           // binding information needed to do type inference.
-          Matcher(aParam, anArg, context) match {
+          Matcher(aParam, anArg, context.builder) match {
             case Fail(reason, index) =>
               throw new ArgumentListException(anArg.loc,
                   "Incorrect argument for operator " + toESymbol(op.name) +
@@ -304,7 +327,7 @@ extends OperatorApplyHandler {
           // We've run out of special cases to handle.  Now just try to match
           // the arguments against the parameters.
           val newparams = op.params.atoms
-          SequenceMatcher.tryMatch(newparams, newseq, context) match {
+          SequenceMatcher.tryMatch(newparams, newseq, context.builder) match {
             case Fail(reason, index) =>
               throw new ArgumentListException(newseq(index).loc,
                   "Incorrect argument for operator " + toESymbol(op.name) +
@@ -322,7 +345,7 @@ extends OperatorApplyHandler {
         }
 
       case _ => {
-        return SimpleApply(op, arg)
+        return new SimpleApply(Loc.internal, op, arg)
       }
     }
   }
@@ -346,35 +369,44 @@ extends OperatorApplyHandler {
     val done = op.cases.exists {
       _ match {
         case rew: Strategy =>
-          val pair = ApplyBuilder.test(rew, arg, context)
+          val pair = context.applybuilder.test(rew, arg, context.builder)
           result = Some(pair._1)
           pair._2
+          
         case app: Applicable =>
-          result = Some(ApplyBuilder(app, arg, context, bypass))
+          result = Some(context.applybuilder(app, arg, context.builder, bypass))
           true
+          
         case atom =>
           result = Some(atom)
           true
       }
     }
+    
     // If nothing worked, then we need to generate an error since the operator
     // was incorrectly applied.
     if (!done)
       throw new ArgumentListException(arg.loc, "Applied the operator " +
         toESymbol(op.name) + " to an incorrect argument list: " +
         arg.toParseString)
+    
     // If the result turned out to be ANY, then just construct a simple
     // apply for this operator.
     result.get match {
       case ANY => arg match {
-        case as: AtomSeq => OpApply(OperatorRef(op), as, Bindings())
-        case _ => SimpleApply(OperatorRef(op), arg)
+        case as: AtomSeq =>
+          new OpApply(Loc.internal, op.typ,
+              context.builder.newOperatorRef(Loc.internal, op), as, Bindings())
+          
+        case _ =>
+          new SimpleApply(Loc.internal,
+              context.builder.newOperatorRef(Loc.internal, op), arg)
       }
       case other =>
         // We have to do one more thing.  We need to bind $__ to this operator,
         // and $_ to the original argument list, and then rewrite the result.
         val binds = Bindings("_"->arg, "__"->op)
-        other.rewrite(binds)._1
+        context.builder.rewrite(other, binds)._1
     }
   }
   
