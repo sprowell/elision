@@ -55,6 +55,7 @@ import ornl.elision.core.OpApply
 import ornl.elision.util.OmitSeq
 import ornl.elision.core.GuardStrategy
 import ornl.elision.core.TypeUniverse
+import ornl.elision.core.BooleanLiteral
 
 /**
  * An evaluator adds the logic for doing rewriting and replacement to the
@@ -96,37 +97,39 @@ abstract class Evaluator extends Builder {
     atom match {
       case TypeUniverse => (atom, false)
       
-      case lit: IntegerLiteral => rewrite(lit, binds, strategy)
+      case lit: BooleanLiteral => rewriteAs(lit, binds, strategy)
       
-      case lit: SymbolLiteral => rewrite(lit, binds, strategy)
+      case lit: IntegerLiteral => rewriteAs(lit, binds, strategy)
       
-      case lit: StringLiteral => rewrite(lit, binds, strategy)
+      case lit: SymbolLiteral => rewriteAs(lit, binds, strategy)
       
-      case lit: BitStringLiteral => rewrite(lit, binds, strategy)
+      case lit: StringLiteral => rewriteAs(lit, binds, strategy)
       
-      case lit: FloatLiteral => rewrite(lit, binds, strategy)
+      case lit: BitStringLiteral => rewriteAs(lit, binds, strategy)
       
-      case ap: AlgProp => rewrite(ap, binds, strategy)
+      case lit: FloatLiteral => rewriteAs(lit, binds, strategy)
       
-      case opapp: OpApply => rewrite(opapp, binds, strategy)
+      case ap: AlgProp => rewriteAs(ap, binds, strategy)
+      
+      case opapp: OpApply => rewriteAs(opapp, binds, strategy)
 
-      case app: Apply => rewrite(app, binds, strategy)
+      case app: Apply => rewriteAs(app, binds, strategy)
         
-      case as: AtomSeq => rewrite(as, binds, strategy)
+      case as: AtomSeq => rewriteAs(as, binds, strategy)
 
-      case ba: BindingsAtom => rewrite(ba, binds, strategy)
+      case ba: BindingsAtom => rewriteAs(ba, binds, strategy)
 
-      case lam: Lambda => rewrite(lam, binds, strategy)
+      case lam: Lambda => rewriteAs(lam, binds, strategy)
         
-      case map: MapPair => rewrite(map, binds, strategy)
+      case map: MapPair => rewriteAs(map, binds, strategy)
         
-      case sf: SpecialForm => rewrite(sf, binds, strategy)
+      case sf: SpecialForm => rewriteAs(sf, binds, strategy)
       
-      case or: OperatorRef => rewrite(or, binds, strategy)
+      case or: OperatorRef => rewriteAs(or, binds, strategy)
         
-      case vari: TermVariable => rewrite(vari, binds, strategy)
+      case vari: TermVariable => rewriteAs(vari, binds, strategy)
         
-      case vari: MetaVariable => rewrite(vari, binds, strategy)
+      case vari: MetaVariable => rewriteAs(vari, binds, strategy)
         
       case _ =>
         throw new ElisionException(Loc.internal,
@@ -149,6 +152,8 @@ abstract class Evaluator extends Builder {
       strategy: GuardStrategy): (BasicAtom, Boolean) = {
     atom match {
       case TypeUniverse => (atom, false)
+      
+      case lit: BooleanLiteral => _replace(lit, map, strategy)
       
       case lit: IntegerLiteral => _replace(lit, map, strategy)
       
@@ -199,7 +204,7 @@ abstract class Evaluator extends Builder {
    * @return  A pair consisting of the rewritten sequence of atoms and a flag
    *          that is true if any rewrites succeeded.
    */
-  def rewrite(subjects: OmitSeq[BasicAtom], binds: Bindings,
+  def rewriteAs(subjects: OmitSeq[BasicAtom], binds: Bindings,
       strategy: GuardStrategy) = {
     var changed = false
     var index = 0
@@ -223,7 +228,7 @@ abstract class Evaluator extends Builder {
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(nrt: NamedRootType, binds: Bindings,
+  def rewriteAs(nrt: NamedRootType, binds: Bindings,
       strategy: GuardStrategy): (NamedRootType, Boolean) = {
     (nrt, false)
   }
@@ -238,7 +243,7 @@ abstract class Evaluator extends Builder {
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(ap: AlgProp, binds: Bindings,
+  def rewriteAs(ap: AlgProp, binds: Bindings,
       strategy: GuardStrategy): (AlgProp, Boolean) = {
     def _rewrite(opt: Option[BasicAtom]) = {
       opt match {
@@ -274,7 +279,7 @@ abstract class Evaluator extends Builder {
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(opapp: OpApply, binds: Bindings,
+  def rewriteAs(opapp: OpApply, binds: Bindings,
       strategy: GuardStrategy) = {
     // TODO Does caching rewrites here actually yield any performance?
     // TODO Should all rewrites be cached?
@@ -314,7 +319,7 @@ abstract class Evaluator extends Builder {
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(app: Apply, binds: Bindings,
+  def rewriteAs(app: Apply, binds: Bindings,
       strategy: GuardStrategy): (BasicAtom, Boolean) = {
     val (nop, nof) = apply(app.op, binds, strategy)
     val (narg, naf) = apply(app.arg, binds, strategy)
@@ -335,10 +340,10 @@ abstract class Evaluator extends Builder {
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(as: AtomSeq, binds: Bindings,
+  def rewriteAs(as: AtomSeq, binds: Bindings,
       strategy: GuardStrategy): (AtomSeq, Boolean) = {
     // Rewrite the properties.
-    val (newprop, pchanged) = rewrite(as.props, binds, strategy)
+    val (newprop, pchanged) = rewriteAs(as.props, binds, strategy)
     
     // We must rewrite every child atom, and collect them into a new sequence.
     var schanged = false
@@ -367,7 +372,7 @@ abstract class Evaluator extends Builder {
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(ba: BindingsAtom, binds: Bindings,
+  def rewriteAs(ba: BindingsAtom, binds: Bindings,
       strategy: GuardStrategy): (BindingsAtom, Boolean) = {
     var changed = false
     var newmap = Bindings()
@@ -394,7 +399,7 @@ abstract class Evaluator extends Builder {
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(lam: Lambda, binds: Bindings,
+  def rewriteAs(lam: Lambda, binds: Bindings,
       strategy: GuardStrategy): (Lambda, Boolean) = {
     // We test for a special case here.  If the bindings specify that we
     // should rewrite our own bound De Bruijn index, we explicitly ignore
@@ -419,7 +424,28 @@ abstract class Evaluator extends Builder {
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(lit: IntegerLiteral, binds: Bindings,
+  def rewriteAs(lit: BooleanLiteral, binds: Bindings,
+      strategy: GuardStrategy): (BooleanLiteral, Boolean) = {
+    apply(lit.theType, binds, strategy) match {
+      case (newtype, true) =>
+        (newLiteral(Loc.internal, newtype, lit.value), true)
+        
+      case _ =>
+        (lit, false)
+    }
+  }
+  
+  /**
+   * Rewrite the provided atom, replacing instances of variables bound (by
+   * name) in the bindings with the bound values.
+   * 
+   * @param atom      The atom to rewrite.
+   * @param binds     The bindings.
+   * @param strategy  The guard strategy required to create rewrite rules.
+   * @return  A pair consisting of the result atom and a flag that is true
+   *          iff any rewriting was performed.
+   */
+  def rewriteAs(lit: IntegerLiteral, binds: Bindings,
       strategy: GuardStrategy): (IntegerLiteral, Boolean) = {
     apply(lit.theType, binds, strategy) match {
       case (newtype, true) =>
@@ -440,7 +466,7 @@ abstract class Evaluator extends Builder {
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(lit: SymbolLiteral, binds: Bindings,
+  def rewriteAs(lit: SymbolLiteral, binds: Bindings,
       strategy: GuardStrategy): (SymbolLiteral, Boolean) = {
     apply(lit.theType, binds, strategy) match {
       case (newtype, true) =>
@@ -461,7 +487,7 @@ abstract class Evaluator extends Builder {
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(lit: StringLiteral, binds: Bindings,
+  def rewriteAs(lit: StringLiteral, binds: Bindings,
       strategy: GuardStrategy): (StringLiteral, Boolean) = {
     apply(lit.theType, binds, strategy) match {
       case (newtype, true) =>
@@ -482,7 +508,7 @@ abstract class Evaluator extends Builder {
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(lit: BitStringLiteral, binds: Bindings,
+  def rewriteAs(lit: BitStringLiteral, binds: Bindings,
       strategy: GuardStrategy): (BitStringLiteral, Boolean) = {
     apply(lit.theType, binds, strategy) match {
       case (newtype, true) =>
@@ -503,7 +529,7 @@ abstract class Evaluator extends Builder {
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(lit: FloatLiteral, binds: Bindings,
+  def rewriteAs(lit: FloatLiteral, binds: Bindings,
       strategy: GuardStrategy): (FloatLiteral, Boolean) = {
     apply(lit.theType, binds, strategy) match {
       case (newtype, true) =>
@@ -525,7 +551,7 @@ abstract class Evaluator extends Builder {
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(map: MapPair, binds: Bindings,
+  def rewriteAs(map: MapPair, binds: Bindings,
       strategy: GuardStrategy): (MapPair, Boolean) = {
     val newleft = apply(map.left, binds, strategy)
     val newright = apply(map.right, binds, strategy)
@@ -546,7 +572,7 @@ abstract class Evaluator extends Builder {
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(or: OperatorRef, binds: Bindings,
+  def rewriteAs(or: OperatorRef, binds: Bindings,
       strategy: GuardStrategy): (OperatorRef, Boolean) = {
     // Operator references cannot be rewritten... which is actually why they
     // exist!
@@ -563,7 +589,7 @@ abstract class Evaluator extends Builder {
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(sf: SpecialForm, binds: Bindings,
+  def rewriteAs(sf: SpecialForm, binds: Bindings,
       strategy: GuardStrategy): (SpecialForm, Boolean) = {
     val newtag = apply(sf.tag, binds, strategy)
     val newcontent = apply(sf.content, binds, strategy)
@@ -584,7 +610,7 @@ abstract class Evaluator extends Builder {
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(vari: TermVariable, binds: Bindings,
+  def rewriteAs(vari: TermVariable, binds: Bindings,
       strategy: GuardStrategy): (BasicAtom, Boolean) = {
     // If we have no bindings, don't rewrite the variable.
     if (binds == null) {
@@ -623,7 +649,7 @@ abstract class Evaluator extends Builder {
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(vari: MetaVariable, binds: Bindings,
+  def rewriteAs(vari: MetaVariable, binds: Bindings,
       strategy: GuardStrategy): (BasicAtom, Boolean) = {
     // If we have no bindings, don't rewrite the variable.
     if (binds == null) {
@@ -770,6 +796,21 @@ abstract class Evaluator extends Builder {
   }
   
   private def _replace(lit: IntegerLiteral, map: Map[BasicAtom, BasicAtom],
+      strategy: GuardStrategy) = {
+    map.get(lit) match {
+      case Some(atom) =>
+        (atom, true)
+      case None =>
+        val (newtype, flag) = replace(lit.theType, map, strategy)
+        if (flag) {
+          (newLiteral(Loc.internal, newtype, lit.value), true)
+        } else {
+          (lit, false)
+        }
+    }
+  }
+  
+  private def _replace(lit: BooleanLiteral, map: Map[BasicAtom, BasicAtom],
       strategy: GuardStrategy) = {
     map.get(lit) match {
       case Some(atom) =>
