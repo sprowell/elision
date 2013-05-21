@@ -54,6 +54,7 @@ import ornl.elision.core.NamedRootType
 import ornl.elision.core.OpApply
 import ornl.elision.util.OmitSeq
 import ornl.elision.core.GuardStrategy
+import ornl.elision.core.TypeUniverse
 
 /**
  * An evaluator adds the logic for doing rewriting and replacement to the
@@ -93,6 +94,8 @@ abstract class Evaluator extends Builder {
   def rewrite(atom: BasicAtom, binds: Bindings,
       strategy: GuardStrategy): (BasicAtom, Boolean) = {
     atom match {
+      case TypeUniverse => (atom, false)
+      
       case lit: IntegerLiteral => rewrite(lit, binds, strategy)
       
       case lit: SymbolLiteral => rewrite(lit, binds, strategy)
@@ -145,6 +148,8 @@ abstract class Evaluator extends Builder {
   def replace(atom: BasicAtom, map: Map[BasicAtom, BasicAtom],
       strategy: GuardStrategy): (BasicAtom, Boolean) = {
     atom match {
+      case TypeUniverse => (atom, false)
+      
       case lit: IntegerLiteral => _replace(lit, map, strategy)
       
       case lit: SymbolLiteral => _replace(lit, map, strategy)

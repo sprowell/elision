@@ -52,6 +52,7 @@ import ornl.elision.core.Literal
 import ornl.elision.core.Strategy
 import ornl.elision.core.StringLiteral
 import ornl.elision.core.GuardStrategy
+import ornl.elision.core.SimpleApply
 
 /**
  * A lambda variable does not match the argument.
@@ -84,7 +85,7 @@ extends ElisionException(loc, msg)
  *                      native dispatch.
  */
 class ApplyBuilder(ophandler: OperatorApplyHandler) {
-
+  
   /**
    * Turn a pair into a binding to be returned from a strategy.  This turns
    * a pair of the form `(a, f)` into a binding of the form
@@ -150,11 +151,11 @@ class ApplyBuilder(ophandler: OperatorApplyHandler) {
   def apply(op: BasicAtom, arg: BasicAtom, builder: Builder,
       strategy: GuardStrategy, bypass: Boolean = false): BasicAtom = {
     op match {
-        case StringLiteral(loc, typ, str) if arg.isInstanceOf[StringLiteral] =>
-          // If the argument is also a string literal, then we want to simply
-          // concatenate them.
-          new StringLiteral(Loc.internal, typ,
-              str + arg.asInstanceOf[StringLiteral].value)
+      case StringLiteral(loc, typ, str) if arg.isInstanceOf[StringLiteral] =>
+        // If the argument is also a string literal, then we want to simply
+        // concatenate them.
+        new StringLiteral(Loc.internal, typ,
+            str + arg.asInstanceOf[StringLiteral].value)
           
       case op_ap: AlgProp =>
         // Handle the case of algebraic properties being applied.  These can
@@ -237,9 +238,9 @@ class ApplyBuilder(ophandler: OperatorApplyHandler) {
         }
         
       case c =>
-        // We come here if we find an unsupported atom class.
-        throw new ElisionException(Loc.internal,
-            "Internal error.  Unrecognized atom class: " + c.getClass)
+        // Nothing special must be done.  Just make the appropriate simple
+        // apply instance.
+        new SimpleApply(Loc.internal, op, arg)
     }
   }
 }

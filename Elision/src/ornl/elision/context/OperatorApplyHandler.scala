@@ -60,7 +60,7 @@ import ornl.elision.core.ArgumentListException
  * operation.  This is the base class for objects that handle that process.
  */
 abstract class OperatorApplyHandler {
-
+  
   /**
    * Apply an operator to an argument.
    * 

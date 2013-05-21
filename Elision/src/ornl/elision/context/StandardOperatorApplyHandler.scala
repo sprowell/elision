@@ -95,7 +95,7 @@ class ApplyData(val op: SymbolicOperator, val args: AtomSeq,
  */
 class StandardOperatorApplyHandler(context: Context)
 extends OperatorApplyHandler {
-
+  
   /**
    * Apply an operator to an argument.
    * 

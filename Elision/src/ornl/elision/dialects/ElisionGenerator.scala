@@ -112,10 +112,6 @@ object ElisionGenerator {
         
         case SYMBOL => buf.append("SYMBOL")
         
-        // Handle the type universe and named root types.
-        case TypeUniverse =>
-          buf.append("^TYPE")
-          
         case NamedRootType(name) =>
           buf.append(toESymbol(name))
           
@@ -261,6 +257,10 @@ object ElisionGenerator {
       context: Option[Context] = None, limit: Int = -1): Appendable = {
     if (limit == 0) return buf.append("...")
     atom match {
+      // Handle the type universe and named root types.
+      case TypeUniverse =>
+        buf.append("^TYPE")
+        
       // Process literals.
       case lit: Literal[_] => _gen(lit, buf, context, limit)
       

@@ -127,10 +127,6 @@ object ScalaGenerator {
         
         case SYMBOL => buf.append("SYMBOL")
         
-        // Handle the type universe and named root types.
-        case TypeUniverse =>
-          buf.append("TypeUniverse")
-          
         case NamedRootType(name) =>
           buf.append("NamedRootType(")
           buf.append(toEString(name))
@@ -320,6 +316,10 @@ object ScalaGenerator {
   def gen(atom: BasicAtom, context: Boolean,
       buf: Appendable = new StringBuffer()): Appendable = {
     atom match {
+      // Handle the type universe and named root types.
+      case TypeUniverse =>
+        buf.append("TypeUniverse")
+        
       // Process literals.
       case lit: Literal[_] => _gen(lit, context, buf)
       

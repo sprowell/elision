@@ -55,6 +55,7 @@ import ornl.elision.util.Version.minor
 import ornl.elision.util.Version.web
 import scala.Array.canBuildFrom
 import scala.xml.XML
+import java.io.FileWriter
 
 /**
  * Manage the default parser kind to use.
@@ -460,13 +461,10 @@ with HasHistory {
    * @param th		An optional throwable.
    */
   def coredump(msg: String, th: Option[Throwable] = None) {
-    try {
-      val cfile = new java.io.FileWriter("elision.core")
-      if (cfile != null) {
-        import Version._
-        val prop = System.getProperties
-        val info =
-          <platform
+    // Write platform information.
+    def getPlatform = {
+      val prop = System.getProperties
+      <platform
             date={(new java.util.Date).toString}
             java.vendor={prop.get("java.vendor").toString}
             java.version={prop.get("java.version").toString}
@@ -476,32 +474,42 @@ with HasHistory {
             version={major+"."+minor}
             build={build}
             scala.version={scala.util.Properties.versionString}
-          />
-        val cont = <context>{ContextGenerator.toParseString(context)}</context>
-        val err = th match {
-          case None => <error/>
-          case Some(ex) =>
-            <error message={ex.getMessage}>{
-              ex.getStackTrace map { item =>
-                <item>{item}</item>
-              }
-            }</error>
-        }
-        val date = (new java.util.Date).toString
-        val hist = <history>{
-          val buf = new StringBuffer()
-          val it = getHistoryIterator
-          while (it.hasNext) buf.append(it.next).append('\n')
-          buf.toString
-        }</history>
-        val all = <elision-core when={date} msg={msg}>
-          {info}
-      		{err}
-      		{cont}
-      		{hist}
-      		</elision-core>
-    		scala.xml.XML.write(cfile,all,"utf-8",true,null)
-        //cfile.write(new scala.xml.PrettyPrinter(80, 2).format(all))
+      />
+    }
+    
+    // Write information about the throwable.
+    def getThrowable = {
+      th match {
+        case None => <error/>
+        case Some(ex) =>
+          <error message={ex.getMessage}>{
+            ex.getStackTrace map { item =>
+              <item>{item}</item>
+            }
+          }</error>
+      }
+    }
+    
+    // Write the command line history.
+    def getHistory = {
+      val buf = new StringBuffer()
+      val it = getHistoryIterator
+      while (it.hasNext) buf.append(it.next).append('\n')
+      <history>{
+        buf.toString
+      }</history>
+    }
+    
+    try {
+      val cfile = new FileWriter("elision.core")
+      if (cfile != null) {
+        val all = <elision-core msg={msg}>
+          {getPlatform}
+          {getThrowable}
+          <context>{ContextGenerator.toParseString(context)}</context>
+          {getHistory}
+          </elision-core>
+        XML.write(cfile,all,"utf-8",true,null)
         cfile.flush()
         cfile.close()
         context.console.emitln("Wrote core dump to elision.core.")

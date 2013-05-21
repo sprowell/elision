@@ -70,35 +70,38 @@ import ornl.elision.util.Debugger
 /**
  * Construct atoms, first applying any evaluation logic.
  */
-abstract class Builder {
-
+abstract class Builder() {
+  
   //======================================================================
   // Define the necessary primitive operators to bootstrap operator typing.
   //======================================================================
-  
+
   /**
-   * The well-known MAP operator.  This is needed to define the types of
-   * operators, but is not used to define its own type.  The type of the MAP
-   * operator is ^TYPE, indicating that it is a root type.  We could, with
-   * great justice, use xx (the cross product) for this operator, but don't.
-   * This makes the types of operators look more natural when viewed.
+   * The well-known list operator.  This is used to define the type of lists
+   * such as the atom sequence.  It has type ^TYPE, indicating that it is a
+   * root type.
    */
-  val MAP = new OperatorRef(
+  val LIST = new OperatorRef(
       Loc.internal,
       new SymbolicOperator(
           Loc.internal,
-          "MAP",
+          "LIST",   
           TypeUniverse,
-          newAtomSeq(Loc.internal, NoProps, 'domain, 'codomain),
-          "Mapping constructor.",
-          "This operator is used to construct types for operators.  It " +
-          "indicates a mapping from one type (the domain) to another type " +
-          "(the codomain).") {
+          /* The following is a hack, but there is really no way around it.
+           * The type of an atom sequence is LIST(x), where x is the unified
+           * type of the elements.  Here we have to override that type to use
+           * ANY, since we have not yet defined LIST.
+           */
+          new AtomSeq(Loc.internal, ANY, NoProps, IndexedSeq('type: BasicAtom)),
+          "List type constructor.",
+          "This operator is used to indicate the type of a list.  It takes a " +
+          "single argument that is the type of the atoms in the list.  For " +
+          "heterogeneous lists this will be ANY.") {
     def apply(args: IndexedSeq[BasicAtom]) =
-      new SimpleApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps,
-          args))
+      new SimpleApply(Loc.internal, this,
+          new AtomSeq(Loc.internal, ANY, NoProps, args))
   })
-      
+
   /**
    * The well-known cross product operator.  This is needed to define the
    * types of operators, but is not used to define its own type.  The type
@@ -120,23 +123,25 @@ abstract class Builder {
       new SimpleApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps,
           args))
   })
-      
+  
   /**
-   * The well-known list operator.  This is used to define the type of lists
-   * such as the atom sequence.  It has type ^TYPE, indicating that it is a
-   * root type.
+   * The well-known MAP operator.  This is needed to define the types of
+   * operators, but is not used to define its own type.  The type of the MAP
+   * operator is ^TYPE, indicating that it is a root type.  We could, with
+   * great justice, use xx (the cross product) for this operator, but don't.
+   * This makes the types of operators look more natural when viewed.
    */
-  val LIST = new OperatorRef(
+  val MAP = new OperatorRef(
       Loc.internal,
       new SymbolicOperator(
           Loc.internal,
-          "LIST",
+          "MAP",
           TypeUniverse,
-          newAtomSeq(Loc.internal, NoProps, 'type),
-          "List type constructor.",
-          "This operator is used to indicate the type of a list.  It takes a " +
-          "single argument that is the type of the atoms in the list.  For " +
-          "heterogeneous lists this will be ANY.") {
+          newAtomSeq(Loc.internal, NoProps, 'domain, 'codomain),
+          "Mapping constructor.",
+          "This operator is used to construct types for operators.  It " +
+          "indicates a mapping from one type (the domain) to another type " +
+          "(the codomain).") {
     def apply(args: IndexedSeq[BasicAtom]) =
       new SimpleApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps,
           args))
@@ -245,8 +250,6 @@ abstract class Builder {
       atoms: BasicAtom*): AtomSeq = {
     val theType = {
       if (atoms.length == 0) {
-        if (LIST == null) println("LIST is null.")
-        if (ANY == null) println("ANY is null.")
         LIST(ANY)
       } else {
         val aType = atoms(0).theType

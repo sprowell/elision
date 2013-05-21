@@ -52,14 +52,18 @@ import ornl.elision.util.Loc
  * ==Equality and Matching==
  * The type universe is equal only to itself, and matches only itself.
  */
-object TypeUniverse extends SymbolLiteral(Loc.internal, null, Symbol("^TYPE")) {
+object TypeUniverse extends BasicAtom(Loc.internal) {
+  
+  val deBruijnIndex = 0
+  val depth = 0
+  val isConstant = true
+  val isTerm = true
   
   /** The type of the type universe is itself. */
   override val theType = this
     
   /** Compute the hash code. */
   override lazy val hashCode = toParseString.hashCode
-  override lazy val otherHashCode =
-    (value.toString).foldLeft(BigInt(0))(other_hashify)  
+  override val otherHashCode = BigInt("^TYPE".hashCode())
   override def equals(other: Any) = TypeUniverse eq other.asInstanceOf[AnyRef]
 }
