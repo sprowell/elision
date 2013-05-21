@@ -33,6 +33,7 @@ import ornl.elision.core.Variable
 import ornl.elision.core.BasicAtom
 import ornl.elision.core.Bindings
 import ornl.elision.context.Builder
+import ornl.elision.core.GuardStrategy
 
 /**
  * Generate bindings by attempting to bind a variable to an atom.  The
@@ -52,11 +53,12 @@ object Binder {
    * @param variable  The variable to bind.
    * @param atom      The atom to which to bind the variable.
    * @param builder   A builder to construct atoms.
+   * @param strategy  A strategy to rewrite rule guards.
    * @return  The outcome of the binding attempt, which may be either a match
    *          or a failure.
    */
   def bind(binds: Bindings, variable: Variable, atom: BasicAtom,
-      builder: Builder): Outcome = {
+      builder: Builder, strategy: GuardStrategy): Outcome = {
     // If this is a by-name variable, reject immediately if the subject is not
     // a variable of the same name.
     if (variable.byName) {
@@ -75,7 +77,11 @@ object Binder {
     } else {
       // Compute the bindings and check the guard.
       val newbinds = binds + (variable.name -> atom)
-      val newterm = builder.rewrite(variable.guard, newbinds)._1
+      var newterm = builder.rewrite(variable.guard, newbinds, strategy)._1
+      if (newterm.isTrue) {
+        return Match(newbinds)
+      }
+      newterm = strategy(newterm)._1
       if (newterm.isTrue) {
         return Match(newbinds)
       } else {

@@ -42,6 +42,7 @@ import ornl.elision.core.Bindings
 import ornl.elision.util.OmitSeq
 import ornl.elision.util.OmitSeq.fromIndexedSeq
 import ornl.elision.context.Builder
+import ornl.elision.core.GuardStrategy
 
 /**
  * Match unbindable atoms in a sequence of patterns to the unbindable atoms
@@ -83,11 +84,12 @@ import ornl.elision.context.Builder
  * 
  * @param patterns	The patterns to match.
  * @param subjects	The subjects to match.
- * @param builder   The builder required to build atoms.
+ * @param builder   The builder needed to create atoms.
+ * @param strategy  The guard strategy to use for new rules.
  * @param binds			Bindings to honor in any match.
  */
 class UnbindableMatcher(patterns: OmitSeq[BasicAtom],
-    subjects: OmitSeq[BasicAtom], builder: Builder,
+    subjects: OmitSeq[BasicAtom], builder: Builder, strategy: GuardStrategy,
     binds: Bindings) extends MatchIterator {
   /**
    * Next index to start looking for a subject to match.
@@ -150,7 +152,7 @@ class UnbindableMatcher(patterns: OmitSeq[BasicAtom],
     
     // Try to match the subject and the pattern.
     val iterator = Matcher(patterns(_patindex), subjects(subindex), builder,
-        binds) match {
+        strategy, binds) match {
       case fail:Fail =>
         // The match failed, but we can try to keep searching.  The thing to
         // do is look at the next subject index.
@@ -192,6 +194,7 @@ class UnbindableMatcher(patterns: OmitSeq[BasicAtom],
           patterns.omit(_patindex), 
           subjects.omit(subindex), 
           builder,
+          strategy,
           bindings ++ binds)
       })
   }

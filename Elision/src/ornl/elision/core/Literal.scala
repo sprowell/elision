@@ -231,9 +231,9 @@ object Literal {
  * @param value	The value.
  */
 case class IntegerLiteral protected[elision] (
-    loc: Loc,
+    xloc: Loc,
     typ: BasicAtom,
-    value: BigInt) extends Literal[BigInt](loc, typ) {
+    value: BigInt) extends Literal[BigInt](xloc, typ) {
   
   /**
    * Provide an alternate constructor using the default type.
@@ -254,10 +254,10 @@ case class IntegerLiteral protected[elision] (
  * @param len           The length.
  */
 case class BitStringLiteral protected[elision] (
-    loc: Loc,
+    xloc: Loc,
     typ: BasicAtom,
     original_bits: BigInt,
-    len: Int) extends Literal[(BigInt, Int)](loc, typ) {
+    len: Int) extends Literal[(BigInt, Int)](xloc, typ) {
   
   /**
    * Provide an alternate constructor using the default type.
@@ -341,9 +341,9 @@ case class BitStringLiteral protected[elision] (
  * @param value The value.
  */
 case class StringLiteral protected[elision] (
-    loc: Loc,
+    xloc: Loc,
     typ: BasicAtom,
-    value: String) extends Literal[String](loc, typ) {
+    value: String) extends Literal[String](xloc, typ) {
   
   /**
    * Provide an alternate constructor using the default type.
@@ -363,9 +363,9 @@ case class StringLiteral protected[elision] (
  * @param value The value.
  */
 case class SymbolLiteral protected[elision] (
-    loc: Loc,
+    xloc: Loc,
     typ: BasicAtom,
-    value: Symbol) extends Literal[Symbol](loc, typ) {
+    value: Symbol) extends Literal[Symbol](xloc, typ) {
   
   /**
    * Provide an alternate constructor using the default type.
@@ -393,9 +393,9 @@ case class SymbolLiteral protected[elision] (
  * @param value The value.
  */
 case class BooleanLiteral protected[elision] (
-    loc: Loc,
+    xloc: Loc,
     typ: BasicAtom,
-    value: Boolean) extends Literal[Boolean](loc, typ) {
+    value: Boolean) extends Literal[Boolean](xloc, typ) {
   
   /**
    * Provide an alternate constructor using the default type.
@@ -501,11 +501,11 @@ object IEEE754Half extends IEEE754(16, 10)
  * @param radix					The radix, which must be 2, 8, 10, or 16.
  */
 case class FloatLiteral protected[elision] (
-    loc: Loc,
+    xloc: Loc,
     typ: BasicAtom,
     significand: BigInt,
     exponent: Int,
-    radix: Int) extends Literal[(BigInt, Int, Int)](loc, typ) {
+    radix: Int) extends Literal[(BigInt, Int, Int)](xloc, typ) {
   
   /**
    * Provide an alternate constructor using the default type.

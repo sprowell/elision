@@ -33,12 +33,11 @@ import ornl.elision.core.BasicAtom
 import ornl.elision.core.Operator
 import ornl.elision.core.SymbolicOperator
 import ornl.elision.core.CaseOperator
-import ornl.elision.core.Strategy
 import ornl.elision.util.Loc
 import ornl.elision.util.ElisionException
 import ornl.elision.core.AtomSeq
 import ornl.elision.core.Bindings
-import ornl.elision.parse.Processor
+import ornl.elision.repl.Processor
 import ornl.elision.core.Apply
 import ornl.elision.core.Literal
 import ornl.elision.core.SimpleApply

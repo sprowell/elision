@@ -53,6 +53,7 @@ import ornl.elision.core.Variable
 import ornl.elision.core.NamedRootType
 import ornl.elision.core.OpApply
 import ornl.elision.util.OmitSeq
+import ornl.elision.core.GuardStrategy
 
 /**
  * An evaluator adds the logic for doing rewriting and replacement to the
@@ -72,50 +73,57 @@ import ornl.elision.util.OmitSeq
  * type-specific `rewriteAs` methods.  These make guarantees about the return
  * value's type.
  */
-class Evaluator extends Builder {
+abstract class Evaluator extends Builder {
+  
+  def apply(atom: BasicAtom, binds: Bindings,
+      strategy: GuardStrategy): (BasicAtom, Boolean) = {
+    rewrite(atom, binds, strategy)
+  }
 
   /**
    * Rewrite the provided atom, replacing instances of variables bound (by
    * name) in the bindings with the bound values.
    * 
-   * @param atom    The atom to rewrite.
-   * @param binds   The bindings.
+   * @param atom      The atom to rewrite.
+   * @param binds     The bindings.
+   * @param strategy  The guard strategy required to create rewrite rules.
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def apply(atom: BasicAtom, binds: Bindings): (BasicAtom, Boolean) = {
+  def rewrite(atom: BasicAtom, binds: Bindings,
+      strategy: GuardStrategy): (BasicAtom, Boolean) = {
     atom match {
-      case lit: IntegerLiteral => rewrite(lit, binds)
+      case lit: IntegerLiteral => rewrite(lit, binds, strategy)
       
-      case lit: SymbolLiteral => rewrite(lit, binds)
+      case lit: SymbolLiteral => rewrite(lit, binds, strategy)
       
-      case lit: StringLiteral => rewrite(lit, binds)
+      case lit: StringLiteral => rewrite(lit, binds, strategy)
       
-      case lit: BitStringLiteral => rewrite(lit, binds)
+      case lit: BitStringLiteral => rewrite(lit, binds, strategy)
       
-      case lit: FloatLiteral => rewrite(lit, binds)
+      case lit: FloatLiteral => rewrite(lit, binds, strategy)
       
-      case ap: AlgProp => rewrite(ap, binds)
+      case ap: AlgProp => rewrite(ap, binds, strategy)
       
-      case opapp: OpApply => rewrite(opapp, binds)
+      case opapp: OpApply => rewrite(opapp, binds, strategy)
 
-      case app: Apply => rewrite(app, binds)
+      case app: Apply => rewrite(app, binds, strategy)
         
-      case as: AtomSeq => rewrite(as, binds)
+      case as: AtomSeq => rewrite(as, binds, strategy)
 
-      case ba: BindingsAtom => rewrite(ba, binds)
+      case ba: BindingsAtom => rewrite(ba, binds, strategy)
 
-      case lam: Lambda => rewrite(lam, binds)
+      case lam: Lambda => rewrite(lam, binds, strategy)
         
-      case map: MapPair => rewrite(map, binds)
+      case map: MapPair => rewrite(map, binds, strategy)
         
-      case sf: SpecialForm => rewrite(sf, binds)
+      case sf: SpecialForm => rewrite(sf, binds, strategy)
       
-      case or: OperatorRef => rewrite(or, binds)
+      case or: OperatorRef => rewrite(or, binds, strategy)
         
-      case vari: TermVariable => rewrite(vari, binds)
+      case vari: TermVariable => rewrite(vari, binds, strategy)
         
-      case vari: MetaVariable => rewrite(vari, binds)
+      case vari: MetaVariable => rewrite(vari, binds, strategy)
         
       case _ =>
         throw new ElisionException(Loc.internal,
@@ -128,43 +136,44 @@ class Evaluator extends Builder {
    * map.  The atom itself may be in the map, in which case its replacement
    * is returned.  This is a "one pass" replacement.
    * 
-   * @param atom    The atom to rewrite.
-   * @param binds   The bindings.
+   * @param atom      The atom to rewrite.
+   * @param binds     The bindings.
+   * @param strategy  The guard strategy required to create rewrite rules.
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def replace(atom: BasicAtom,
-      map: Map[BasicAtom, BasicAtom]): (BasicAtom, Boolean) = {
+  def replace(atom: BasicAtom, map: Map[BasicAtom, BasicAtom],
+      strategy: GuardStrategy): (BasicAtom, Boolean) = {
     atom match {
-      case lit: IntegerLiteral => _replace(lit, map)
+      case lit: IntegerLiteral => _replace(lit, map, strategy)
       
-      case lit: SymbolLiteral => _replace(lit, map)
+      case lit: SymbolLiteral => _replace(lit, map, strategy)
       
-      case lit: StringLiteral => _replace(lit, map)
+      case lit: StringLiteral => _replace(lit, map, strategy)
       
-      case lit: BitStringLiteral => _replace(lit, map)
+      case lit: BitStringLiteral => _replace(lit, map, strategy)
       
-      case lit: FloatLiteral => _replace(lit, map)
+      case lit: FloatLiteral => _replace(lit, map, strategy)
       
-      case ap: AlgProp => _replace(ap, map)
+      case ap: AlgProp => _replace(ap, map, strategy)
 
-      case app: Apply => _replace(app, map)
+      case app: Apply => _replace(app, map, strategy)
         
-      case as: AtomSeq => _replace(as, map)
+      case as: AtomSeq => _replace(as, map, strategy)
 
-      case ba: BindingsAtom => _replace(ba, map)
+      case ba: BindingsAtom => _replace(ba, map, strategy)
 
-      case lam: Lambda => _replace(lam, map)
+      case lam: Lambda => _replace(lam, map, strategy)
         
-      case mp: MapPair => _replace(mp, map)
+      case mp: MapPair => _replace(mp, map, strategy)
         
-      case sf: SpecialForm => _replace(sf, map)
+      case sf: SpecialForm => _replace(sf, map, strategy)
       
-      case or: OperatorRef => _replace(or, map)
+      case or: OperatorRef => _replace(or, map, strategy)
         
-      case vari: TermVariable => _replace(vari, map)
+      case vari: TermVariable => _replace(vari, map, strategy)
         
-      case vari: MetaVariable => _replace(vari, map)
+      case vari: MetaVariable => _replace(vari, map, strategy)
         
       case _ =>
         throw new ElisionException(Loc.internal,
@@ -179,17 +188,19 @@ class Evaluator extends Builder {
   /**
    * Rewrite a sequence of atoms by applying the given bindings to each.
    * 
-   * @param subjects  The atoms to rewrite.
-   * @param binds     The bindings to apply.
+   * @param atom      The atom to rewrite.
+   * @param binds     The bindings.
+   * @param strategy  The guard strategy required to create rewrite rules.
    * @return  A pair consisting of the rewritten sequence of atoms and a flag
    *          that is true if any rewrites succeeded.
    */
-  def rewrite(subjects: OmitSeq[BasicAtom], binds: Bindings) = {
+  def rewrite(subjects: OmitSeq[BasicAtom], binds: Bindings,
+      strategy: GuardStrategy) = {
     var changed = false
     var index = 0
     var newseq = OmitSeq[BasicAtom]()
     while (index < subjects.size) {
-      val (newatom, change) = apply(subjects(index), binds)
+      val (newatom, change) = apply(subjects(index), binds, strategy)
       changed |= change
       newseq :+= newatom
       index += 1
@@ -201,12 +212,14 @@ class Evaluator extends Builder {
    * Rewrite the provided atom, replacing instances of variables bound (by
    * name) in the bindings with the bound values.
    * 
-   * @param atom    The atom to rewrite.
-   * @param binds   The bindings.
+   * @param atom      The atom to rewrite.
+   * @param binds     The bindings.
+   * @param strategy  The guard strategy required to create rewrite rules.
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(nrt: NamedRootType, binds: Bindings): (NamedRootType, Boolean) = {
+  def rewrite(nrt: NamedRootType, binds: Bindings,
+      strategy: GuardStrategy): (NamedRootType, Boolean) = {
     (nrt, false)
   }
   
@@ -214,19 +227,21 @@ class Evaluator extends Builder {
    * Rewrite the provided atom, replacing instances of variables bound (by
    * name) in the bindings with the bound values.
    * 
-   * @param atom    The atom to rewrite.
-   * @param binds   The bindings.
+   * @param atom      The atom to rewrite.
+   * @param binds     The bindings.
+   * @param strategy  The guard strategy required to create rewrite rules.
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(ap: AlgProp, binds: Bindings): (AlgProp, Boolean) = {
+  def rewrite(ap: AlgProp, binds: Bindings,
+      strategy: GuardStrategy): (AlgProp, Boolean) = {
     def _rewrite(opt: Option[BasicAtom]) = {
       opt match {
         case None => 
           (None, false)
           
         case Some(atom) => {
-          val newatom = apply(atom, binds)
+          val newatom = apply(atom, binds, strategy)
           (Some(newatom._1), newatom._2)
         }
       }
@@ -248,12 +263,14 @@ class Evaluator extends Builder {
    * Rewrite an operator application.  These are special, since the operator
    * is never rewritten, and there may be cached rewrites.
    * 
-   * @param atom    The atom to rewrite.
-   * @param binds   The bindings.
+   * @param atom      The atom to rewrite.
+   * @param binds     The bindings.
+   * @param strategy  The guard strategy required to create rewrite rules.
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(opapp: OpApply, binds: Bindings) = {
+  def rewrite(opapp: OpApply, binds: Bindings,
+      strategy: GuardStrategy) = {
     // TODO Does caching rewrites here actually yield any performance?
     // TODO Should all rewrites be cached?
     
@@ -270,9 +287,9 @@ class Evaluator extends Builder {
         // Rewrite the argument, but not the operator.  In reality, operators
         // should protect their arguments using De Bruijn indices, but that's
         // not implemented.
-        val pair = apply(opapp.arg, binds)
+        val pair = apply(opapp.arg, binds, strategy)
         if (pair._2) {
-          val napply = newApply(Loc.internal, opapp.op, pair._1)
+          val napply = newApply(Loc.internal, opapp.op, pair._1, strategy)
           binds.rewrites(opapp) = (napply, true) 
           (napply, true) 
         } else {
@@ -286,16 +303,18 @@ class Evaluator extends Builder {
    * Rewrite the provided atom, replacing instances of variables bound (by
    * name) in the bindings with the bound values.
    * 
-   * @param atom    The atom to rewrite.
-   * @param binds   The bindings.
+   * @param atom      The atom to rewrite.
+   * @param binds     The bindings.
+   * @param strategy  The guard strategy required to create rewrite rules.
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(app: Apply, binds: Bindings): (BasicAtom, Boolean) = {
-    val (nop, nof) = apply(app.op, binds)
-    val (narg, naf) = apply(app.arg, binds)
+  def rewrite(app: Apply, binds: Bindings,
+      strategy: GuardStrategy): (BasicAtom, Boolean) = {
+    val (nop, nof) = apply(app.op, binds, strategy)
+    val (narg, naf) = apply(app.arg, binds, strategy)
     if (nof || naf) {
-      (newApply(Loc.internal, nop, narg), true)
+      (newApply(Loc.internal, nop, narg, strategy), true)
     } else { 
       (app, false)
     }
@@ -305,20 +324,22 @@ class Evaluator extends Builder {
    * Rewrite the provided atom, replacing instances of variables bound (by
    * name) in the bindings with the bound values.
    * 
-   * @param atom    The atom to rewrite.
-   * @param binds   The bindings.
+   * @param atom      The atom to rewrite.
+   * @param binds     The bindings.
+   * @param strategy  The guard strategy required to create rewrite rules.
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(as: AtomSeq, binds: Bindings): (AtomSeq, Boolean) = {
+  def rewrite(as: AtomSeq, binds: Bindings,
+      strategy: GuardStrategy): (AtomSeq, Boolean) = {
     // Rewrite the properties.
-    val (newprop, pchanged) = rewrite(as.props, binds)
+    val (newprop, pchanged) = rewrite(as.props, binds, strategy)
     
     // We must rewrite every child atom, and collect them into a new sequence.
     var schanged = false
     val newseq = as.atoms map {
       atom =>
-        val (newatom, changed) = apply(atom, binds)
+        val (newatom, changed) = apply(atom, binds, strategy)
         schanged |= changed
         newatom
     }
@@ -335,16 +356,18 @@ class Evaluator extends Builder {
    * Rewrite the provided atom, replacing instances of variables bound (by
    * name) in the bindings with the bound values.
    * 
-   * @param atom    The atom to rewrite.
-   * @param binds   The bindings.
+   * @param atom      The atom to rewrite.
+   * @param binds     The bindings.
+   * @param strategy  The guard strategy required to create rewrite rules.
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(ba: BindingsAtom, binds: Bindings): (BindingsAtom, Boolean) = {
+  def rewrite(ba: BindingsAtom, binds: Bindings,
+      strategy: GuardStrategy): (BindingsAtom, Boolean) = {
     var changed = false
     var newmap = Bindings()
     for ((key, value) <- ba.mybinds) { 
-      val (newvalue, valuechanged) = apply(value, binds)
+      val (newvalue, valuechanged) = apply(value, binds, strategy)
       changed |= valuechanged
       newmap += (key -> newvalue)
     } // Rewrite all bindings.
@@ -360,19 +383,21 @@ class Evaluator extends Builder {
    * Rewrite the provided atom, replacing instances of variables bound (by
    * name) in the bindings with the bound values.
    * 
-   * @param atom    The atom to rewrite.
-   * @param binds   The bindings.
+   * @param atom      The atom to rewrite.
+   * @param binds     The bindings.
+   * @param strategy  The guard strategy required to create rewrite rules.
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(lam: Lambda, binds: Bindings): (Lambda, Boolean) = {
+  def rewrite(lam: Lambda, binds: Bindings,
+      strategy: GuardStrategy): (Lambda, Boolean) = {
     // We test for a special case here.  If the bindings specify that we
     // should rewrite our own bound De Bruijn index, we explicitly ignore
     // it.
     val newbinds = binds - lam.lvar.name
-    apply(lam.body, newbinds) match {
+    apply(lam.body, newbinds, strategy) match {
       case (newatom, changed) if changed => 
-        (newLambda(Loc.internal, lam.lvar, newatom), true)
+        (newLambda(Loc.internal, lam.lvar, newatom, strategy), true)
         
       case _ => 
         (lam, false)
@@ -383,14 +408,15 @@ class Evaluator extends Builder {
    * Rewrite the provided atom, replacing instances of variables bound (by
    * name) in the bindings with the bound values.
    * 
-   * @param atom    The atom to rewrite.
-   * @param binds   The bindings.
+   * @param atom      The atom to rewrite.
+   * @param binds     The bindings.
+   * @param strategy  The guard strategy required to create rewrite rules.
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(lit: IntegerLiteral,
-      binds: Bindings): (IntegerLiteral, Boolean) = {
-    apply(lit.theType, binds) match {
+  def rewrite(lit: IntegerLiteral, binds: Bindings,
+      strategy: GuardStrategy): (IntegerLiteral, Boolean) = {
+    apply(lit.theType, binds, strategy) match {
       case (newtype, true) =>
         (newLiteral(Loc.internal, newtype, lit.value), true)
         
@@ -403,13 +429,15 @@ class Evaluator extends Builder {
    * Rewrite the provided atom, replacing instances of variables bound (by
    * name) in the bindings with the bound values.
    * 
-   * @param atom    The atom to rewrite.
-   * @param binds   The bindings.
+   * @param atom      The atom to rewrite.
+   * @param binds     The bindings.
+   * @param strategy  The guard strategy required to create rewrite rules.
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(lit: SymbolLiteral, binds: Bindings): (SymbolLiteral, Boolean) = {
-    apply(lit.theType, binds) match {
+  def rewrite(lit: SymbolLiteral, binds: Bindings,
+      strategy: GuardStrategy): (SymbolLiteral, Boolean) = {
+    apply(lit.theType, binds, strategy) match {
       case (newtype, true) =>
         (newLiteral(Loc.internal, newtype, lit.value), true)
         
@@ -422,13 +450,15 @@ class Evaluator extends Builder {
    * Rewrite the provided atom, replacing instances of variables bound (by
    * name) in the bindings with the bound values.
    * 
-   * @param atom    The atom to rewrite.
-   * @param binds   The bindings.
+   * @param atom      The atom to rewrite.
+   * @param binds     The bindings.
+   * @param strategy  The guard strategy required to create rewrite rules.
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(lit: StringLiteral, binds: Bindings): (StringLiteral, Boolean) = {
-    apply(lit.theType, binds) match {
+  def rewrite(lit: StringLiteral, binds: Bindings,
+      strategy: GuardStrategy): (StringLiteral, Boolean) = {
+    apply(lit.theType, binds, strategy) match {
       case (newtype, true) =>
         (newLiteral(Loc.internal, newtype, lit.value), true)
         
@@ -441,14 +471,15 @@ class Evaluator extends Builder {
    * Rewrite the provided atom, replacing instances of variables bound (by
    * name) in the bindings with the bound values.
    * 
-   * @param atom    The atom to rewrite.
-   * @param binds   The bindings.
+   * @param atom      The atom to rewrite.
+   * @param binds     The bindings.
+   * @param strategy  The guard strategy required to create rewrite rules.
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(lit: BitStringLiteral,
-      binds: Bindings): (BitStringLiteral, Boolean) = {
-    apply(lit.theType, binds) match {
+  def rewrite(lit: BitStringLiteral, binds: Bindings,
+      strategy: GuardStrategy): (BitStringLiteral, Boolean) = {
+    apply(lit.theType, binds, strategy) match {
       case (newtype, true) =>
         (newLiteral(Loc.internal, newtype, lit.bits, lit.len), true)
         
@@ -461,13 +492,15 @@ class Evaluator extends Builder {
    * Rewrite the provided atom, replacing instances of variables bound (by
    * name) in the bindings with the bound values.
    * 
-   * @param atom    The atom to rewrite.
-   * @param binds   The bindings.
+   * @param atom      The atom to rewrite.
+   * @param binds     The bindings.
+   * @param strategy  The guard strategy required to create rewrite rules.
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(lit: FloatLiteral, binds: Bindings): (FloatLiteral, Boolean) = {
-    apply(lit.theType, binds) match {
+  def rewrite(lit: FloatLiteral, binds: Bindings,
+      strategy: GuardStrategy): (FloatLiteral, Boolean) = {
+    apply(lit.theType, binds, strategy) match {
       case (newtype, true) =>
         (newLiteral(Loc.internal, newtype, lit.significand,
             lit.exponent, lit.radix), true)
@@ -481,14 +514,16 @@ class Evaluator extends Builder {
    * Rewrite the provided atom, replacing instances of variables bound (by
    * name) in the bindings with the bound values.
    * 
-   * @param atom    The atom to rewrite.
-   * @param binds   The bindings.
+   * @param atom      The atom to rewrite.
+   * @param binds     The bindings.
+   * @param strategy  The guard strategy required to create rewrite rules.
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(map: MapPair, binds: Bindings): (MapPair, Boolean) = {
-    val newleft = apply(map.left, binds)
-    val newright = apply(map.right, binds)
+  def rewrite(map: MapPair, binds: Bindings,
+      strategy: GuardStrategy): (MapPair, Boolean) = {
+    val newleft = apply(map.left, binds, strategy)
+    val newright = apply(map.right, binds, strategy)
     if (newleft._2 || newright._2) {
       (newMapPair(Loc.internal, newleft._1, newright._2), true)
     } else {
@@ -500,12 +535,14 @@ class Evaluator extends Builder {
    * Rewrite the provided atom, replacing instances of variables bound (by
    * name) in the bindings with the bound values.
    * 
-   * @param atom    The atom to rewrite.
-   * @param binds   The bindings.
+   * @param atom      The atom to rewrite.
+   * @param binds     The bindings.
+   * @param strategy  The guard strategy required to create rewrite rules.
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(or: OperatorRef, binds: Bindings): (OperatorRef, Boolean) = {
+  def rewrite(or: OperatorRef, binds: Bindings,
+      strategy: GuardStrategy): (OperatorRef, Boolean) = {
     // Operator references cannot be rewritten... which is actually why they
     // exist!
     (or, false)
@@ -515,16 +552,18 @@ class Evaluator extends Builder {
    * Rewrite the provided atom, replacing instances of variables bound (by
    * name) in the bindings with the bound values.
    * 
-   * @param atom    The atom to rewrite.
-   * @param binds   The bindings.
+   * @param atom      The atom to rewrite.
+   * @param binds     The bindings.
+   * @param strategy  The guard strategy required to create rewrite rules.
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(sf: SpecialForm, binds: Bindings): (SpecialForm, Boolean) = {
-    val newtag = apply(sf.tag, binds)
-    val newcontent = apply(sf.content, binds)
+  def rewrite(sf: SpecialForm, binds: Bindings,
+      strategy: GuardStrategy): (SpecialForm, Boolean) = {
+    val newtag = apply(sf.tag, binds, strategy)
+    val newcontent = apply(sf.content, binds, strategy)
     if (newtag._2 || newcontent._2) {
-      (newSpecialForm(Loc.internal, newtag._1, newcontent._1), true)
+      (newSpecialForm(Loc.internal, newtag._1, newcontent._1, strategy), true)
     } else {
       (sf, false)
     }
@@ -534,12 +573,14 @@ class Evaluator extends Builder {
    * Rewrite the provided atom, replacing instances of variables bound (by
    * name) in the bindings with the bound values.
    * 
-   * @param atom    The atom to rewrite.
-   * @param binds   The bindings.
+   * @param atom      The atom to rewrite.
+   * @param binds     The bindings.
+   * @param strategy  The guard strategy required to create rewrite rules.
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(vari: TermVariable, binds: Bindings): (BasicAtom, Boolean) = {
+  def rewrite(vari: TermVariable, binds: Bindings,
+      strategy: GuardStrategy): (BasicAtom, Boolean) = {
     // If we have no bindings, don't rewrite the variable.
     if (binds == null) {
       (vari, false)
@@ -553,7 +594,7 @@ class Evaluator extends Builder {
         case None => {
           // Though the atom is not bound, its type still might have to be
           // rewritten.
-          apply(vari.theType, binds) match {
+          apply(vari.theType, binds, strategy) match {
             case (newtype, true) =>
               (newTermVariable(Loc.internal, newtype, vari.name,
                   vari.guard, vari.labels, vari.byName), true)
@@ -571,12 +612,14 @@ class Evaluator extends Builder {
    * Rewrite the provided atom, replacing instances of variables bound (by
    * name) in the bindings with the bound values.
    * 
-   * @param atom    The atom to rewrite.
-   * @param binds   The bindings.
+   * @param atom      The atom to rewrite.
+   * @param binds     The bindings.
+   * @param strategy  The guard strategy required to create rewrite rules.
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(vari: MetaVariable, binds: Bindings): (BasicAtom, Boolean) = {
+  def rewrite(vari: MetaVariable, binds: Bindings,
+      strategy: GuardStrategy): (BasicAtom, Boolean) = {
     // If we have no bindings, don't rewrite the variable.
     if (binds == null) {
       (vari, false)
@@ -590,7 +633,7 @@ class Evaluator extends Builder {
         case None => {
           // Though the atom is not bound, its type still might have to be
           // rewritten.
-          apply(vari.theType, binds) match {
+          apply(vari.theType, binds, strategy) match {
             case (newtype, true) =>
               (newMetaVariable(Loc.internal, newtype, vari.name,
                   vari.guard, vari.labels, vari.byName), true)
@@ -608,13 +651,14 @@ class Evaluator extends Builder {
   // Replace methods.
   //======================================================================
   
-  private def _replace(ap: AlgProp, map: Map[BasicAtom, BasicAtom]) = {
+  private def _replace(ap: AlgProp, map: Map[BasicAtom, BasicAtom],
+      strategy: GuardStrategy) = {
     def _replace(opt: Option[BasicAtom]) = opt match {
       case None =>
         (None, false)
         
       case Some(atom) =>
-        val (newatom, flag) = replace(atom, map)
+        val (newatom, flag) = replace(atom, map, strategy)
         (Some(newatom), flag)
     }
     map.get(ap) match {
@@ -635,23 +679,25 @@ class Evaluator extends Builder {
     }
   }
   
-  private def _replace(app: Apply, map: Map[BasicAtom, BasicAtom]) = {
+  private def _replace(app: Apply, map: Map[BasicAtom, BasicAtom],
+      strategy: GuardStrategy) = {
     map.get(app) match {
       case Some(atom) =>
         (atom, true)
         
       case None =>
-        val (newop, flag1) = replace(app.op, map)
-        val (newarg, flag2) = replace(app.arg, map)
+        val (newop, flag1) = replace(app.op, map, strategy)
+        val (newarg, flag2) = replace(app.arg, map, strategy)
         if (flag1 || flag2) {
-          (newApply(Loc.internal, newop, newarg), true)
+          (newApply(Loc.internal, newop, newarg, strategy), true)
         } else {
           (app, false)
         }
     }
   }
   
-  private def _replace(as: AtomSeq, map: Map[BasicAtom, BasicAtom]) = {
+  private def _replace(as: AtomSeq, map: Map[BasicAtom, BasicAtom],
+      strategy: GuardStrategy) = {
     map.get(as) match {
       case Some(atom) =>
         (atom, true)
@@ -659,14 +705,14 @@ class Evaluator extends Builder {
         var flag1 = false
         val newatoms = as.atoms map {
           atom =>
-            val (newatom, changed) = replace(atom, map)
+            val (newatom, changed) = replace(atom, map, strategy)
             flag1 |= changed
             newatom
         }
         // The algebraic properties must rewrite to a valid algebraic
         // properties atom, or we must discard it since we cannot build a
         // legal algebraic properties atom otherwise.
-        val (newprops, flag2) = replace(as.props, map) match {
+        val (newprops, flag2) = replace(as.props, map, strategy) match {
           case (ap: AlgProp, flag: Boolean) => (ap, flag)
           case _ => (as.props, false)
         }
@@ -678,7 +724,8 @@ class Evaluator extends Builder {
     }
   }
   
-  private def _replace(ba: BindingsAtom, map: Map[BasicAtom, BasicAtom]) = {
+  private def _replace(ba: BindingsAtom, map: Map[BasicAtom, BasicAtom],
+      strategy: GuardStrategy) = {
     map.get(ba) match {
       case Some(atom) =>
         (atom, true)
@@ -686,7 +733,7 @@ class Evaluator extends Builder {
         var flag = false
         val newbinds = ba.mybinds map {
           bind =>
-            val (newbind, changed) = replace(bind._2, map)
+            val (newbind, changed) = replace(bind._2, map, strategy)
             flag |= changed
             (bind._1, newbind)
         }
@@ -698,30 +745,32 @@ class Evaluator extends Builder {
     }
   }
   
-  private def _replace(lam: Lambda, map: Map[BasicAtom, BasicAtom]) = {
+  private def _replace(lam: Lambda, map: Map[BasicAtom, BasicAtom],
+      strategy: GuardStrategy) = {
     map.get(lam) match {
       case Some(atom) =>
         (atom, true)
       case None =>
-        val (newvar, flag) = replace(lam.lvar, map)
+        val (newvar, flag) = replace(lam.lvar, map, strategy)
         val (newlvar, flag1) =
           (if (newvar.isInstanceOf[Variable])
             (newvar.asInstanceOf[Variable], flag) else (lam.lvar, false))
-        val (newbody, flag2) = replace(lam.body, map)
+        val (newbody, flag2) = replace(lam.body, map, strategy)
         if (flag1 || flag2) {
-          (newLambda(Loc.internal, newlvar, newbody), true)
+          (newLambda(Loc.internal, newlvar, newbody, strategy), true)
         } else {
           (lam, false)
         }
     }
   }
   
-  private def _replace(lit: IntegerLiteral, map: Map[BasicAtom, BasicAtom]) = {
+  private def _replace(lit: IntegerLiteral, map: Map[BasicAtom, BasicAtom],
+      strategy: GuardStrategy) = {
     map.get(lit) match {
       case Some(atom) =>
         (atom, true)
       case None =>
-        val (newtype, flag) = replace(lit.theType, map)
+        val (newtype, flag) = replace(lit.theType, map, strategy)
         if (flag) {
           (newLiteral(Loc.internal, newtype, lit.value), true)
         } else {
@@ -730,12 +779,13 @@ class Evaluator extends Builder {
     }
   }
   
-  private def _replace(lit: SymbolLiteral, map: Map[BasicAtom, BasicAtom]) = {
+  private def _replace(lit: SymbolLiteral, map: Map[BasicAtom, BasicAtom],
+      strategy: GuardStrategy) = {
     map.get(lit) match {
       case Some(atom) =>
         (atom, true)
       case None =>
-        val (newtype, flag) = replace(lit.theType, map)
+        val (newtype, flag) = replace(lit.theType, map, strategy)
         if (flag) {
           (newLiteral(Loc.internal, newtype, lit.value), true)
         } else {
@@ -744,12 +794,13 @@ class Evaluator extends Builder {
     }
   }
   
-  private def _replace(lit: StringLiteral, map: Map[BasicAtom, BasicAtom]) = {
+  private def _replace(lit: StringLiteral, map: Map[BasicAtom, BasicAtom],
+      strategy: GuardStrategy) = {
     map.get(lit) match {
       case Some(atom) =>
         (atom, true)
       case None =>
-        val (newtype, flag) = replace(lit.theType, map)
+        val (newtype, flag) = replace(lit.theType, map, strategy)
         if (flag) {
           (newLiteral(Loc.internal, newtype, lit.value), true)
         } else {
@@ -758,12 +809,13 @@ class Evaluator extends Builder {
     }
   }
   
-  private def _replace(lit: BitStringLiteral, map: Map[BasicAtom, BasicAtom]) = {
+  private def _replace(lit: BitStringLiteral, map: Map[BasicAtom, BasicAtom],
+      strategy: GuardStrategy) = {
     map.get(lit) match {
       case Some(atom) =>
         (atom, true)
       case None =>
-        val (newtype, flag) = replace(lit.theType, map)
+        val (newtype, flag) = replace(lit.theType, map, strategy)
         if (flag) {
           (newLiteral(Loc.internal, newtype, lit.bits, lit.len), true)
         } else {
@@ -772,12 +824,13 @@ class Evaluator extends Builder {
     }
   }
   
-  private def _replace(lit: FloatLiteral, map: Map[BasicAtom, BasicAtom]) = {
+  private def _replace(lit: FloatLiteral, map: Map[BasicAtom, BasicAtom],
+      strategy: GuardStrategy) = {
     map.get(lit) match {
       case Some(atom) =>
         (atom, true)
       case None =>
-        val (newtype, flag) = replace(lit.theType, map)
+        val (newtype, flag) = replace(lit.theType, map, strategy)
         if (flag) {
           (newLiteral(Loc.internal, newtype, lit.significand,
               lit.exponent, lit.radix), true)
@@ -787,14 +840,15 @@ class Evaluator extends Builder {
     }
   }
   
-  private def _replace(mp: MapPair, map: Map[BasicAtom, BasicAtom]) = {
+  private def _replace(mp: MapPair, map: Map[BasicAtom, BasicAtom],
+      strategy: GuardStrategy) = {
     map.get(mp) match {
       case Some(atom) =>
         (atom, true)
         
       case None =>
-        val (newleft, flag1) = replace(mp.left, map)
-        val (newright, flag2) = replace(mp.right, map)
+        val (newleft, flag1) = replace(mp.left, map, strategy)
+        val (newright, flag2) = replace(mp.right, map, strategy)
         if (flag1 || flag2) {
           (newMapPair(Loc.internal, newleft, newright), true)
         } else {
@@ -803,30 +857,33 @@ class Evaluator extends Builder {
     }
   }
   
-  private def _replace(or: OperatorRef, map: Map[BasicAtom, BasicAtom]) = {
+  private def _replace(or: OperatorRef, map: Map[BasicAtom, BasicAtom],
+      strategy: GuardStrategy) = {
     map.get(or) match {
       case None => (or, false)
       case Some(atom) => (atom, true)
     }
   }
   
-  private def _replace(sf: SpecialForm, map: Map[BasicAtom, BasicAtom]) = {
+  private def _replace(sf: SpecialForm, map: Map[BasicAtom, BasicAtom],
+      strategy: GuardStrategy) = {
     map.get(sf) match {
       case Some(atom) =>
         (atom, true)
         
       case None =>
-        val (newtag, flag1) = replace(sf.tag, map)
-        val (newcontent, flag2) = replace(sf.content, map)
+        val (newtag, flag1) = replace(sf.tag, map, strategy)
+        val (newcontent, flag2) = replace(sf.content, map, strategy)
         if (flag1 || flag2) {
-          (newSpecialForm(Loc.internal, newtag, newcontent), true)
+          (newSpecialForm(Loc.internal, newtag, newcontent, strategy), true)
         } else {
           (sf, false)
         }
     }
   }
   
-  private def _replace(vari: TermVariable, map: Map[BasicAtom, BasicAtom]) = {
+  private def _replace(vari: TermVariable, map: Map[BasicAtom, BasicAtom],
+      strategy: GuardStrategy) = {
     // Variables are complex critters.  We need to replace in (1) the type,
     // (2) the guard(s), and (3) the variable itself.  We try the easiest
     // case first.
@@ -835,8 +892,8 @@ class Evaluator extends Builder {
         (atom, true)
         
       case None =>
-        val (newtype, flag1) = replace(vari.theType, map)
-        val (newguard, flag2) = replace(vari.guard, map)
+        val (newtype, flag1) = replace(vari.theType, map, strategy)
+        val (newguard, flag2) = replace(vari.guard, map, strategy)
         if (flag1 || flag2) {
           (newTermVariable(Loc.internal, newtype, vari.name, newguard,
               vari.labels, vari.byName), true)
@@ -846,7 +903,8 @@ class Evaluator extends Builder {
     }
   }
   
-  private def _replace(vari: MetaVariable, map: Map[BasicAtom, BasicAtom]) = {
+  private def _replace(vari: MetaVariable, map: Map[BasicAtom, BasicAtom],
+      strategy: GuardStrategy) = {
     // Variables are complex critters.  We need to replace in (1) the type,
     // (2) the guard(s), and (3) the variable itself.  We try the easiest
     // case first.
@@ -855,8 +913,8 @@ class Evaluator extends Builder {
         (atom, true)
         
       case None =>
-        val (newtype, flag1) = replace(vari.theType, map)
-        val (newguard, flag2) = replace(vari.guard, map)
+        val (newtype, flag1) = replace(vari.theType, map, strategy)
+        val (newguard, flag2) = replace(vari.guard, map, strategy)
         if (flag1 || flag2) {
           (newMetaVariable(Loc.internal, newtype, vari.name, newguard,
               vari.labels, vari.byName), true)

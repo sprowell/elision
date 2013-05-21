@@ -93,7 +93,7 @@ object RuleApplyHandler {
     // Local function to check the guards.
     def checkGuards(candidate: Bindings): Boolean = {
       for (guard <- rule.guards) {
-        val (newguard, _) = builder.rewrite(guard, candidate)
+        val (newguard, _) = builder.rewrite(guard, candidate, rule.strategy)
         val (newguard1, _) = rule.strategy(newguard)
         if (!newguard1.isTrue) return false
       }
@@ -105,12 +105,12 @@ object RuleApplyHandler {
     def doRuleRewrite(candidate: Bindings) = {
       Debugger("rewrite", "Applied rule: " + rule.toParseString +
           " to: " + candidate.toParseString + "")
-      (builder.rewrite(rule.rewrite, candidate)._1, true)
+      (builder.rewrite(rule.rewrite, candidate, rule.strategy)._1, true)
     }
     
     // First we try to match the given atom against the pattern.
     Debugger("rulematch", "Trying rule: " + rule.toParseString)
-    Matcher(rule.pattern, subject, builder, binds, hint) match {
+    Matcher(rule.pattern, subject, builder, rule.strategy, binds, hint) match {
       case fail:Fail =>
         Debugger("rulematch", "Rule does not match subject: " + fail)
         return (subject, false)

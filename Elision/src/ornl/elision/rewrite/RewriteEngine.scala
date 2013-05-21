@@ -332,7 +332,8 @@ class RewriteEngine protected[elision] () {
           val newlhs = _rewritechild(lhs, task)
           val newrhs = _rewritechild(rhs, task)
           if (newlhs._2 || newrhs._2) {
-            (task._builder.newApply(Loc.internal, newlhs._1, newrhs._1), true)
+            (task._builder.newApply(Loc.internal, newlhs._1, newrhs._1,
+                task._strategy), true)
           } else {
             (atom, false)
           }
@@ -345,7 +346,7 @@ class RewriteEngine protected[elision] () {
           val newbody = _rewritechild(body, task)
           if (newparam._2 || newbody._2) {
             (task._builder.newLambda(Loc.internal, newparam._1,
-                newbody._1), true)
+                newbody._1, task._strategy), true)
           } else {
             (atom, false)
           }
@@ -355,7 +356,7 @@ class RewriteEngine protected[elision] () {
           val newrhs = _rewritechild(content, task)
           if (newlhs._2 || newrhs._2) {
             (task._builder.newSpecialForm(Loc.internal, newlhs._1,
-                newrhs._1), true)
+                newrhs._1, task._strategy), true)
           } else {
             (atom, false)
           }

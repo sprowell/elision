@@ -108,6 +108,10 @@ extends Map[String, BasicAtom] with Mutable {
   def ++(other: Bindings): Bindings = new Bindings(self ++ other.self)
   override def -(key: String): Bindings = new Bindings(self - key)
   
+  def +[B1 >: BasicAtom](kv: (String, B1)): Map[String, B1] = {
+    new Bindings(self + kv.asInstanceOf[(String, BasicAtom)])
+  }
+  
   /**
    * A special cache of rewrites that this binding has produced.  This map is
    * mutable!

@@ -45,7 +45,7 @@ import ornl.elision.util.PropertyManager
 import ornl.elision.util.Debugger
 import ornl.elision.util.Loc
 import ornl.elision.context.Context
-import ornl.elision.parse.Processor
+import ornl.elision.repl.Processor
 
 /**
  * The core classes and definitions that make up the Elision runtime.

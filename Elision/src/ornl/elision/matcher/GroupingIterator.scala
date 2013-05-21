@@ -45,6 +45,7 @@ import ornl.elision.util.OmitSeq.fromIndexedSeq
 import ornl.elision.context.ApplyBuilder
 import ornl.elision.context.Builder
 import ornl.elision.util.Loc
+import ornl.elision.core.GuardStrategy
 
 /**
  * Iterate over all associative groupings of items.
@@ -76,9 +77,14 @@ import ornl.elision.util.Loc
  * @param patterns	The patterns.
  * @param subjects	The subjects.
  * @param builder   The builder needed to build atoms.
+ * @oaran strategy  A guard strategy for new rules.
  * @param op				The operator, if known.
  */
-class GroupingIterator(patterns: AtomSeq, subjects: AtomSeq, builder: Builder,
+class GroupingIterator(
+    patterns: AtomSeq,
+    subjects: AtomSeq,
+    builder: Builder,
+    strategy: GuardStrategy,
     op: Option[OperatorRef]) extends Iterator[OmitSeq[BasicAtom]] {
   
   /* How this class works.
@@ -264,7 +270,7 @@ class GroupingIterator(patterns: AtomSeq, subjects: AtomSeq, builder: Builder,
 		      
 			      // If we have an operator, apply it now.
 		      	if (operator != null) {
-		      	  builder.newApply(Loc.internal, operator, list)
+		      	  builder.newApply(Loc.internal, operator, list, strategy)
 		      	} else {
 		      	  list
 		      	}

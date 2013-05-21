@@ -121,11 +121,11 @@ abstract class Apply(
  * 								synthetic!
  */
 case class OpApply protected[elision] (
-    loc: Loc,
+    xloc: Loc,
     val theType: BasicAtom,
     override val op: OperatorRef,
     override val arg: AtomSeq,
-    val pabinds: Bindings) extends Apply(loc, op, arg) {
+    val pabinds: Bindings) extends Apply(xloc, op, arg) {
 }
 
 /**
@@ -141,9 +141,9 @@ case class OpApply protected[elision] (
  * @param arg		The argument.
  */
 case class SimpleApply protected[elision] (
-    loc: Loc,
+    xloc: Loc,
     override val op: BasicAtom,
-    override val arg: BasicAtom) extends Apply(loc, op, arg) {
+    override val arg: BasicAtom) extends Apply(xloc, op, arg) {
   
   /**
    * We take the type from the operator.  This may be an incomplete type, but

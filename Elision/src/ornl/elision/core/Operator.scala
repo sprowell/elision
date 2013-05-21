@@ -277,16 +277,16 @@ object SymbolicOperator {
  *                      probably leave this with the default value of false.
  * @param handlertxt    Optional text for a native handler.  None by default.
  */
-class SymbolicOperator protected[elision] (
+abstract class SymbolicOperator protected[elision] (
     loc: Loc,
     content: => BasicAtom,
     name: String,
     typ: BasicAtom,
     val params: AtomSeq,
-    description: String = "no description",
-    detail: String = "no detail",
-    evenMeta: Boolean = false,
-    val handlertxt: Option[String] = None) extends Operator(loc, content, name,
+    description: String,
+    detail: String,
+    evenMeta: Boolean,
+    val handlertxt: Option[String]) extends Operator(loc, content, name,
         typ, params, description, detail, evenMeta) {
     
   /**

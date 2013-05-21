@@ -51,6 +51,7 @@ import ornl.elision.core.OperatorRef
 import ornl.elision.core.Literal
 import ornl.elision.core.Strategy
 import ornl.elision.core.StringLiteral
+import ornl.elision.core.GuardStrategy
 
 /**
  * A lambda variable does not match the argument.
@@ -103,24 +104,25 @@ class ApplyBuilder(ophandler: OperatorApplyHandler) {
    * @param strat     The strategy to apply.
    * @param arg       The argument.
    * @param builder   The builder needed to build atoms.
+   * @param strategy  The guard strategy to use for new rules.
    * @return  The pair of result atom and flag.
    */
-  def test(strat: Strategy, arg: BasicAtom,
-      builder: Builder): (BasicAtom, Boolean) = {
+  def test(strat: Strategy, arg: BasicAtom, builder: Builder,
+      strategy: GuardStrategy): (BasicAtom, Boolean) = {
     strat match {
       case op_mappair: MapPair =>
         // Handle the case of a map pair.  A map pair is a primitive sort of
         // rewrite rule that consists of a pattern and a rewrite, and nothing
         // else.
-        Matcher(op_mappair.left, arg, builder, Bindings(), None) match {
+        Matcher(op_mappair.left, arg, builder, strategy, Bindings(), None) match {
           case file:Fail => 
             (arg, false)
             
           case Match(binds) =>
-            (builder.rewrite(op_mappair.right, binds)._1, true)
+            (builder.rewrite(op_mappair.right, binds, strategy)._1, true)
             
           case Many(iter) =>
-            (builder.rewrite(op_mappair.right, iter.next)._1, true)
+            (builder.rewrite(op_mappair.right, iter.next, strategy)._1, true)
         }
 
       case op_rule: RewriteRule =>
@@ -146,7 +148,7 @@ class ApplyBuilder(ophandler: OperatorApplyHandler) {
    * @return  The result of applying the operator to the argument.
    */
   def apply(op: BasicAtom, arg: BasicAtom, builder: Builder,
-      bypass: Boolean = false): BasicAtom = {
+      strategy: GuardStrategy, bypass: Boolean = false): BasicAtom = {
     op match {
         case StringLiteral(loc, typ, str) if arg.isInstanceOf[StringLiteral] =>
           // If the argument is also a string literal, then we want to simply
@@ -180,7 +182,7 @@ class ApplyBuilder(ophandler: OperatorApplyHandler) {
         //
         // Try to rewrite the argument using the bindings and whatever we get
         // back is the result.
-        builder.rewrite(arg, op_bind.mybinds)._1
+        builder.rewrite(arg, op_bind.mybinds, strategy)._1
 
       case op_lambda: Lambda =>
         // Handle the case of applying a lambda to an atom.  A lambda is a
@@ -194,15 +196,15 @@ class ApplyBuilder(ophandler: OperatorApplyHandler) {
           // Make it possible to check types by matching the variable against the
           // argument instead of just binding.  For pure binding without checking
           // types, use a bind.
-          Matcher(op_lambda.lvar, arg, builder, Bindings(), None) match {
+          Matcher(op_lambda.lvar, arg, builder, strategy, Bindings(), None) match {
             case fail:Fail =>
               throw new LambdaVariableMismatchException(arg.loc,
                   "Lambda argument does not match parameter: " + fail.theReason)
             case Match(binds) =>
               // Great!  Now rewrite the body with the bindings.
-              builder.rewrite(op_lambda.body, binds)._1
+              builder.rewrite(op_lambda.body, binds, strategy)._1
             case Many(iter) =>
-              builder.rewrite(op_lambda.body, iter.next)._1
+              builder.rewrite(op_lambda.body, iter.next, strategy)._1
           }
         } catch {
           case ex:java.lang.StackOverflowError =>
@@ -214,12 +216,12 @@ class ApplyBuilder(ophandler: OperatorApplyHandler) {
         
       case op_strat: Strategy =>
         // Handle a strategy.
-        pair2bind(test(op_strat, arg, builder))
+        pair2bind(test(op_strat, arg, builder, strategy))
         
       case op_opref: OperatorRef =>
         // An operator reference holds an operator as a "closure."  We need to
         // extract the operator and then apply it.
-        apply(op_opref.operator, arg, builder, bypass)
+        apply(op_opref.operator, arg, builder, strategy, bypass)
         
       case op_op: Operator =>
         // An operator can be applied to another atom, potentially resulting

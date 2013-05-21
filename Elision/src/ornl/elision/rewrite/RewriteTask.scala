@@ -38,6 +38,7 @@ import ornl.elision.context.Memo
 import ornl.elision.context.RuleLibrary
 import ornl.elision.context.Builder
 import scala.compat.Platform
+import ornl.elision.core.GuardStrategy
 
 /**
  * Package defaults and provide for creation of rewrite tasks.
@@ -81,12 +82,13 @@ object RewriteTask {
    * @param library   The rule library that provides the rulesets.
    * @param memo      A memoization cache to use.
    * @param builder   The builder to make new atoms.
+   * @param strategy  A default guard strategy to use for new rules.
    * @param rulesets  The rulesets to use for rewriting, or `Set.empty` to use
    *                  all enabled, which is the default.
    * @return  The new rewrite task.
    */
   def apply(atom: BasicAtom, library: RuleLibrary, memo: Memo, builder: Builder,
-      rulesets: Set[String] = Set.empty) = {
+      strategy: GuardStrategy, rulesets: Set[String] = Set.empty) = {
     // Lock the pool so we can get the next object safely.
     val rt = _pool.synchronized {
       // See if there is an object in the pool.
@@ -108,6 +110,7 @@ object RewriteTask {
     rt._library = library
     rt._memo = memo
     rt._builder = builder
+    rt._strategy = strategy
     rt._rulesets = library.getRulesetBits(rulesets)
     rt._timeout = timeout
     rt
@@ -156,6 +159,9 @@ class RewriteTask private () extends Mutable {
   
   /** The builder to use. */
   private[rewrite] var _builder: Builder = _
+  
+  /** A default guard strategy to use. */
+  private[rewrite] var _strategy: GuardStrategy = _
   
   /** The rulesets to use during rewrite. */
   private[rewrite] var _rulesets: BitSet = _

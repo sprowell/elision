@@ -36,8 +36,6 @@ import ornl.elision.cli.ArgSwitch
 import ornl.elision.cli.Setting
 import ornl.elision.cli.CLI
 import ornl.elision.cli.Switch
-import ornl.elision.parse.Processor
-import ornl.elision.parse.ProcessorControl
 import ornl.elision.util.Loc
 import ornl.elision.rewrite.RewriteEngine
 import ornl.elision.context.ApplyData
@@ -47,6 +45,7 @@ import ornl.elision.rewrite.RewriteTask
 import ornl.elision.context.StandardBuilder
 import scala.io.Source
 import ornl.elision.dialects.Dialect
+import ornl.elision.dialects.ContextGenerator
 
 /**
  * Implement an interface to run the REPL from the prompt.
@@ -344,7 +343,15 @@ extends Processor(state.settings, new Context()) {
       "Use the pager when output is longer than the screen.", true)
   context.declareProperty("syntaxcolor", "Use syntax-based coloring of atoms where " +
       "it is supported.", true)
-  
+      
+  // Configure the native compiler cache.  Make the setting available as a
+  // runtime property.
+  context.declareProperty("elision.cache",
+      "Name of the folder where Elision will cache native handlers.", {
+    settings.getOrElse("elision.cache",
+        new File(_home, "cache").getAbsolutePath)
+  })
+
   //======================================================================
   // Define the REPL control fields.
   //======================================================================
@@ -405,7 +412,8 @@ extends Processor(state.settings, new Context()) {
           showatom("", atom)
         }
         if (context.getProperty("applybinds")) {
-          Some(context.builder.rewrite(atom, context.binds)._1)
+          Some(context.builder.rewrite(atom, context.binds,
+              context.guardstrategy)._1)
         } else {
           Some(atom)
         }
@@ -644,7 +652,7 @@ extends Processor(state.settings, new Context()) {
       case None =>
       case Some(fn) =>
         context.console.emitln("Writing compilable context as: " + fn)
-        ContextGenerator.generate(fn, context)
+        ContextWriter.generate(fn, context)
         context.console.emitln("Done.")
         return
     }
@@ -775,7 +783,7 @@ extends Processor(state.settings, new Context()) {
     addHistoryLine("// Ended normally: " + new java.util.Date)
     val cfile = new java.io.FileWriter(_lastcontext)
     if (cfile != null) {
-      cfile.write(context.toParseString)
+      cfile.write(ContextGenerator.toParseString(context))
       cfile.flush()
       cfile.close()
     } else {

@@ -64,6 +64,7 @@ import ornl.elision.core.BOOLEAN
 import ornl.elision.core.SYMBOL
 import ornl.elision.core.BooleanLiteral
 import ornl.elision.core.GuardStrategy
+import ornl.elision.core.SimpleApply
 
 /**
  * Construct atoms, first applying any evaluation logic.
@@ -75,24 +76,27 @@ abstract class Builder {
    * map.  The atom itself may be in the map, in which case its replacement
    * is returned.  This is a "one pass" replacement.
    * 
-   * @param atom    The atom to rewrite.
-   * @param binds   The bindings.
+   * @param atom      The atom to rewrite.
+   * @param binds     The bindings.
+   * @param strategy  The guard strategy required to create rewrite rules.
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def replace(atom: BasicAtom,
-      map: Map[BasicAtom, BasicAtom]): (BasicAtom, Boolean)
+  def replace(atom: BasicAtom, map: Map[BasicAtom, BasicAtom],
+      strategy: GuardStrategy): (BasicAtom, Boolean)
       
   /**
    * Rewrite the provided atom, replacing instances of variables bound (by
    * name) in the bindings with the bound values.
    * 
-   * @param atom    The atom to rewrite.
-   * @param binds   The bindings.
+   * @param atom      The atom to rewrite.
+   * @param binds     The bindings.
+   * @param strategy  The guard strategy required to create rewrite rules.
    * @return  A pair consisting of the result atom and a flag that is true
    *          iff any rewriting was performed.
    */
-  def rewrite(atom: BasicAtom, binds: Bindings): (BasicAtom, Boolean)
+  def rewrite(atom: BasicAtom, binds: Bindings,
+      strategy: GuardStrategy): (BasicAtom, Boolean)
 
   /**
    * Make a new algebraic property specification.
@@ -117,11 +121,12 @@ abstract class Builder {
    * @param loc           Location of this specification.
    * @param operator      The operator.
    * @param argument      The argument.
+   * @param strategy      A guard strategy for new rules.
    * @param bypass        If true, bypass native handler.  Default is false.
    * @return  The result.
    */
   def newApply(loc: Loc, operator: BasicAtom, argument: BasicAtom,
-      bypass: Boolean = false): BasicAtom
+      strategy: GuardStrategy, bypass: Boolean = false): BasicAtom
   
   /**
    * Make a new atom collection.
@@ -153,7 +158,9 @@ abstract class Builder {
   def newAtomSeq(loc: Loc, properties: AlgProp,
       atoms: BasicAtom*): AtomSeq = {
     val theType = {
-      if (atoms.length == 0) LIST(ANY) else {
+      if (atoms.length == 0) {
+        LIST(ANY)
+      } else {
         val aType = atoms(0).theType
         if (atoms.forall(aType == _.theType)) LIST(aType) else LIST(ANY)
       }
@@ -184,17 +191,21 @@ abstract class Builder {
   }
   
   /**
-   * Make a new lambda.
+   * Make a new lambda.  This requires that a guard strategy be specified
+   * because it must rewrite the body, and that method requires the strategy.
+   * No rules are (likely to be) created.
    * 
    * @param loc           Location of this atom's declaration.
    * @param parameter     The lambda parameter.
    * @param body          The lambda body.
+   * @param strategy      The guard strategy to use for new rules.
    * @return  The new lambda.
    */
-  def newLambda(loc: Loc, parameter: Variable, body: BasicAtom): Lambda = {
-    val (lvar, lbody) = adjust(parameter, body)
+  def newLambda(loc: Loc, parameter: Variable, body: BasicAtom,
+      strategy: GuardStrategy): Lambda = {
+    val (lvar, lbody) = _adjust(parameter, body, strategy)
     new Lambda(loc, lvar, lbody, MAP(lvar.theType, lbody.theType)) {
-      def apply(arg: BasicAtom) = newApply(Loc.internal, this, arg)
+      def apply(arg: BasicAtom) = newApply(Loc.internal, this, arg, strategy)
     }
   }
   
@@ -286,40 +297,7 @@ abstract class Builder {
   def newMapPair(loc: Loc, pattern: BasicAtom, rewrite: BasicAtom): MapPair = {
     new MapPair(loc, pattern, rewrite)
   }
-  
-  /**
-   * Make a new rewrite rule.  Provide the special form content.
-   * 
-   * @param loc         Location of the atom's declaration.
-   * @param content     The content of the special form, lazily evaluated.
-   * @param pattern     The pattern to match.
-   * @param rewrite     The rewrite to apply on match.
-   * @param guards      Guards that must be true to accept a match.
-   * @param rulesets    The rulesets that contain this rule.
-   * @param strategy    The guard strategy to use.
-   * @param name        Optional rule name.
-   * @param description Optional rule description.
-   * @param detail      Optional detailed rule description.
-   * @param synthetic   If true, this is a synthetic rule.
-   * @return  The new rewrite rule.
-   */
-  def newRewriteRule(
-      loc: Loc,
-      content: => BasicAtom,
-      pattern: BasicAtom,
-      rewrite: BasicAtom,
-      guards: Seq[BasicAtom],
-      rulesets: Set[String],
-      strategy: GuardStrategy,
-      name: Option[String] = None,
-      description: String = "",
-      detail: String = "",
-      synthetic: Boolean = false) = {
-    new RewriteRule(loc, content, pattern, rewrite, guards, rulesets, strategy,
-        name, description, detail, synthetic)
-  }
-  
-  
+    
   /**
    * Make a new rewrite rule.  Provide the special form content.
    * 
@@ -346,88 +324,29 @@ abstract class Builder {
       description: String = "",
       detail: String = "",
       synthetic: Boolean = false) = {
-    var content = Bindings {
-      "" -> newAtomSeq(Loc.internal, NoProps,
-          newMapPair(Loc.internal, pattern, rewrite))
-      "guards" -> newAtomSeq(Loc.internal, NoProps, guards.toIndexedSeq)
-      "description" -> newLiteral(Loc.internal, STRING, description)
-      "detail" -> newLiteral(Loc.internal, STRING, detail)
+    def makeContent = () => {
+      var content = Bindings {
+        "" -> newAtomSeq(Loc.internal, NoProps,
+            newMapPair(Loc.internal, pattern, rewrite))
+        "guards" -> newAtomSeq(Loc.internal, NoProps, guards.toIndexedSeq)
+        "description" -> newLiteral(Loc.internal, STRING, description)
+        "detail" -> newLiteral(Loc.internal, STRING, detail)
+      }
+      if (name.isDefined) {
+        content += ("name" -> newLiteral(Loc.internal, SYMBOL, Symbol(name.get)))
+      }
+      content
     }
-    if (name.isDefined) {
-      content += ("name" -> newLiteral(Loc.internal, SYMBOL, Symbol(name.get)))
-    }
-    new RewriteRule(loc, content,
+    new RewriteRule(loc, makeContent(),
         pattern, rewrite, guards, rulesets, strategy, name,
         description, detail, synthetic)
-  }
-
-  /**
-   * Make a new symbolic operator.  Provide special form content.
-   * 
-   * @param loc           The location.
-   * @param content       The content.  This is lazily evaluated.
-   * @param name          The operator name.
-   * @param typ           The type of the fully-applied operator.
-   * @param params        The operator parameters.
-   * @param description   An optional short description for the operator.
-   * @param detail        Optional detailed help for the operator.
-   * @param evenMeta      Apply this operator even when the arguments contain
-   *                      meta-terms.  This is not advisable, and you should
-   *                      probably leave this with the default value of false.
-   * @param handlertxt    The text for an optional native handler.
-   */
-  def newTypedSymbolicOperator(
-      loc: Loc,
-      content: => BasicAtom,
-      name: String,
-      typ: BasicAtom,
-      params: AtomSeq,
-      description: String,
-      detail: String,
-      evenMeta: Boolean,
-      handlertxt: Option[String]): TypedSymbolicOperator = {
-    new TypedSymbolicOperator(loc, content, name, typ,
-        _makeOperatorType(params, typ), params, description, detail, evenMeta,
-        handlertxt) {
-      def apply(args: IndexedSeq[BasicAtom]) =
-        newApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps, args))
-    }
-  }
-  
-  /**
-   * Make a new case operator.  Provide special form content.
-   * 
-   * @param loc           The location.
-   * @param content       The content.  This is lazily evaluated.
-   * @param name          The operator name.
-   * @param typ           The operator type.
-   * @param cases         The definition.
-   * @param description   An optional short description for the operator.
-   * @param detail        Optional detailed help for the operator.
-   * @param evenMeta      Apply this operator even when the arguments contain
-   *                      meta-terms.  This is not advisable, and you should
-   *                      probably leave this with the default value of false.
-   */
-  def newCaseOperator(
-      loc: Loc,
-      content: => BasicAtom,
-      name: String,
-      typ: BasicAtom,
-      cases: AtomSeq,
-      description: String,
-      detail: String,
-      evenMeta: Boolean): CaseOperator = {
-    new CaseOperator(loc, content, name, typ, cases, description, detail,
-        evenMeta) {
-      def apply(args: IndexedSeq[BasicAtom]) =
-        newApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps, args))
-    }
   }
 
   /**
    * Make a new symbolic operator.
    * 
    * @param loc           The location.
+   * @param strategy      A guard strategy for new rules.
    * @param name          The operator name.
    * @param typ           The type of the fully-applied operator.
    * @param params        The operator parameters.
@@ -440,6 +359,7 @@ abstract class Builder {
    */
   def newTypedSymbolicOperator(
       loc: Loc,
+      strategy: GuardStrategy,
       name: String,
       typ: BasicAtom,
       params: AtomSeq,
@@ -459,7 +379,8 @@ abstract class Builder {
         }), name, typ, _makeOperatorType(params, typ), params, description,
         detail, evenMeta, handlertxt) {
       def apply(args: IndexedSeq[BasicAtom]) =
-        newApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps, args))
+        newApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps, args),
+            strategy)
     }
   }
   
@@ -467,6 +388,7 @@ abstract class Builder {
    * Make a new case operator.
    * 
    * @param loc           The location.
+   * @param strategy      A guard strategy for new rules.
    * @param name          The operator name.
    * @param typ           The operator type.
    * @param cases         The definition.
@@ -478,6 +400,7 @@ abstract class Builder {
    */
   def newCaseOperator(
       loc: Loc,
+      strategy: GuardStrategy,
       name: String,
       typ: BasicAtom,
       cases: AtomSeq,
@@ -495,7 +418,8 @@ abstract class Builder {
           "evenmeta" -> new BooleanLiteral(Loc.internal, evenMeta)
         }, name, typ, cases, description, detail, evenMeta) {
       def apply(args: IndexedSeq[BasicAtom]) =
-        newApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps, args))
+        newApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps, args),
+            strategy)
     }
   }
   
@@ -507,9 +431,7 @@ abstract class Builder {
    * @return  The new operator reference.
    */
   def newOperatorRef(loc: Loc, operator: Operator): OperatorRef = {
-    new OperatorRef(loc, operator) {
-      def apply(args: IndexedSeq[BasicAtom]) = operator(args)
-    }
+    new OperatorRef(loc, operator)
   }
   
   /**
@@ -518,9 +440,11 @@ abstract class Builder {
    * @param loc           Location of this atom's declaration.
    * @param tag           The special form tag.
    * @param content       The content.
+   * @param strategy      The strategy to use to rewrite rule guards.
    * @return  The new special form.
    */
-  def newSpecialForm(loc: Loc, tag: BasicAtom, content: BasicAtom): SpecialForm
+  def newSpecialForm(loc: Loc, tag: BasicAtom, content: BasicAtom,
+      strategy: GuardStrategy): SpecialForm
   
   /**
    * Make a new term variable.
@@ -569,9 +493,11 @@ abstract class Builder {
    *
    * @param given_lvar  The given lambda parameter.
    * @param given_body  The given lambda body.
+   * @param strategy    The guard strategy to use for new rules.
    * @return  The pair consisting of the corrected variable and body.
    */
-  def adjust(given_lvar: Variable, given_body: BasicAtom) = {
+  private def _adjust(given_lvar: Variable, given_body: BasicAtom,
+      strategy: GuardStrategy): (Variable, BasicAtom) = {
     // Make and return the new lambda.
     if (Lambda.useDeBruijnIndices) {
       // Decide what De Bruijn index to use for this lambda.  We will use one
@@ -610,7 +536,7 @@ abstract class Builder {
           given_lvar.asMetaVariable -> newmvar)
     
       // Bind the old variable to the new one and rewrite the body.
-      val (newbody, notfixed) = replace(given_body, map)
+      val (newbody, notfixed) = replace(given_body, map, strategy)
       
       // Return the result.
       if (given_lvar.isTerm) {
@@ -687,7 +613,8 @@ abstract class Builder {
           "indicates a mapping from one type (the domain) to another type " +
           "(the codomain).") {
     def apply(args: IndexedSeq[BasicAtom]) =
-      newApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps, args))
+      new SimpleApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps,
+          args))
   })
       
   /**
@@ -708,7 +635,8 @@ abstract class Builder {
           "indicates the cross product of two atoms (typically types).  " +
           "These originate from the types of the parameters of an operator.") {
     def apply(args: IndexedSeq[BasicAtom]) =
-      newApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps, args))
+      new SimpleApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps,
+          args))
   })
       
   /**
@@ -728,6 +656,7 @@ abstract class Builder {
           "single argument that is the type of the atoms in the list.  For " +
           "heterogeneous lists this will be ANY.") {
     def apply(args: IndexedSeq[BasicAtom]) =
-      newApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps, args))
+      new SimpleApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps,
+          args))
   })
 }

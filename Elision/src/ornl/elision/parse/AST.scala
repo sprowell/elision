@@ -301,7 +301,8 @@ object AST {
           
         case value: Any => value
       }
-      context.builder.newApply(loc, op, right.interpret(context))
+      context.builder.newApply(loc, op, right.interpret(context),
+          context.guardstrategy)
     }
   }
   
@@ -393,7 +394,7 @@ object AST {
   def lambda(param: AST[Variable], body: BA, loc: Loc) = new AST[Lambda](loc) {
     def interpret(context: Context) =
       context.builder.newLambda(loc, param.interpret(context),
-          body.interpret(context))
+          body.interpret(context), context.guardstrategy)
   }
   
   /**
@@ -407,7 +408,7 @@ object AST {
   def special(tag: BA, content: BA, loc: Loc) = new BA(loc) {
     def interpret(context: Context) =
       context.builder.newSpecialForm(loc, tag.interpret(context),
-          content.interpret(context))
+          content.interpret(context), context.guardstrategy)
   }
   
   /**

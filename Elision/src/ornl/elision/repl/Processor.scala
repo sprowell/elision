@@ -27,22 +27,34 @@
  * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package ornl.elision.parse
+package ornl.elision.repl
 
 import ornl.elision.actors.ReplActor
 import ornl.elision.context.Context
 import ornl.elision.core.BasicAtom
-import ornl.elision.util.Console
-import ornl.elision.util.PrintConsole
 import ornl.elision.util.FileResolver
 import ornl.elision.util.Timeable
 import ornl.elision.util.PropertyManager
 import ornl.elision.util.HasHistory
 import ornl.elision.util.ElisionException
-import ornl.elision.util.Version
 import ornl.elision.util.Loc
-import ornl.elision.dialects.Dialect
 import ornl.elision.matcher.ACMatcher
+import java.io.File
+import ornl.elision.dialects.ContextGenerator
+import java.io.FileNotFoundException
+import ornl.elision.parse.AST
+import ornl.elision.parse.ElisionParser
+import ornl.elision.parse.Failure
+import ornl.elision.parse.Presult
+import ornl.elision.parse.Success
+import ornl.elision.util.Version
+import ornl.elision.util.Version.build
+import ornl.elision.util.Version.loaded
+import ornl.elision.util.Version.major
+import ornl.elision.util.Version.minor
+import ornl.elision.util.Version.web
+import scala.Array.canBuildFrom
+import scala.xml.XML
 
 /**
  * Manage the default parser kind to use.
@@ -104,7 +116,7 @@ with HasHistory {
       "Whether to use the class path to locate files.", true)
   context.declareProperty("path",
       "The search path to use to locate files.", FileResolver.defaultPath)
-  
+        
   // Determine whether to do risky (but fast) equality checking.
   context.declareProperty("risky_equality_check",
       "Whether to do fast, but risky, equality checking of atoms.",
@@ -148,7 +160,6 @@ with HasHistory {
    * @param history If true (default), log the start of the session.
    */
   def banner(history: Boolean = true) {
-    import ornl.elision.util.Version._
     context.console.emitln(
         """|      _ _     _
 					 |  ___| (_)___(_) ___  _ __
@@ -466,7 +477,7 @@ with HasHistory {
             build={build}
             scala.version={scala.util.Properties.versionString}
           />
-        val cont = <context>{context.toParseString}</context>
+        val cont = <context>{ContextGenerator.toParseString(context)}</context>
         val err = th match {
           case None => <error/>
           case Some(ex) =>

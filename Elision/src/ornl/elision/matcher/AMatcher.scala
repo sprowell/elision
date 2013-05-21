@@ -47,6 +47,7 @@ import scala.annotation.tailrec
 import ornl.elision.core.AtomSeq
 import ornl.elision.context.Builder
 import ornl.elision.util.Loc
+import ornl.elision.core.GuardStrategy
 
 /**
  * Match two sequences, where the elements of the second sequence can be
@@ -60,15 +61,17 @@ object AMatcher {
    * provides better performance and results in more obvious (and expected)
    * matching in many cases.
    * 
-   * @param plist	  The pattern list.
-   * @param slist	  The subject list.
-   * @param builder The builder needed to build atoms.
-   * @param binds	  Bindings that must be honored in any match.
-   * @param op		  An optional operator to apply to sublists.
+   * @param plist	    The pattern list.
+   * @param slist	    The subject list.
+   * @param builder   The builder needed to create atoms.
+   * @param strategy  The guard strategy to use for new rules.
+   * @param binds	    Bindings that must be honored in any match.
+   * @param op		    An optional operator to apply to sublists.
    * @return	The match outcome.
    */
   def tryMatch(plist: AtomSeq, slist: AtomSeq, builder: Builder,
-      binds: Bindings, op: Option[OperatorRef]): Outcome = {
+      strategy: GuardStrategy, binds: Bindings,
+      op: Option[OperatorRef]): Outcome = {
     // Check the length.
     if (plist.atoms.length > slist.atoms.length)
       return Fail("More patterns than subjects, so no match is possible.",
@@ -88,7 +91,8 @@ object AMatcher {
       
     // If there are the same number, then this is a simple case of matching.
     if (plist.atoms.length == slist.atoms.length)
-      return SequenceMatcher.tryMatch(plist.atoms, slist.atoms, builder, binds)
+      return SequenceMatcher.tryMatch(plist.atoms, slist.atoms, builder,
+          strategy, binds)
       
     // If there is exactly one pattern then match it immediately.
     if (plist.atoms.length == 1) {
@@ -96,18 +100,18 @@ object AMatcher {
       // the single pattern against the result.
       return Matcher(plist.atoms(0), op match {
         case Some(opref) =>
-          builder.newApply(Loc.internal, opref, slist)
+          builder.newApply(Loc.internal, opref, slist, strategy)
 
         case None =>
           slist
-      }, builder, binds)
+      }, builder, strategy, binds)
     }
       
     // We need to group the atoms so there is the same number of patterns and
     // subjects.  If there are N subjects and M patterns (with M < N per the
     // above checks) then we essentially insert M-1 markers between elements
     // of the N subjects.  Get it?  We use a special iterator for that.
-    val iter = new AMatchIterator(plist, slist, builder, binds, op)
+    val iter = new AMatchIterator(plist, slist, builder, strategy, binds, op)
     if (iter.hasNext) return Many(iter)
     else Fail("The lists do not match.", plist, slist)
   }
@@ -188,18 +192,21 @@ object AMatcher {
    * 
    * @param patterns	The patterns.
    * @param subjects	The subjects.
-   * @param builder   The builder needed to build atoms.
+   * @param builder   The builder needed to create atoms.
+   * @param strategy  The guard strategy to use for new rules.
    * @param binds			Bindings to honor.
    */
   private class AMatchIterator(
       patterns: AtomSeq,
       subjects: AtomSeq,
       builder: Builder,
+      strategy: GuardStrategy,
       binds: Bindings,
       op: Option[OperatorRef]) extends MatchIterator {
     
     /** An iterator over all groupings of the subjects. */
-    private val _groups = new GroupingIterator(patterns, subjects, builder, op)
+    private val _groups = new GroupingIterator(patterns, subjects, builder,
+        strategy, op)
     
     /**
      * Find the next match.  At the end of running this method either we
@@ -216,7 +223,7 @@ object AMatcher {
         _local = null
         if (_groups.hasNext) {
           SequenceMatcher.tryMatch(patterns.atoms, _groups.next, builder,
-              binds) match {
+              strategy, binds) match {
             case fail:Fail =>
               // We ignore this case.  We only fail if we exhaust all attempts.
               Debugger("matching", fail.toString)

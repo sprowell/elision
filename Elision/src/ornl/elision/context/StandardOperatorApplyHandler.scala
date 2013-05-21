@@ -83,7 +83,8 @@ class ApplyData(val op: SymbolicOperator, val args: AtomSeq,
    * Just preserve the apply as it is.  The loc of the operator is used as the
    * loc of the generated apply.
    */
-  def as_is = context.builder.newApply(op.loc, op, args, true)
+  def as_is =
+    context.builder.newApply(op.loc, op, args, context.guardstrategy, true)
 }
 
 /**
@@ -103,7 +104,7 @@ extends OperatorApplyHandler {
    * @param bypass  If true, bypass the operator's native handler, if any.
    * @return  The constructed atom.
    */
-  def apply(op: Operator, arg: BasicAtom,
+  def apply(op: Operator, arg: BasicAtom, builder: Builder,
       bypass: Boolean = false): BasicAtom = {
     // Operator applications can be handled in two quite different ways.
     // A symbolic operator is processed differently from a case operator.
@@ -135,7 +136,7 @@ extends OperatorApplyHandler {
    * @return  The constructed atom.
    */
   private def _opApply(op: SymbolicOperator, arg: BasicAtom, context: Context,
-      bypass: Boolean = false): BasicAtom = {
+      bypass: Boolean): BasicAtom = {
     arg match {
       case args: AtomSeq =>
         // Things have to happen in the correct order here.  First increase
@@ -203,7 +204,8 @@ extends OperatorApplyHandler {
           // obtained by rewriting the operator's type using the bindings.
           // The "fully applied type" (the co-domain) must be used, and not
           // the type for a typed symbolic operator (which is a MAP).
-          val appliedtype = context.builder.rewrite(op.typ, binds)._1
+          val appliedtype = context.builder.rewrite(op.typ, binds,
+              context.guardstrategy)._1
           return new OpApply(Loc.internal, appliedtype,
               context.builder.newOperatorRef(Loc.internal, op), newargs, binds)
         }
@@ -252,7 +254,7 @@ extends OperatorApplyHandler {
             val atom = newseq(0)
             // Match the type of the atom against the type of the parameters.
             val param = op.params(0)
-            Matcher(param, atom, context.builder) match {
+            Matcher(param, atom, context.builder, context.guardstrategy) match {
               case Fail(reason, index) =>
                 // The argument is invalid.  Reject!
                 throw new ArgumentListException(atom.loc,
@@ -308,7 +310,7 @@ extends OperatorApplyHandler {
           // arguments/formal parameters have the same type, matching
           // 1 formal parameter with 1 argument gives us all the
           // binding information needed to do type inference.
-          Matcher(aParam, anArg, context.builder) match {
+          Matcher(aParam, anArg, context.builder, context.guardstrategy) match {
             case Fail(reason, index) =>
               throw new ArgumentListException(anArg.loc,
                   "Incorrect argument for operator " + toESymbol(op.name) +
@@ -327,7 +329,8 @@ extends OperatorApplyHandler {
           // We've run out of special cases to handle.  Now just try to match
           // the arguments against the parameters.
           val newparams = op.params.atoms
-          SequenceMatcher.tryMatch(newparams, newseq, context.builder) match {
+          SequenceMatcher.tryMatch(newparams, newseq, context.builder,
+              context.guardstrategy) match {
             case Fail(reason, index) =>
               throw new ArgumentListException(newseq(index).loc,
                   "Incorrect argument for operator " + toESymbol(op.name) +
@@ -360,7 +363,7 @@ extends OperatorApplyHandler {
    * @return  The constructed atom.
    */
   private def _opApply(op: CaseOperator, arg: BasicAtom, context: Context,
-      bypass: Boolean = false) = {
+      bypass: Boolean) = {
     // Traverse the list of cases and try to find a case that the arguments
     // match.  Every case should be a rewritable, an applicable, or an atom.
     // If a rewritable, apply it and if it succeeds, choose the result.
@@ -369,12 +372,14 @@ extends OperatorApplyHandler {
     val done = op.cases.exists {
       _ match {
         case rew: Strategy =>
-          val pair = context.applybuilder.test(rew, arg, context.builder)
+          val pair = context.applybuilder.test(rew, arg, context.builder,
+              context.guardstrategy)
           result = Some(pair._1)
           pair._2
           
         case app: Applicable =>
-          result = Some(context.applybuilder(app, arg, context.builder, bypass))
+          result = Some(context.applybuilder(app, arg, context.builder,
+              context.guardstrategy, bypass))
           true
           
         case atom =>
@@ -406,7 +411,7 @@ extends OperatorApplyHandler {
         // We have to do one more thing.  We need to bind $__ to this operator,
         // and $_ to the original argument list, and then rewrite the result.
         val binds = Bindings("_"->arg, "__"->op)
-        context.builder.rewrite(other, binds)._1
+        context.builder.rewrite(other, binds, context.guardstrategy)._1
     }
   }
   

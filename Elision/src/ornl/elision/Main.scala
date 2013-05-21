@@ -36,7 +36,7 @@ import ornl.elision.cli.ArgSwitch
 import ornl.elision.util.Text
 import ornl.elision.util.Version
 import ornl.elision.util.Debugger
-import ornl.elision.parse.ProcessorControl
+import ornl.elision.repl.ProcessorControl
 
 /**
  * This is the entry point when running from the jar file.  This also provides

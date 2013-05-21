@@ -200,10 +200,11 @@ object StandardBuilderComponents {
    * @param tag       Tag for the special form, included for consistency.
    * @param content   The content.
    * @param builder   The builder to make atoms.
+   * @param strategy  A guard strategy for new rules.
    * @return  The new operator.
    */
   def buildOperator(loc: Loc, tag: BasicAtom, content: BasicAtom,
-      builder: Builder) = {
+      builder: Builder, strategy: GuardStrategy) = {
     // The content is a binding.
     val binds = content.asInstanceOf[BindingsAtom].mybinds
     
@@ -226,12 +227,12 @@ object StandardBuilderComponents {
       } else {
         None
       })
-      builder.newTypedSymbolicOperator(loc, content, name, typ, params,
+      builder.newTypedSymbolicOperator(loc, strategy, name, typ, params,
           description, detail, evenmeta, handlertxt)
     } else if (binds.contains("cases")) {
       // This is a case operator.
       val cases = getAs[AtomSeq](loc, tag, binds, "cases", None)
-      builder.newCaseOperator(loc, content, name, typ, cases, description,
+      builder.newCaseOperator(loc, strategy, name, typ, cases, description,
           detail, evenmeta)
     } else {
       // This is an error.
@@ -256,12 +257,13 @@ class StandardBuilder(appbuilder: ApplyBuilder) extends Evaluator {
    * @param loc           Location of this specification.
    * @param operator      The operator.
    * @param argument      The argument.
+   * @param strategy      A guard strategy to use for new rules.
    * @param bypass        If true, bypass native handler.  Default is false.
    * @return  The result.
    */
   def newApply(loc: Loc, operator: BasicAtom, argument: BasicAtom,
-      bypass: Boolean = false): BasicAtom = {
-    appbuilder(operator, argument, this, bypass)
+      strategy: GuardStrategy, bypass: Boolean = false): BasicAtom = {
+    appbuilder(operator, argument, this, strategy, bypass)
   }
   
   /**
@@ -290,7 +292,8 @@ class StandardBuilder(appbuilder: ApplyBuilder) extends Evaluator {
             SpecialForm.check(tag, content, map)
             sym.value match {
               case 'operator =>
-                StandardBuilderComponents.buildOperator(loc, tag, content, this)
+                StandardBuilderComponents.buildOperator(loc, tag, content,
+                    this, strategy)
                 
               case 'rule =>
                 StandardBuilderComponents.buildRule(loc, tag, content, this,
@@ -307,5 +310,5 @@ class StandardBuilder(appbuilder: ApplyBuilder) extends Evaluator {
       case _ =>
         new SpecialForm(loc, tag, content)
     }
-  }  
+  }
 }

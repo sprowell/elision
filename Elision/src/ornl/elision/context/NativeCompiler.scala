@@ -169,8 +169,8 @@ object NativeCompiler {
 /**
  * Provide for the compilation and caching of native operators.
  * 
- * The location of the native cache is obtained from the executor instance,
- * which must specify the configuration option `elision.cache`.
+ * The location of the native cache is obtained from the property
+ * `cache.folder`.
  * 
  * @param context   The context needed to build atoms.
  */
@@ -179,7 +179,7 @@ class NativeCompiler(context: Context) {
   import NativeCompiler.{getKey, makeObject, makeMethod}
   
   /** Location of the native cache. */
-  private val _cache = new File(context.getSetting("elision.cache"))
+  private val _cache = new File(context.getProperty[String]("elision.cache"))
   if (!_cache.exists) {
     if (_cache.mkdir) {
       throw new NativeHandlerException(Loc.internal,

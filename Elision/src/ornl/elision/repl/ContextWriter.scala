@@ -37,11 +37,12 @@ import ornl.elision.context.NativeCompiler
 import ornl.elision.core.Literal
 import ornl.elision.dialects.ScalaGenerator
 import ornl.elision.util.toQuotedString
+import ornl.elision.dialects.ContextGenerator
 
 /**
  * Generate compilable Scala source files for a context.
  */
-object ContextGenerator {
+object ContextWriter {
   
   /**
    * Generate the context as compilable Scala source.  The generated files
@@ -148,12 +149,12 @@ object ContextGenerator {
     // Now we can append the code to create the context.  To do this, we first
     // traverse the rule list and collect all the rules in the order they are
     // present in the library.
-    var known = context.Known()
+    var known = ContextGenerator.Known()
     var thelist = List[BasicAtom]()
     // Now we can collect any remaining unknown operators.  Just traverse the
     // operators and trust the system to write any that are unknown.
     for (operator <- context.operatorLibrary.getAllOperators) {
-      val pair = context.collect(operator, known, thelist)
+      val pair = ContextGenerator.collect(operator, known, thelist)
       known = pair._1
       thelist = pair._2
     } // Collect all rules and their dependencies.
@@ -161,7 +162,7 @@ object ContextGenerator {
     for (rule <- context.ruleLibrary.getAllRules) {
       // Write the rule and any dependencies.  The new set of "known" stuff is
       // returned, and we preserve it.
-      val pair = context.collect(rule, known, thelist)
+      val pair = ContextGenerator.collect(rule, known, thelist)
       known = pair._1
       thelist = pair._2
     } // Collect all rules and their dependencies.
