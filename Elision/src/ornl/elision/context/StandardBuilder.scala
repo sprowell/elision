@@ -57,28 +57,33 @@ object StandardBuilderComponents {
    * special form.  See [[ornl.elision.core.SpecialForm]]`.check`. 
    */
   val structures = Map {
+    /* These were converted to using the (,) notation instead of -> notation
+     * because the 2.10 Scala optimizer generates inline warnings about them.
+     * This is a bug.  See:
+     * https://issues.scala-lang.org/browse/SI-6723
+     */
     'operator -> Map {
-      "name" -> true
-      "type" -> false
-      "params" -> false
-      "cases" -> false
-      "detail" -> false
-      "description" -> false
-      "handler" -> false
-      "evenmeta" -> false
+      ("name", true)
+      ("type", false)
+      ("params", false)
+      ("cases", false)
+      ("detail", false)
+      ("description", false)
+      ("handler", false)
+      ("evenmeta", false)
     }
     'rule -> Map {
-      "name" -> false
-      "" -> true
-      "detail" -> false
-      "description" -> false
-      "rulesets" -> false
-      "ruleset" -> false
-      "if" -> false
+      ("name", false)
+      ("", true)
+      ("detail", false)
+      ("description", false)
+      ("rulesets", false)
+      ("ruleset", false)
+      ("if", false)
     }
     'match -> Map {
-      "" -> true
-      "if" -> false
+      ("", true)
+      ("if", false)
     }
   }
   

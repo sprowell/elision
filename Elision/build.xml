@@ -158,7 +158,8 @@ bin, lib, and other folders.</echo>
 			destdir		="${build.bin}"
 			classpathref	="build.classpath"
 			deprecation	="on"
-			unchecked	="on">
+			unchecked	="on"
+			feature		="on">
 			<src path="${build.test}"/>
 		</scalac>
 	</target>
