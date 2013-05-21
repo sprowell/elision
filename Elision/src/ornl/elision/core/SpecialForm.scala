@@ -32,6 +32,7 @@ package ornl.elision.core
 import scala.collection.immutable.Map
 import ornl.elision.util.ElisionException
 import ornl.elision.util.Loc
+import scala.reflect.{ClassTag, classTag}
 
 /**
  * Construction of a special form failed for the specified reason.
@@ -162,8 +163,9 @@ class SpecialForm(
    * @param default     Optional default value if the key is not present.
    * @return  The value of the key, cast to the correct type.
    */
-  def fetchAs[TYPE](key: String, default: Option[TYPE] = None)
-  (implicit mTYPE: scala.reflect.Manifest[TYPE]): TYPE = {
+  def fetchAs[TYPE: ClassTag](
+      key: String,
+      default: Option[TYPE] = None): TYPE = {
     if (binding.isEmpty) {
         throw new SpecialFormException(Loc.internal,
             "The special form with tag "+tag.toParseString+
@@ -181,11 +183,11 @@ class SpecialForm(
               " requires key " + toESymbol(key) + " but it was not given.")
       }
       case Some(item) =>
-        if (mTYPE >:> Manifest.classType(key.getClass))
+        if (classTag[TYPE].runtimeClass.isInstance(key))
           throw new SpecialFormException(loc,
               "The value for key " + toESymbol(key) + " of form " +
               tag.toParseString + " is of the wrong type: " +
-              item.toParseString + ". Expected " + mTYPE.toString +
+              item.toParseString + ". Expected " + classTag[TYPE].toString +
               " but got " + Manifest.classType(key.getClass) + ".")
         else
           item.asInstanceOf[TYPE]

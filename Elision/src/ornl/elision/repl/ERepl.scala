@@ -46,6 +46,7 @@ import ornl.elision.context.StandardBuilder
 import scala.io.Source
 import ornl.elision.dialects.Dialect
 import ornl.elision.dialects.ContextGenerator
+import scala.language.reflectiveCalls
 
 /**
  * Implement an interface to run the REPL from the prompt.

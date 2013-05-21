@@ -43,6 +43,7 @@ import ornl.elision.util.Debugger
 import ornl.elision.util.HasOtherHash
 import ornl.elision.util.Loc
 import ornl.elision.dialects.Dialect
+import scala.language.existentials
 
 /**
  * This marker trait is used to frighten developers and strike fear into

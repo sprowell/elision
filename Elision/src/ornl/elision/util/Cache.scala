@@ -36,6 +36,8 @@
 ======================================================================*/
 package ornl.elision.util
 
+import scala.reflect.{ClassTag, classTag}
+
 /**
  * The cache contains the wrong type of item for the requested key.
  * 
@@ -68,17 +70,16 @@ trait Cache {
    *                it correctly.
    * @return  The requested value, or the default value.
    */
-  def fetchAs[TYPE](key: String, default: TYPE)
-  (implicit mTYPE: scala.reflect.Manifest[TYPE]): TYPE = {
+  def fetchAs[TYPE: ClassTag](key: String, default: TYPE): TYPE = {
     _cache.get(key) match {
       case None =>
         _cache(key) = default
         default
       case Some(item) =>
-        if (mTYPE >:> Manifest.classType(key.getClass))
+        if (classTag[TYPE].runtimeClass.isInstance(key))
           throw new CacheException(
               "The cache entry for key " + toQuotedString(key) +
-              " is of the wrong type.  Expected " + mTYPE.toString +
+              " is of the wrong type.  Expected " + classTag[TYPE].toString +
               " but got " + Manifest.classType(key.getClass) + ".")
         else
           item.asInstanceOf[TYPE]
@@ -93,8 +94,7 @@ trait Cache {
    * @param value The value.
    * @return The stored value.
    */
-  def stash[TYPE](key: String, value: TYPE)
-  (implicit mTYPE: scala.reflect.Manifest[TYPE]) = {
+  def stash[TYPE](key: String, value: TYPE) = {
     _cache(key) = value
     value
   }

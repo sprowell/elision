@@ -71,6 +71,7 @@ import AST.typeuniverse
 import AST.variable
 import ornl.elision.core.boolToLiteral
 import ornl.elision.util.Loc
+import scala.language.implicitConversions
 
 /**
  * Implement a parser for Elision atoms.

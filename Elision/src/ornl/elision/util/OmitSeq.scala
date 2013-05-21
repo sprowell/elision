@@ -29,7 +29,8 @@
  */
 package ornl.elision.util
 
-  
+import scala.language.implicitConversions
+
 /**
  * An omit sequence permits rapid modification of a sequence by either
  * omitting a single element or inserting a sequence.  These operations are

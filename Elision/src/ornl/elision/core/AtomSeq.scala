@@ -44,6 +44,7 @@ import ornl.elision.matcher.CMatcher
 import ornl.elision.matcher.ACMatcher
 import ornl.elision.matcher.SequenceMatcher
 import ornl.elision.util.Loc
+import scala.language.reflectiveCalls
 
 /**
  * Improve matching of atom sequences as lists of atoms.

@@ -65,11 +65,93 @@ import ornl.elision.core.SYMBOL
 import ornl.elision.core.BooleanLiteral
 import ornl.elision.core.GuardStrategy
 import ornl.elision.core.SimpleApply
+import ornl.elision.util.Debugger
 
 /**
  * Construct atoms, first applying any evaluation logic.
  */
 abstract class Builder {
+
+  //======================================================================
+  // Define the necessary primitive operators to bootstrap operator typing.
+  //======================================================================
+  
+  /**
+   * The well-known MAP operator.  This is needed to define the types of
+   * operators, but is not used to define its own type.  The type of the MAP
+   * operator is ^TYPE, indicating that it is a root type.  We could, with
+   * great justice, use xx (the cross product) for this operator, but don't.
+   * This makes the types of operators look more natural when viewed.
+   */
+  val MAP = new OperatorRef(
+      Loc.internal,
+      new SymbolicOperator(
+          Loc.internal,
+          "MAP",
+          TypeUniverse,
+          newAtomSeq(Loc.internal, NoProps, 'domain, 'codomain),
+          "Mapping constructor.",
+          "This operator is used to construct types for operators.  It " +
+          "indicates a mapping from one type (the domain) to another type " +
+          "(the codomain).") {
+    def apply(args: IndexedSeq[BasicAtom]) =
+      new SimpleApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps,
+          args))
+  })
+      
+  /**
+   * The well-known cross product operator.  This is needed to define the
+   * types of operators, but is not used to define its own type.  The type
+   * of the cross product is ANY.  Note that it must be ANY, since it is
+   * associative.
+   */
+  val xx = new OperatorRef(
+      Loc.internal,
+      new SymbolicOperator(
+          Loc.internal,
+          "xx",
+          ANY,
+          newAtomSeq(Loc.internal, Associative(true), 'x, 'y),
+          "Cross product.",
+          "This operator is used to construct types for operators.  It " +
+          "indicates the cross product of two atoms (typically types).  " +
+          "These originate from the types of the parameters of an operator.") {
+    def apply(args: IndexedSeq[BasicAtom]) =
+      new SimpleApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps,
+          args))
+  })
+      
+  /**
+   * The well-known list operator.  This is used to define the type of lists
+   * such as the atom sequence.  It has type ^TYPE, indicating that it is a
+   * root type.
+   */
+  val LIST = new OperatorRef(
+      Loc.internal,
+      new SymbolicOperator(
+          Loc.internal,
+          "LIST",
+          TypeUniverse,
+          newAtomSeq(Loc.internal, NoProps, 'type),
+          "List type constructor.",
+          "This operator is used to indicate the type of a list.  It takes a " +
+          "single argument that is the type of the atoms in the list.  For " +
+          "heterogeneous lists this will be ANY.") {
+    def apply(args: IndexedSeq[BasicAtom]) =
+      new SimpleApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps,
+          args))
+  })
+  
+  /**
+   * The primitive operators defined by this builder.  If you extend and
+   * need to add any, override this and add to the list, but do not remove
+   * the ones already present (unless you want to override them).
+   */  
+  val primitiveOperators = List(MAP, xx, LIST)
+
+  //======================================================================
+  // Rewriting methods.
+  //======================================================================\
   
   /**
    * Rewrite the provided atom by applying the replacements defined in the
@@ -98,6 +180,10 @@ abstract class Builder {
   def rewrite(atom: BasicAtom, binds: Bindings,
       strategy: GuardStrategy): (BasicAtom, Boolean)
 
+  //======================================================================
+  // Construction methods.
+  //======================================================================\
+  
   /**
    * Make a new algebraic property specification.
    * 
@@ -159,10 +245,16 @@ abstract class Builder {
       atoms: BasicAtom*): AtomSeq = {
     val theType = {
       if (atoms.length == 0) {
+        if (LIST == null) println("LIST is null.")
+        if (ANY == null) println("ANY is null.")
         LIST(ANY)
       } else {
         val aType = atoms(0).theType
-        if (atoms.forall(aType == _.theType)) LIST(aType) else LIST(ANY)
+        if (atoms.forall(aType == _.theType)) {
+          LIST(aType)
+        } else {
+          LIST(ANY)
+        }
       }
     }
     new AtomSeq(loc, theType, properties, atoms.toIndexedSeq)
@@ -582,81 +674,4 @@ abstract class Builder {
         // parameter types mapped to the overall type.
         MAP(xx(params.map(_.theType)), typ)
     }
-
-  //======================================================================
-  // Define the necessary primitive operators to bootstrap operator typing.
-  //======================================================================
-  
-  /**
-   * The primitive operators defined by this builder.  If you extend and
-   * need to add any, override this and add to the list, but do not remove
-   * the ones already present (unless you want to override them).
-   */  
-  val primitiveOperators = List(MAP, xx, LIST)
-  
-  /**
-   * The well-known MAP operator.  This is needed to define the types of
-   * operators, but is not used to define its own type.  The type of the MAP
-   * operator is ^TYPE, indicating that it is a root type.  We could, with
-   * great justice, use xx (the cross product) for this operator, but don't.
-   * This makes the types of operators look more natural when viewed.
-   */
-  val MAP = new OperatorRef(
-      Loc.internal,
-      new SymbolicOperator(
-          Loc.internal,
-          "MAP",
-          TypeUniverse,
-          newAtomSeq(Loc.internal, NoProps, 'domain, 'codomain),
-          "Mapping constructor.",
-          "This operator is used to construct types for operators.  It " +
-          "indicates a mapping from one type (the domain) to another type " +
-          "(the codomain).") {
-    def apply(args: IndexedSeq[BasicAtom]) =
-      new SimpleApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps,
-          args))
-  })
-      
-  /**
-   * The well-known cross product operator.  This is needed to define the
-   * types of operators, but is not used to define its own type.  The type
-   * of the cross product is ANY.  Note that it must be ANY, since it is
-   * associative.
-   */
-  val xx = new OperatorRef(
-      Loc.internal,
-      new SymbolicOperator(
-          Loc.internal,
-          "xx",
-          ANY,
-          newAtomSeq(Loc.internal, Associative(true), 'x, 'y),
-          "Cross product.",
-          "This operator is used to construct types for operators.  It " +
-          "indicates the cross product of two atoms (typically types).  " +
-          "These originate from the types of the parameters of an operator.") {
-    def apply(args: IndexedSeq[BasicAtom]) =
-      new SimpleApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps,
-          args))
-  })
-      
-  /**
-   * The well-known list operator.  This is used to define the type of lists
-   * such as the atom sequence.  It has type ^TYPE, indicating that it is a
-   * root type.
-   */
-  val LIST = new OperatorRef(
-      Loc.internal,
-      new SymbolicOperator(
-          Loc.internal,
-          "LIST",
-          TypeUniverse,
-          newAtomSeq(Loc.internal, NoProps, 'type),
-          "List type constructor.",
-          "This operator is used to indicate the type of a list.  It takes a " +
-          "single argument that is the type of the atoms in the list.  For " +
-          "heterogeneous lists this will be ANY.") {
-    def apply(args: IndexedSeq[BasicAtom]) =
-      new SimpleApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps,
-          args))
-  })
 }

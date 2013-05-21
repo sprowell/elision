@@ -47,6 +47,8 @@ import ornl.elision.core.SymbolLiteral
 import ornl.elision.core.toESymbol
 import ornl.elision.util.Loc
 import ornl.elision.core.GuardStrategy
+import scala.reflect.{ClassTag, classTag}
+import scala.language.postfixOps
 
 object StandardBuilderComponents {
   
@@ -94,13 +96,12 @@ object StandardBuilderComponents {
    * @param default An optional default value.
    * @return  The requested value.
    */
-  private def getAs[TYPE](
+  private def getAs[TYPE: ClassTag](
       loc: Loc,
       tag: BasicAtom,
       binds: Bindings,
       key: String,
-      default: Option[TYPE])
-  (implicit mTYPE: scala.reflect.Manifest[TYPE]): TYPE = {
+      default: Option[TYPE]): TYPE = {
     if (!binds.contains(key)) {
       if (default.isDefined) {
         return default.get
@@ -108,18 +109,18 @@ object StandardBuilderComponents {
         throw new SpecialFormException(loc,
             "Special form "+tag.toParseString+
             " requires that a key "+toESymbol(key)+
-            " of type "+mTYPE.toString+
+            " of type "+classTag[TYPE].toString+
             " be given, but the key is missing.")
       }
     }
     val value = binds(key)
-    if (mTYPE >:> Manifest.classType(key.getClass)) {
+    if (classTag[TYPE].runtimeClass.isInstance(key)) {
       value.asInstanceOf[TYPE]
     } else {
       throw new SpecialFormException(loc,
           "Special form "+tag.toParseString+
           " requires that key "+toESymbol(key)+
-          " be of type "+mTYPE.toString+
+          " be of type "+classTag[TYPE].toString+
           ", but the type "+value.getClass.toString+" was found.")
     }
   }

@@ -46,6 +46,7 @@ import ornl.elision.util.OmitSeq
 import ornl.elision.util.OmitSeq.fromIndexedSeq
 import ornl.elision.context.Builder
 import ornl.elision.core.GuardStrategy
+import scala.language.reflectiveCalls
 
 /**
  * Match two sequences of atoms.
