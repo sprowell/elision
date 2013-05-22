@@ -11,5 +11,6 @@
 	<classpathentry kind="lib" path="lib/scalatest_2.10-2.0.M5b.jar"/>
 	<classpathentry kind="lib" path="lib/specs2-scalaz-core_2.10-7.0.0.jar"/>
 	<classpathentry kind="lib" path="lib/parboiled-core-1.1.5.jar"/>
+	<classpathentry kind="lib" path="lib/parboiled-scala_2.10-1.1.5.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

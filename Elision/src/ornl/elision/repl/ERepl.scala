@@ -38,7 +38,6 @@ import ornl.elision.cli.CLI
 import ornl.elision.cli.Switch
 import ornl.elision.util.Loc
 import ornl.elision.rewrite.RewriteEngine
-import ornl.elision.context.ApplyData
 import ornl.elision.core.GuardStrategy
 import ornl.elision.core.BasicAtom
 import ornl.elision.rewrite.RewriteTask
@@ -47,6 +46,7 @@ import scala.io.Source
 import ornl.elision.dialects.Dialect
 import ornl.elision.dialects.ContextGenerator
 import scala.language.reflectiveCalls
+import ornl.elision.context.OperatorApplyHandler
 
 /**
  * Implement an interface to run the REPL from the prompt.

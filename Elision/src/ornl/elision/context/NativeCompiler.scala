@@ -41,12 +41,13 @@ import ornl.elision.core.BasicAtom
 import ornl.elision.core.toEString
 import ornl.elision.core.toESymbol
 import ornl.elision.util.ElisionException
+import ornl.elision.core.SymbolicOperator
 
 /**
  * Trait for all handlers.
  */
 trait HandlerClass {
-  def handler(_data: ApplyData): BasicAtom
+  def handler(_data: SymbolicOperator.AbstractApplyData): BasicAtom
 }
 
 /**
@@ -248,7 +249,8 @@ class NativeCompiler(context: Context) {
    * @param key The cache key.
    * @return  The optional class implementing the native handler.
    */
-  private def getCachedHandler(key: String): Option[ApplyData => BasicAtom] = {
+  private def getCachedHandler(key: String):
+      Option[SymbolicOperator.AbstractApplyData => BasicAtom] = {
     // See if the handler is stashed.  If so, there is nothing to do.
     NativeCompiler._override.get(key) match {
       case None =>

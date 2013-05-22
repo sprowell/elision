@@ -96,7 +96,8 @@ abstract class Builder() {
           "List type constructor.",
           "This operator is used to indicate the type of a list.  It takes a " +
           "single argument that is the type of the atoms in the list.  For " +
-          "heterogeneous lists this will be ANY.") {
+          "heterogeneous lists this will be ANY.",
+          false) {
     def apply(args: IndexedSeq[BasicAtom]) =
       new SimpleApply(Loc.internal, this,
           new AtomSeq(Loc.internal, ANY, NoProps, args))

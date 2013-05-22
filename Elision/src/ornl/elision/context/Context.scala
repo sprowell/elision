@@ -67,6 +67,7 @@ import ornl.elision.util.Loc
 import ornl.elision.rewrite.RewriteTask
 import ornl.elision.rewrite.RewriteEngine
 import ornl.elision.core.GuardStrategy
+import ornl.elision.core.AtomSeq
 
 /**
  * A requested setting is not present.
@@ -96,18 +97,39 @@ extends ElisionException(Loc.internal, msg)
  *  - An instance of [[ornl.elision.core.OperatorLibrary]].
  *  - Rulesets.
  *  - "Automatic" rewriting of atoms using rules.
- * 
- * @param builder       A builder to evaluate and construct atoms.
  */
-class Context extends PropertyManager with Fickle with Mutable with Cache {
+class Context()
+extends PropertyManager with Fickle with Mutable with Cache {
   
   override def clone = {
-    val clone = new Context
+    val clone = new Context()
+    clone.setApplyDataBuilder(applyDataBuilder)
     clone.binds = this.binds.clone
     clone.operatorLibrary = this.operatorLibrary.clone
     clone.ruleLibrary = this.ruleLibrary.clone
     clone
   }
+  
+  //======================================================================
+  // Handle native operator application.
+  //======================================================================
+  
+  private var _applyDataBuilder: OperatorApplyHandler.ApplyDataBuilder = _
+  
+  /**
+   * Set the apply data builder for this context. If one is not set, then
+   * native handlers cannot execute.
+   * 
+   * @param abd    A closure to make apply data blocks for native handlers.
+   */
+  def setApplyDataBuilder(adb: OperatorApplyHandler.ApplyDataBuilder) {
+    _applyDataBuilder = adb
+  }
+  
+  /**
+   * Get the apply data builder for this context.
+   */
+  def applyDataBuilder = _applyDataBuilder
   
   //======================================================================
   // Settings that may need to be overridden.

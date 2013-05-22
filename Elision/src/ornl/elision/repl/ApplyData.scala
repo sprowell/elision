@@ -27,61 +27,61 @@
  * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package ornl.elision.context
+package ornl.elision.repl
 
-import ornl.elision.core.BasicAtom
-import ornl.elision.core.Operator
+import ornl.elision.core.SymbolicOperator.AbstractApplyData
+import ornl.elision.util.Console
+import ornl.elision.context.Context
 import ornl.elision.core.SymbolicOperator
-import ornl.elision.core.CaseOperator
-import ornl.elision.util.Loc
-import ornl.elision.util.ElisionException
 import ornl.elision.core.AtomSeq
 import ornl.elision.core.Bindings
-import ornl.elision.repl.Processor
-import ornl.elision.core.Apply
 import ornl.elision.core.Literal
-import ornl.elision.core.SimpleApply
-import ornl.elision.core.OperatorRef
-import ornl.elision.core.toESymbol
-import ornl.elision.core.OpApply
-import ornl.elision.core.ANY
-import ornl.elision.core.Applicable
-import ornl.elision.core.NONE
-import ornl.elision.util.Console
-import ornl.elision.matcher.Matcher
-import ornl.elision.matcher.Fail
-import ornl.elision.matcher.Match
-import ornl.elision.matcher.Many
-import ornl.elision.matcher.SequenceMatcher
-import ornl.elision.core.ArgumentListException
 
 /**
- * Common elements for operator application.
+ * Constants available to native operators during execution.
  */
-object OperatorApplyHandler {
-
-  /**
-   * Type for an apply data builder.
-   */
-  type ApplyDataBuilder = (SymbolicOperator, AtomSeq, Bindings) =>
-  SymbolicOperator.AbstractApplyData
+object ApplyData {
+  
+  /** A special literal that we never show, or save as a binding. */
+  val _no_show = Literal(Symbol(" NO SHOW "))
 }
 
 /**
- * Applying an operator to an argument (or argument list) is a complicated
- * operation.  This is the base class for objects that handle that process.
+ * Provide a concrete interface to native handlers that allows them access to
+ * the top-level processor.  These instances can only be created from a
+ * processor, and this is done by providing the context (and thus other
+ * subordinate classes) with a closure that creates these instances.
+ * 
+ * @author Stacy Prowell (sprowell@gmail.com)
+ * 
+ * @param op    The operator.
+ * @param args  The arugments.
+ * @param binds Binding of parameters to arguments.
  */
-abstract class OperatorApplyHandler {
+abstract class ApplyData(
+    val op: SymbolicOperator,
+    val args: AtomSeq,
+    val binds: Bindings) extends AbstractApplyData {
 
   /**
-   * Apply an operator to an argument.
-   * 
-   * @param op      The operator.
-   * @param arg     The argument.
-   * @param builder The builder to create atoms.
-   * @param bypass  If true, bypass the operator's native handler, if any.
-   * @return  The constructed atom.
+   * The top-level processor that created this instance.
    */
-  def apply(op: Operator, arg: BasicAtom, builder: Builder,
-      bypass: Boolean = false): BasicAtom 
+  val processor: Processor
+  
+  /**
+   * The context providing named semantics.
+   */
+  val context: Context
+  
+  /**
+   * A console for output.
+   */
+  val console: Console
+
+  /**
+   * Just preserve the apply as it is.  The loc of the operator is used as the
+   * loc of the generated apply.
+   */
+  def as_is =
+    context.builder.newApply(op.loc, op, args, context.guardstrategy, true)
 }

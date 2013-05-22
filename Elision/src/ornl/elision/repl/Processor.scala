@@ -56,6 +56,10 @@ import ornl.elision.util.Version.web
 import scala.Array.canBuildFrom
 import scala.xml.XML
 import java.io.FileWriter
+import ornl.elision.core.SymbolicOperator
+import ornl.elision.core.AtomSeq
+import ornl.elision.core.Bindings
+import ornl.elision.context.OperatorApplyHandler
 
 /**
  * Manage the default parser kind to use.
@@ -105,6 +109,34 @@ class Processor(val settings: Map[String, String], var context: Context)
 extends TraceableParse
 with Timeable
 with HasHistory {
+
+  /**
+   * Generate an apply data block, capturing information about the processor
+   * that is relevant to native handlers.
+   * 
+   * @param op      The operator.
+   * @param args    The arguments.
+   * @param binds   Bindings from parameter to argument.
+   * @return  An apply data instance.
+   */
+  private def _getApplyData(
+      op: SymbolicOperator,
+      args: AtomSeq,
+      binds: Bindings): SymbolicOperator.AbstractApplyData = {
+    new ApplyData(op, args, binds) {
+      val processor = Processor.this
+      val context = Processor.this.context
+      val console = Processor.this.context.console
+    }
+  }
+  
+  /**
+   * The apply data builder to use.
+   */
+  val applyDataBuilder: OperatorApplyHandler.ApplyDataBuilder = _getApplyData _
+  
+  // Tell the context to use the apply data builder.
+  context.setApplyDataBuilder(applyDataBuilder)
   
   // Set up the stacktrace property.
   context.declareProperty("stacktrace",
@@ -572,6 +604,7 @@ with HasHistory {
           context.console.emitln("Successfully reloaded context.")
           context.console.emitln("Rebuilding context...")
           context = new Context()
+          context.setApplyDataBuilder(applyDataBuilder)
           val prior = context.console.quiet
           context.console.quiet = 1
           _execute(success)

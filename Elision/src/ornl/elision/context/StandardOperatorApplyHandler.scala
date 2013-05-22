@@ -54,40 +54,6 @@ import ornl.elision.core.OperatorRef
 import ornl.elision.core.ANY
 
 /**
- * Additional constants and support methods for native handlers.
- */
-object ApplyData {
-  /** A special literal that we never show, or save as a binding. */
-  val _no_show = Literal(Symbol(" NO SHOW "))
-}
-
-/**
- * Data block and special functions provided to a native handler.  A native
- * handler takes an instance of this class and hands back an atom.
- * 
- * Certain information is populated based on the current __implicit__
- * `Executor` instance.  This is done at construction time.
- *
- * @param op      The operator.
- * @param args    The argument list.
- * @param binds   Bindings of parameter to argument value.
- * @param context A context to supply to the native handler.
- */
-class ApplyData(val op: SymbolicOperator, val args: AtomSeq,
-    val binds: Bindings, val context: Context)
-    extends SymbolicOperator.AbstractApplyData {
-  /** Provide fast access to the console from the executor. */
-  val console = context.console
-
-  /**
-   * Just preserve the apply as it is.  The loc of the operator is used as the
-   * loc of the generated apply.
-   */
-  def as_is =
-    context.builder.newApply(op.loc, op, args, context.guardstrategy, true)
-}
-
-/**
  * Applying an operator to an argument (or argument list) is a complicated
  * operation.  This object manages the details of that.
  * 
@@ -101,6 +67,7 @@ extends OperatorApplyHandler {
    * 
    * @param op      The operator.
    * @param arg     The argument.
+   * @param builder The builder to make atoms.
    * @param bypass  If true, bypass the operator's native handler, if any.
    * @return  The constructed atom.
    */
@@ -200,8 +167,8 @@ extends OperatorApplyHandler {
               op.handler = compileHandler(op, op.handlertxt, context)
             }
             if (op.handler.isDefined) {
-              val ad = new ApplyData(op, newargs, binds, context)
-              return op.handler.get.asInstanceOf[ApplyData => BasicAtom](ad)
+              val ad = context.applyDataBuilder(op, newargs, binds)
+              return op.handler.get(ad)
             }
           }
           // No native handler.  In this case the type of the apply must be
@@ -444,6 +411,11 @@ extends OperatorApplyHandler {
     console.emit("Time Compiling Native Handlers: ")
     console.emitln(Timeable.asTimeString(_timer.getCumulativeTimeMillis))
   }
+  
+  // Preserve the last context and associated compiler so we don't have to
+  // create a new compiler instance every time (unless the context is changed).
+  private var lastContext: Context = _
+  private var lastCompiler: NativeCompiler = _
 
   /**
    * Compile Scala code to a native handler.
@@ -454,7 +426,7 @@ extends OperatorApplyHandler {
    * @return  The optional handler result.
    */
   private def compileHandler(op: SymbolicOperator, code: Option[String],
-      context: Context): Option[ApplyData => BasicAtom] = {
+      context: Context): Option[SymbolicOperator.AbstractApplyData => BasicAtom] = {
     // Fetch the handler text.
     if (code.isDefined) {
       var handlertxt = code.get
@@ -463,9 +435,15 @@ extends OperatorApplyHandler {
         
       // Compile the handler, if we were given one.
       if (handlertxt != "") {
-        return Some(_timer.time {
-          new NativeCompiler(context).compile(op.loc, op.name, handlertxt)
-        })
+        lastCompiler synchronized {
+          if (context != lastContext) {
+            lastCompiler = new NativeCompiler(context)
+            lastContext = context
+          }
+          return Some(_timer.time {
+            lastCompiler.compile(op.loc, op.name, handlertxt)
+          })
+        }
       }
     } // Handler has text.
     
