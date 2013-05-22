@@ -47,11 +47,11 @@
 """
   args(0) match {
     case op: Operator =>
-      context.operatorLibrary.add(op)
+      context.operatorLibrary.add(op, context.builder)
       console.emitln("Declared operator " + toESymbol(op.name) + ".")
       _no_show
     case rule: RewriteRule =>
-      context.ruleLibrary.add(rule)
+      context.ruleLibrary.add(rule, context.builder)
       console.emitln("Declared rule.")
       _no_show
     case _ =>
@@ -97,7 +97,7 @@ decl.{! inc($fn: STRING)
   val included = 
     context.fetchAs[Set[String]]("read_once.included", Set[String]())
   args match {
-    case Args(StringLiteral(_, filename)) =>
+    case Args(StringLiteral(_, _, filename)) =>
       exec match {
         case proc: ornl.elision.parse.Processor =>
           if (!included.contains(filename)) {

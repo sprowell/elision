@@ -61,11 +61,11 @@ trait PropertyManager {
    * }}}
    */
   val clazzes: Set[_ <: Class[_]] = Set(
-    classOf[java.lang.Boolean],
-    classOf[Boolean],
-    classOf[java.lang.Integer],
-    classOf[BigInt],
-    classOf[String]
+      classOf[java.lang.Boolean],
+      classOf[Boolean],
+      classOf[java.lang.Integer],
+      classOf[BigInt],
+      classOf[String]
   )
   
   /**
