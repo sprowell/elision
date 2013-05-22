@@ -435,7 +435,7 @@ extends OperatorApplyHandler {
         
       // Compile the handler, if we were given one.
       if (handlertxt != "") {
-        lastCompiler synchronized {
+        this synchronized {
           if (context != lastContext) {
             lastCompiler = new NativeCompiler(context)
             lastContext = context

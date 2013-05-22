@@ -157,7 +157,8 @@ object NativeCompiler {
        | * Operator source: %s
        | * Created on: %s
        | */
-       |import ornl.elision.context.{HandlerClass, ApplyData, Context}
+       |import ornl.elision.repl.ApplyData
+       |import ornl.elision.context.{HandlerClass, Context}
        |import ornl.elision.core._
        |import ornl.elision.util.Loc
        |object %s extends HandlerClass {
