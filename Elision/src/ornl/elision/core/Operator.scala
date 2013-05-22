@@ -335,7 +335,7 @@ abstract class SymbolicOperator protected[elision] (
    * not modify this or tamper with it in any way!
    */
   protected[elision] var
-  handler: Option[(SymbolicOperator.AbstractApplyData => BasicAtom)] = None
+  handler: Option[((_ <: SymbolicOperator.AbstractApplyData) => BasicAtom)] = None
 
   // Check the properties.
   _check()

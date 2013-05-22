@@ -47,6 +47,7 @@ import ornl.elision.util.Loc
 import ornl.elision.context.Context
 import ornl.elision.repl.Processor
 import scala.language.implicitConversions
+import ornl.elision.util.Debugger
 
 /**
  * The core classes and definitions that make up the Elision runtime.
@@ -164,6 +165,71 @@ package object core {
         (atom1.otherHashCode == atom2.otherHashCode) &&
         (if (_riskyEqual) true else other)
     )
+  }
+  
+  /**
+   * Perform "fast equality checking" on two atoms.  This performs basic
+   * structural comparson of the atoms.  If this cannot prove that the two
+   * atoms are either equal to unequal, then the closure `other` is invoked
+   * to resolve.
+   * 
+   * As this is done, report the results of each step to the console.
+   * 
+   * @param atom1   The first atom.
+   * @param atom2   The second atom.
+   * @param other   Other checking to perform, if the fast check is
+   *                indeterminate.
+   * @return  True if equal, false if not.
+   */
+  def sfeq(atom1: BasicAtom, atom2: BasicAtom, other: => Boolean) = {
+    if (atom1 eq atom2) {
+      Debugger("feq", " Identical: true")
+      true
+    } else {
+      Debugger("feq", " Identical: false")
+      (if (atom1.depth == atom2.depth) {
+        Debugger("feq", "     Depth: true")
+        true
+      } else {
+        Debugger("feq", "     Depth: false")
+        false
+      }) &&
+      (if (atom1.isConstant == atom2.isConstant) {
+        Debugger("feq", " Constancy: true")
+        true
+      } else {
+        Debugger("feq", " Constancy: false")
+        false
+      }) &&
+      (if (atom1.isTerm == atom2.isTerm) {
+        Debugger("feq", "  Termness: true")
+        true
+      } else {
+        Debugger("feq", "  Termness: false")
+        false
+      }) &&
+      (if (atom1.hashCode == atom2.hashCode) {
+        Debugger("feq", "      Hash: true")
+        true
+      } else {
+        Debugger("feq", "      Hash: false")
+        false
+      }) &&
+      (if (atom1.otherHashCode == atom2.otherHashCode) {
+        Debugger("feq", "Other Hash: true")
+        true
+      } else {
+        Debugger("feq", "Other Hash: false")
+        false
+      }) &&
+      (if (other) {
+        Debugger("feq", "     Other: true")
+        true
+      } else {
+        Debugger("feq", "     Other: false")
+        false
+      })
+    } // else
   }
   
   //======================================================================

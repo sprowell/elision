@@ -56,36 +56,36 @@ object StandardBuilderComponents {
    * Define a mapping from special form tag to the structure mapping for the
    * special form.  See [[ornl.elision.core.SpecialForm]]`.check`. 
    */
-  val structures = Map {
+  val structures = Map (
     /* These were converted to using the (,) notation instead of -> notation
      * because the 2.10 Scala optimizer generates inline warnings about them.
      * This is a bug.  See:
      * https://issues.scala-lang.org/browse/SI-6723
      */
-    'operator -> Map {
-      ("name", true)
-      ("type", false)
-      ("params", false)
-      ("cases", false)
-      ("detail", false)
-      ("description", false)
-      ("handler", false)
+    'operator -> Map (
+      ("name", true),
+      ("type", false),
+      ("params", false),
+      ("cases", false),
+      ("detail", false),
+      ("description", false),
+      ("handler", false),
       ("evenmeta", false)
-    }
-    'rule -> Map {
-      ("name", false)
-      ("", true)
-      ("detail", false)
-      ("description", false)
-      ("rulesets", false)
-      ("ruleset", false)
+    ),
+    'rule -> Map (
+      ("name", false),
+      ("", true),
+      ("detail", false),
+      ("description", false),
+      ("rulesets", false),
+      ("ruleset", false),
       ("if", false)
-    }
-    'match -> Map {
-      ("", true)
+    ),
+    'match -> Map (
+      ("", true),
       ("if", false)
-    }
-  }
+    )
+  )
   
   /**
    * Get a component from a special form binding.
@@ -113,20 +113,20 @@ object StandardBuilderComponents {
       } else {
         throw new SpecialFormException(loc,
             "Special form "+tag.toParseString+
-            " requires that a key "+toESymbol(key)+
-            " of type "+classTag[TYPE].toString+
+            " requires that a key #"+toESymbol(key)+
+            " of class "+classTag[TYPE].toString+
             " be given, but the key is missing.")
       }
     }
     val value = binds(key)
-    if (classTag[TYPE].runtimeClass.isInstance(key)) {
+    if (classTag[TYPE].runtimeClass.isInstance(value)) {
       value.asInstanceOf[TYPE]
     } else {
       throw new SpecialFormException(loc,
           "Special form "+tag.toParseString+
-          " requires that key "+toESymbol(key)+
-          " be of type "+classTag[TYPE].toString+
-          ", but the type "+value.getClass.toString+" was found.")
+          " requires that key #"+toESymbol(key)+
+          " be of class "+classTag[TYPE].toString+
+          ", but "+value.getClass.toString+" was found.")
     }
   }
   
@@ -190,7 +190,7 @@ object StandardBuilderComponents {
         case _ =>
           throw new SpecialFormException(loc,
               "Special form "+tag.toParseString+
-              " requires that key rulesets be a list of symbols, but the " +
+              " requires that key #rulesets be a list of symbols, but the " +
               "non-symbol atom "+item.toParseString+" was found.")
       }
     } toSet
@@ -244,7 +244,7 @@ object StandardBuilderComponents {
       // This is an error.
       throw new SpecialFormException(loc,
           "Special form "+tag.toParseString+
-          " requires that either params or cases be given, but neither" +
+          " requires that either #params or #cases be given, but neither" +
           " was found.")
     }
   }

@@ -156,7 +156,7 @@ object NativeCompiler {
        | * Operator source: %s
        | * Created on: %s
        | */
-       |import ornl.elision.context.{HandlerClass, Context}
+       |import ornl.elision.context.{HandlerClass, ApplyData, Context}
        |import ornl.elision.core._
        |import ornl.elision.util.Loc
        |object %s extends HandlerClass {
@@ -180,8 +180,8 @@ class NativeCompiler(context: Context) {
   
   /** Location of the native cache. */
   private val _cache = new File(context.getProperty[String]("elision.cache"))
-  if (!_cache.exists) {
-    if (_cache.mkdir) {
+  if (! _cache.exists) {
+    if (! _cache.mkdir) {
       throw new NativeHandlerException(Loc.internal,
           "Unable to create cache folder: " + _cache.toString)
     }

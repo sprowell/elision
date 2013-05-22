@@ -86,7 +86,7 @@ object SpecialForm {
           case Some(badkey) =>
             throw new SpecialFormException(Loc.internal,
                 "The special form with tag "+tag.toParseString+
-                " does not allow the key "+toESymbol(badkey)+".")
+                " does not allow the key #"+toESymbol(badkey)+".")
         }
         
         // Next make sure that everything that is required is present.
@@ -97,7 +97,7 @@ object SpecialForm {
           case Some(badkey) =>
             throw new SpecialFormException(Loc.internal,
                 "The special form with tag "+tag.toParseString+
-                " requires the key "+toESymbol(badkey)+".")
+                " requires the key #"+toESymbol(badkey)+".")
         }
         
       case _ =>
@@ -180,12 +180,12 @@ class SpecialForm(
         case None =>
           throw new SpecialFormException(loc,
               "Form " + tag.toParseString +
-              " requires key " + toESymbol(key) + " but it was not given.")
+              " requires key #" + toESymbol(key) + " but it was not given.")
       }
       case Some(item) =>
         if (classTag[TYPE].runtimeClass.isInstance(key))
           throw new SpecialFormException(loc,
-              "The value for key " + toESymbol(key) + " of form " +
+              "The value for key #" + toESymbol(key) + " of form " +
               tag.toParseString + " is of the wrong type: " +
               item.toParseString + ". Expected " + classTag[TYPE].toString +
               " but got " + Manifest.classType(key.getClass) + ".")

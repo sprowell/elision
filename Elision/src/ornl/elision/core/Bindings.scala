@@ -111,6 +111,19 @@ extends Map[String, BasicAtom] with Mutable {
   def +[B1 >: BasicAtom](kv: (String, B1)): Map[String, B1] = {
     new Bindings(self + kv.asInstanceOf[(String, BasicAtom)])
   }
+
+  /**
+   * Conditionally add a mapping to this binding.  If the predicate is true,
+   * then the pair is added.  If false, it is not.
+   * 
+   * @param pred    A predicate.
+   * @param kv      The key, value pair to add.
+   * @return  The (possibly-updated) binding.
+   */
+  def +?[B1 >: BasicAtom](pred: Boolean, kv: (String, B1)): Map[String, B1] = {
+    if (pred) new Bindings(self + kv.asInstanceOf[(String, BasicAtom)])
+    else this
+  }
   
   /**
    * A special cache of rewrites that this binding has produced.  This map is

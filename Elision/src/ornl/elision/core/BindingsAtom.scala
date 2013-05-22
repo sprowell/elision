@@ -90,6 +90,7 @@ class BindingsAtom(
     this(loc, Bindings(mybinds))
   }
   
+  override val hashCode = mybinds.hashCode
   lazy val otherHashCode = (this.toString).foldLeft(BigInt(0))(other_hashify)+1
 
   /** The type of a bindings atom is the special bindings type. */

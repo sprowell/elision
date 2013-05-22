@@ -194,10 +194,14 @@ extends OperatorApplyHandler {
             context.builder.newAtomSeq(Loc.internal, op.params.props, newseq)
           // See if we are bypassing the native handler.
           if (!bypass) {
-            // Run any native handler.
+            // Do we have a native handler?
+            if (op.handler.isEmpty && op.handlertxt.isDefined) {
+              // Compile the native handler and cache it.
+              op.handler = compileHandler(op, op.handlertxt, context)
+            }
             if (op.handler.isDefined) {
               val ad = new ApplyData(op, newargs, binds, context)
-              return op.handler.get(ad)
+              return op.handler.get.asInstanceOf[ApplyData => BasicAtom](ad)
             }
           }
           // No native handler.  In this case the type of the apply must be

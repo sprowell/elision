@@ -420,13 +420,13 @@ abstract class Builder() {
       detail: String = "",
       synthetic: Boolean = false) = {
     def makeContent = () => {
-      var content = Bindings {
+      var content = Bindings (
         "" -> newAtomSeq(Loc.internal, NoProps,
-            newMapPair(Loc.internal, pattern, rewrite))
-        "guards" -> newAtomSeq(Loc.internal, NoProps, guards.toIndexedSeq)
-        "description" -> newLiteral(Loc.internal, STRING, description)
+            newMapPair(Loc.internal, pattern, rewrite)),
+        "guards" -> newAtomSeq(Loc.internal, NoProps, guards.toIndexedSeq),
+        "description" -> newLiteral(Loc.internal, STRING, description),
         "detail" -> newLiteral(Loc.internal, STRING, detail)
-      }
+      )
       if (name.isDefined) {
         content += ("name" -> newLiteral(Loc.internal, SYMBOL, Symbol(name.get)))
       }
@@ -462,21 +462,32 @@ abstract class Builder() {
       detail: String,
       evenMeta: Boolean,
       handlertxt: Option[String]): TypedSymbolicOperator = {
-    new TypedSymbolicOperator(
+    // Make the operator.
+    val op = new TypedSymbolicOperator(
         loc,
-        new BindingsAtom(loc, Bindings {
-          "name" -> new SymbolLiteral(Loc.internal, Symbol(name))
-          "type" -> typ
-          "params" -> params
-          "description" -> new StringLiteral(Loc.internal, description)
-          "detail" -> new StringLiteral(Loc.internal, detail)
-          "evenmeta" -> new BooleanLiteral(Loc.internal, evenMeta)
-        }), name, typ, _makeOperatorType(params, typ), params, description,
-        detail, evenMeta, handlertxt) {
+        new BindingsAtom(loc, Bindings (
+            "name" -> new SymbolLiteral(Loc.internal, Symbol(name)),
+            "type" -> typ,
+            "params" -> params,
+            "description" -> new StringLiteral(Loc.internal, description),
+            "detail" -> new StringLiteral(Loc.internal, detail),
+            "evenmeta" -> new BooleanLiteral(Loc.internal, evenMeta)
+          ) +? (handlertxt.isDefined,
+            "handler" -> newLiteral(Loc.internal, STRING, handlertxt.get))),
+        name,
+        typ,
+        _makeOperatorType(params, typ),
+        params,
+        description,
+        detail,
+        evenMeta,
+        handlertxt) {
       def apply(args: IndexedSeq[BasicAtom]) =
         newApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps, args),
             strategy)
     }
+    // Done.
+    op
   }
   
   /**
@@ -504,14 +515,14 @@ abstract class Builder() {
       evenMeta: Boolean): CaseOperator = {
     new CaseOperator(
         loc,
-        Bindings {
-          "name" -> new SymbolLiteral(Loc.internal, Symbol(name))
-          "type" -> typ
-          "cases" -> cases
-          "description" -> new StringLiteral(Loc.internal, description)
-          "detail" -> new StringLiteral(Loc.internal, detail)
+        Bindings (
+          "name" -> new SymbolLiteral(Loc.internal, Symbol(name)),
+          "type" -> typ,
+          "cases" -> cases,
+          "description" -> new StringLiteral(Loc.internal, description),
+          "detail" -> new StringLiteral(Loc.internal, detail),
           "evenmeta" -> new BooleanLiteral(Loc.internal, evenMeta)
-        }, name, typ, cases, description, detail, evenMeta) {
+        ), name, typ, cases, description, detail, evenMeta) {
       def apply(args: IndexedSeq[BasicAtom]) =
         newApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps, args),
             strategy)
