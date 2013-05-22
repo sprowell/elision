@@ -185,6 +185,7 @@ bin, lib, and other folders.</echo>
 			destdir		="${build.bin}"
 			classpathref	="build.classpath"
 			deprecation	="on"
+			scalacdebugging = "on"
 			unchecked	="on">
 			<src path="${build.src}"/>
 		</scalac>
