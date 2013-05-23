@@ -62,8 +62,7 @@ import ornl.elision.util.Debugger
  * guards, and these must be rewritten in some more general context.  However
  * a rule may be placed in more than one rule library, so the rule may not
  * reference a rule library.  To avoid this issue the rewrite strategy for
- * guards must be specified.  This is done at the package level by giving
- * a distinguished [[ornl.elision.core.Rewriter]] instance to handle guards.
+ * guards must be specified.
  * 
  * == Design Goals ==
  *  - Avoid global data and singletons.

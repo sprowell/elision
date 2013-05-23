@@ -85,7 +85,7 @@ trait Strategy extends Applicable
  *  - Specify the type of the object.  To do this add `val theType = `(a basic
  *    atom).
  *    
- *  - Visit [[ornl.elision.core.AtomWalker]] and add code to traverse the atom.
+ *  - Visit [[ornl.elision.context.AtomWalker]] and add code to traverse the atom.
  *  
  *  - Visit [[ornl.elision.context.Builder]] and add code or a method to make
  *    the atom.  If specialized processing is required then add that in an
@@ -93,7 +93,7 @@ trait Strategy extends Applicable
  *  
  *  - Visit [[ornl.elision.dialects.ElisionGenerator]] and add code to create a
  *    string from the new atom.  This must return a string that is parseable by
- *    [[ornl.elision.parse.AtomParser]] to re-create the atom.
+ *    [[ornl.elision.parse.ElisionParser]] to re-create the atom.
  *    
  *  - Visit [[ornl.elision.dialects.ScalaGenerator]] and add code to create a
  *    string from the new atom.  This must return a string that is parseable by
@@ -232,7 +232,7 @@ abstract class BasicAtom(val loc: Loc = Loc.internal) extends HasOtherHash {
 
   /**
    * Generate a parseable string from this atom.  The returned string should
-   * be able to "round trip," that is, [[ornl.elision.parse.AtomParser]] must
+   * be able to "round trip," that is, [[ornl.elision.parse.ElisionParser]] must
    * be able to parse it and return an atom equal to this one.
    * 
    * @return	The string.

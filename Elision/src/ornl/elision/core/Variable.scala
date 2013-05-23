@@ -173,7 +173,7 @@ object TermVariable {
  * For proposed binding of variable `$``x` to value `v`, with guard `g`, we do
  * the following.
  * 
- * - If `g` is a [[ornl.elision.core.Rewritable]], then `g.a` is computed and
+ * - If `g` is a [[ornl.elision.core.Strategy]], then `g.a` is computed and
  *   if the flag is true, `$``x` is bound to the resulting atom.
  * - If `g` is a [[ornl.elision.core.Applicable]], then `g.a` is computed and
  *   `$``x` is bound the result.

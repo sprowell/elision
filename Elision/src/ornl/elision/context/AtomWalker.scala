@@ -421,7 +421,7 @@ object AtomWalker {
    * atom encountered.  This implements the visitor pattern.
    * 
    * For details on how this all works, see the documentation for
-   * [[ornl.elision.core.AtomWalker.Visitor]] and especially the companion
+   * [[ornl.elision.context.AtomWalker.Visitor]] and especially the companion
    * class.
    * 
    * @param atom      The atom to visit.

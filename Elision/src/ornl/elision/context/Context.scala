@@ -94,7 +94,7 @@ extends ElisionException(Loc.internal, msg)
  *
  * This class provides for management of four things:
  *  - A set of [[ornl.elision.core.Bindings]].
- *  - An instance of [[ornl.elision.core.OperatorLibrary]].
+ *  - An instance of [[ornl.elision.context.OperatorLibrary]].
  *  - Rulesets.
  *  - "Automatic" rewriting of atoms using rules.
  */

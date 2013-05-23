@@ -97,7 +97,8 @@ abstract class Builder() {
           "This operator is used to indicate the type of a list.  It takes a " +
           "single argument that is the type of the atoms in the list.  For " +
           "heterogeneous lists this will be ANY.",
-          false) {
+          false,
+          None) {
     def apply(args: IndexedSeq[BasicAtom]) =
       new SimpleApply(Loc.internal, this,
           new AtomSeq(Loc.internal, ANY, NoProps, args))
@@ -119,7 +120,9 @@ abstract class Builder() {
           "Cross product.",
           "This operator is used to construct types for operators.  It " +
           "indicates the cross product of two atoms (typically types).  " +
-          "These originate from the types of the parameters of an operator.") {
+          "These originate from the types of the parameters of an operator.",
+          false,
+          None) {
     def apply(args: IndexedSeq[BasicAtom]) =
       new SimpleApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps,
           args))
@@ -142,7 +145,9 @@ abstract class Builder() {
           "Mapping constructor.",
           "This operator is used to construct types for operators.  It " +
           "indicates a mapping from one type (the domain) to another type " +
-          "(the codomain).") {
+          "(the codomain).",
+          false,
+          None) {
     def apply(args: IndexedSeq[BasicAtom]) =
       new SimpleApply(Loc.internal, this, newAtomSeq(Loc.internal, NoProps,
           args))

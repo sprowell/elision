@@ -54,7 +54,7 @@ import ornl.elision.core.GuardStrategy
  * The number of patterns must be less than the number of subjects, or an
  * exception is thrown on construction.  Note that if there are more patterns
  * than subjects, no match is possible.  If there are equal numbers of patterns
- * and subjects, use the [[ornl.elision.core.SequenceMatcher]] instead.
+ * and subjects, use the [[ornl.elision.matcher.SequenceMatcher]] instead.
  * 
  * Additionally the number of patterns must be at least two.  If the number of
  * patterns is less than two, there is no need to perform any grouping.
@@ -77,7 +77,7 @@ import ornl.elision.core.GuardStrategy
  * @param patterns	The patterns.
  * @param subjects	The subjects.
  * @param builder   The builder needed to build atoms.
- * @oaran strategy  A guard strategy for new rules.
+ * @param strategy  A guard strategy for new rules.
  * @param op				The operator, if known.
  */
 class GroupingIterator(
