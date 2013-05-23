@@ -130,7 +130,8 @@ object NativeCompiler {
    * @return  The method, ready for compilation.
    */
   private def makeMethod(handler: String) =
-    """|  def handler(_data: ApplyData): BasicAtom = {
+    """|  def handler(data: SymbolicOperator.AbstractApplyData): BasicAtom = {
+       |    val _data = data.asInstanceOf[ApplyData]
        |    import _data._
        |    // Force the correct context, in case there is another in scope.
        |    val context = _data.context

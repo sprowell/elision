@@ -323,6 +323,10 @@ class AtomWalker(withtypes: Boolean) {
    */
   def apply(atom: BasicAtom, visitor: Visitor, typ: Boolean): Boolean = {
     atom match {
+      // Visit the type universe.
+      case TypeUniverse =>
+        visitor(atom, typ)
+      
       // Process literals.
       case lit: Literal[_] =>
         apply(lit, visitor, typ)

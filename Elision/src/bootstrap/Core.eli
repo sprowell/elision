@@ -142,6 +142,7 @@ decl.{operator #name=_defer #cases
   "blocked by the metavariable)."
 }
 
+/*
 decl.{operator #name=defer #cases
   %($op, $arg) -> _defer($$__,$$op,$$arg)
   #description="Defer a composition."
@@ -149,6 +150,7 @@ decl.{operator #name=defer #cases
   "Computes $op.$arg on the right-hand side of a case operator's map pair ".
   "but only when that map pair is selected."
 }
+*/
 
 decl.{! eval($atom)
   #handler=
@@ -178,7 +180,7 @@ decl.{! operator($name)
   #handler=
   """
   args match {
-    case Args(SymbolLiteral(_, sym)) =>
+    case Args(SymbolLiteral(_, _, sym)) =>
       context.operatorLibrary(sym.name)
     case Args(StringLiteral(_, name)) =>
       context.operatorLibrary(name)
@@ -197,7 +199,7 @@ decl.{! getop($x)
         opref.operator
       case Args(op: Operator) =>
       	op
-      case Args(SymbolLiteral(_, sym)) =>
+      case Args(SymbolLiteral(_, _, sym)) =>
         getop(sym.name)
       case Args(StringLiteral(_, name)) =>
         getop(name)
@@ -288,9 +290,9 @@ decl.{! _help_op($r)
     args match {
       case Args(or: OperatorRef) =>
         givehelp(or.name)
-      case Args(SymbolLiteral(_, sym)) =>
+      case Args(SymbolLiteral(_, _, sym)) =>
         givehelp(sym.name)
-      case Args(StringLiteral(_, name)) =>
+      case Args(StringLiteral(_, _, name)) =>
         givehelp(name)
       case _ =>
         as_is
@@ -661,6 +663,7 @@ decl.{! _traverse($atom, $kind: SYMBOL)
   #evenmeta=true
 }
 
+/*
 decl.{operator #name=traverse #cases
   %($atom, $kind: SYMBOL) -> defer(_traverse:OPREF, %($$atom, $$kind)),
   %($atom) -> defer(_traverse:OPREF, %($$atom, elision))
@@ -670,6 +673,7 @@ decl.{operator #name=traverse #cases
   #description="Fully write an operator's definition."
   #evenmeta=true
 }
+*/
 
 //======================================================================
 // Error reporting.
@@ -702,7 +706,7 @@ decl.{! _declprop($name: STRING, $default, $description: STRING)
            case StringLiteral(_, str) => str
            case IntegerLiteral(_, ival) => ival
            case BooleanLiteral(_, flag) => flag
-           case SymbolLiteral(_, sym) => sym
+           case SymbolLiteral(_, _, sym) => sym
          }
          context.declareProperty(name, description, realval)
          console.emitln("Declared property "+toEString(name)+" with type "+

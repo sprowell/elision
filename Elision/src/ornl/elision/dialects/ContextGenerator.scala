@@ -41,6 +41,7 @@ import ornl.elision.context.NativeCompiler
 import ornl.elision.core.SymbolicOperator
 import ornl.elision.core.OperatorRef
 import ornl.elision.context.AtomWalker
+import scala.collection.mutable.{HashSet => Set}
 
 /**
  * Generate code to re-produce a context.

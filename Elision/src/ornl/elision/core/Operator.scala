@@ -245,7 +245,7 @@ object SymbolicOperator {
    * Base class for data to pass to a native handler.  This must be
    * concretized elsewhere.
    */
-  protected[elision] class AbstractApplyData
+  class AbstractApplyData
 
   /**
    * Extract the parts of a symbolic operator.

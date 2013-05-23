@@ -98,16 +98,11 @@ decl.{! inc($fn: STRING)
     context.fetchAs[Set[String]]("read_once.included", Set[String]())
   args match {
     case Args(StringLiteral(_, _, filename)) =>
-      exec match {
-        case proc: ornl.elision.parse.Processor =>
-          if (!included.contains(filename)) {
-            if (proc.read(filename, console.quiet > 1))
-              included += filename
-          }
-          // Silently ignore this.
-        case _ =>
-          // Silently ignore this, too.
+      if (!included.contains(filename)) {
+        if (processor.read(filename, console.quiet > 1))
+          included += filename
       }
+      // Silently ignore this.
       _no_show
     case _ =>
       // Not a string literal, so preserve it.
@@ -140,7 +135,7 @@ decl.{! print($a: STRING)
 #handler=
 """
   args match {
-    case Args(StringLiteral(_, str)) => print(str)
+    case Args(StringLiteral(_, _, str)) => print(str)
     case _ =>
   }
   _no_show
@@ -154,7 +149,7 @@ decl.{! println($a: STRING)
 #handler=
 """
   args match {
-    case Args(StringLiteral(_, str)) => console.sendln(str)
+    case Args(StringLiteral(_, _, str)) => console.sendln(str)
     case _ =>
   }
   _no_show
