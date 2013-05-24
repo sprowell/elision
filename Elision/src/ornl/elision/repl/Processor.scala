@@ -60,6 +60,7 @@ import ornl.elision.core.SymbolicOperator
 import ornl.elision.core.AtomSeq
 import ornl.elision.core.Bindings
 import ornl.elision.context.OperatorApplyHandler
+import ornl.elision.dialects.Dialect
 
 /**
  * Manage the default parser kind to use.
@@ -109,6 +110,21 @@ class Processor(val settings: Map[String, String], var context: Context)
 extends TraceableParse
 with Timeable
 with HasHistory {
+  
+  //======================================================================
+  // Create a trait to handle printing.
+  //======================================================================
+  
+  /**
+   * Capture the context information from this processor in closures to allow
+   * printing with the correct context information.
+   */
+  object WithDialect {
+    def toParseString(atom: BasicAtom, limit: Int) =
+      Dialect.serialize('elision, new StringBuffer(), atom, Some(context), limit)
+    def toString(atom: BasicAtom, limit: Int) =
+      Dialect.serialize('scala, new StringBuffer(), atom, Some(context), limit)
+  }
 
   /**
    * Generate an apply data block, capturing information about the processor
@@ -130,13 +146,10 @@ with HasHistory {
     }
   }
   
-  /**
-   * The apply data builder to use.
-   */
-  val applyDataBuilder: OperatorApplyHandler.ApplyDataBuilder = _getApplyData _
-  
   // Tell the context to use the apply data builder.
-  context.setApplyDataBuilder(applyDataBuilder)
+  context.setApplyDataBuilder(_getApplyData _)
+  context.setToParseString(WithDialect.toParseString _)
+  context.setToString(WithDialect.toString)
   
   // Set up the stacktrace property.
   context.declareProperty("stacktrace",
@@ -604,7 +617,7 @@ with HasHistory {
           context.console.emitln("Successfully reloaded context.")
           context.console.emitln("Rebuilding context...")
           context = new Context()
-          context.setApplyDataBuilder(applyDataBuilder)
+          context.setApplyDataBuilder(_getApplyData _)
           val prior = context.console.quiet
           context.console.quiet = 1
           _execute(success)

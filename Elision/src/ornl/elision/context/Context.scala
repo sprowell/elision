@@ -68,6 +68,7 @@ import ornl.elision.rewrite.RewriteTask
 import ornl.elision.rewrite.RewriteEngine
 import ornl.elision.core.GuardStrategy
 import ornl.elision.core.AtomSeq
+import ornl.elision.dialects.Dialect
 
 /**
  * A requested setting is not present.
@@ -86,7 +87,8 @@ extends ElisionException(Loc.internal, msg)
  *    
  *  - The __console__ that should get output.
  * 
- * Note that the settings must be specified at construction time.
+ * Note that the apply data builder must be specified in order for native
+ * handlers to execute.  See `setApplyDataBuilder`.
  *
  * == Use ==
  * In general it is not necessary to make an instance; one is typically
@@ -118,7 +120,7 @@ extends PropertyManager with Fickle with Mutable with Cache {
   
   /**
    * Set the apply data builder for this context. If one is not set, then
-   * native handlers cannot execute.
+   * native handlers will not execute.
    * 
    * @param abd    A closure to make apply data blocks for native handlers.
    */
@@ -130,6 +132,51 @@ extends PropertyManager with Fickle with Mutable with Cache {
    * Get the apply data builder for this context.
    */
   def applyDataBuilder = _applyDataBuilder
+  
+  //======================================================================
+  // Handle printing.
+  //======================================================================
+  
+  private var _toParseString: (BasicAtom, Int) => Appendable = {
+    Dialect.serialize('elision, new StringBuffer(), _, Some(this), _)
+  }
+  private var _toString: (BasicAtom, Int) => Appendable = {
+    Dialect.serialize('scala, new StringBuffer(), _, Some(this), _)
+  }
+  
+  /**
+   * Set the action to use to print a parse string for an atom.
+   * 
+   * Provided with an atom and a limit, create a new string buffer and write
+   * the parse string to that string buffer.  Then return the buffer for
+   * printing.
+   * 
+   * A default implementation is provided.
+   * 
+   * @param action  The action to convert an atom and a depth limit into an
+   *                appendable.
+   * @return  The appendable.
+   */
+  def setToParseString(action: (BasicAtom, Int) => Appendable) {
+    _toParseString = action
+  }
+  
+  /**
+   * Set the action to use to print a Scala string for an atom.
+   * 
+   * Provided with an atom and a limit, create a new string buffer and write
+   * the Scala string to that string buffer.  Then return the buffer for
+   * printing.
+   * 
+   * A default implementation is provided.
+   * 
+   * @param action  The action to convert an atom and a depth limit into an
+   *                appendable.
+   * @return  The appendable.
+   */
+  def setToString(action: (BasicAtom, Int) => Appendable) {
+    _toString = action
+  }
   
   //======================================================================
   // Settings that may need to be overridden.

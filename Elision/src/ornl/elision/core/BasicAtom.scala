@@ -275,9 +275,6 @@ abstract class BasicAtom(val loc: Loc = Loc.internal) extends HasOtherHash {
 
 /**
  * Mutable controls affecting all atoms and matching go here.
- * 
- * In addition you can find the helper method `buildConstantPool` to
- * compute the constant pool for an atom.
  */
 object BasicAtom {
 

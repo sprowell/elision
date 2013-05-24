@@ -166,7 +166,7 @@ extends OperatorApplyHandler {
               // Compile the native handler and cache it.
               op.handler = compileHandler(op, op.handlertxt, context)
             }
-            if (op.handler.isDefined) {
+            if (op.handler.isDefined && context.applyDataBuilder != null) {
               val ad = context.applyDataBuilder(op, newargs, binds)
               return op.handler.get(ad)
             }
