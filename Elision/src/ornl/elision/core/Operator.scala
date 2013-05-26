@@ -227,7 +227,7 @@ abstract class TypedSymbolicOperator protected[elision] (
     detail: String,
     evenMeta: Boolean,
     handlertxt: Option[String]) extends SymbolicOperator(loc, content, name,
-        optype, params, description, detail, evenMeta, handlertxt) {
+        typ, params, description, detail, evenMeta, handlertxt) {
   
   /**
    * The type of an operator is a mapping from the operator domain to the
