@@ -159,5 +159,6 @@ decl.{! println($a: STRING)
 }
 
 inc("bootstrap/Type.eli")
+inc("bootstrap/Help.eli")
 inc("bootstrap/Core.eli")
 inc("bootstrap/Context.eli")
