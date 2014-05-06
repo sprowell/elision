@@ -49,7 +49,7 @@ import ornl.elision.core.Operator
 import ornl.elision.core.RewriteRule
 import ornl.elision.core.OperatorRef
 import ornl.elision.core.Literal
-import ornl.elision.core.Strategy
+import ornl.elision.core.YieldsPair
 import ornl.elision.core.StringLiteral
 import ornl.elision.core.GuardStrategy
 import ornl.elision.core.SimpleApply
@@ -108,7 +108,7 @@ class ApplyBuilder(ophandler: OperatorApplyHandler) {
    * @param strategy  The guard strategy to use for new rules.
    * @return  The pair of result atom and flag.
    */
-  def test(strat: Strategy, arg: BasicAtom, builder: Builder,
+  def test(strat: YieldsPair, arg: BasicAtom, builder: Builder,
       strategy: GuardStrategy): (BasicAtom, Boolean) = {
     strat match {
       case op_mappair: MapPair =>
@@ -215,7 +215,7 @@ class ApplyBuilder(ophandler: OperatorApplyHandler) {
                 op_lambda.toParseString + ").(" + arg.toParseString + ")")
         }
         
-      case op_strat: Strategy =>
+      case op_strat: YieldsPair =>
         // Handle a strategy.
         pair2bind(test(op_strat, arg, builder, strategy))
         

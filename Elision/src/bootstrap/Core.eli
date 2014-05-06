@@ -360,9 +360,10 @@ decl.{! apropos($str:STRING)
 }
 
 decl.{ operator #name=help #cases
-  %($r:OPREF) -> _help_op($$r), 
+  $r:SYMBOL -> _help_op($$r),
   %($r:SYMBOL) -> _help_op($$r), 
   %($r:STRING) -> _help_op($$r), 
+  %($r:OPREF) -> _help_op($$r), 
   %() -> _help_all.$$_
   #description="Get general help or help on an operator."
   #detail=

@@ -99,7 +99,7 @@ class RewriteRule protected[elision] (
     val description: String = "",
     val detail: String = "",
     val synthetic: Boolean = false)
-    extends SpecialForm(loc, RewriteRule.tag, content) with Strategy {
+    extends SpecialForm(loc, RewriteRule.tag, content) with YieldsPair {
   
   // Rewrite rules all have type strategy.
   override val theType = STRATEGY

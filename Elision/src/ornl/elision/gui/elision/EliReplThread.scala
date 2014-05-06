@@ -54,7 +54,7 @@ class EliReplThread extends ReplThread {
 	var myRepl : ornl.elision.repl.ERepl = null
   
 	// Work out where Elision's runtime store should live on the system.
-  private val _default_root = (if (CLI.iswin) {
+  private val _default_root = (if (Platform.iswin) {
     // On a Windows system the settings should live under %LOCALAPPDATA%
     // in a folder specific to the application.  While the simplest thing is
     // to obtain the local appdata folder from the environment variable, this

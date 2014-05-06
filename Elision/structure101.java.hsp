@@ -1,22 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <local-project language="java" version="3.5.4044" flavor="j2se">
-  <property name="hide-externals" value="true" />
   <property name="show-needs-to-compile" value="false" />
+  <property name="hide-externals" value="true" />
   <property name="root-file" value="/Users/ysp/workspace" />
   <property name="detail-mode" value="true" />
-  <property name="project-excluded" value="/Users/ysp/workspace/fx/bin" />
   <property name="project-type" value="eclipse_workspace" />
+  <property name="project-excluded" value="" />
+  <property name="hide-deprecated" value="false" />
   <property name="action-set-mod" value="10" />
   <property name="resolve-name-clashes" value="true" />
-  <property name="hide-deprecated" value="false" />
   <property name="parse-archive-in-archive" value="false" />
   <classpath relativeto="/Users/ysp/workspace/Elision">
     <classpathentry kind="lib" path="bin" />
+    <classpathentry kind="lib" path="../fx/bin" />
   </classpath>
   <pom-root-files />
   <excludes>
     <exclude expression="*._*" active="true" />
-    <exclude expression="ornl.elision.core.*&amp;" active="true" />
     <exclude expression="eli_rules.BitStringSpecification" active="true" />
     <exclude expression="util.ProcessorUtil" active="true" />
     <exclude expression="ornl.elision.test.core.MemoTest" active="true" />
@@ -30,7 +30,7 @@
     <set version="2" name="List 1" hiview="Codemap" active="true" todo="false" />
   </restructuring>
   <sourcepaths>
-    <pathentry type="file" path="/Users/ysp/workspace/Elision/test" />
+    <pathentry type="file" path="/Users/ysp/workspace/Elision/src" />
     <pathentry type="file" path="/Users/ysp/workspace/fx/test" />
   </sourcepaths>
 </local-project>

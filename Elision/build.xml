@@ -125,11 +125,12 @@ bin, lib, and other folders.</echo>
 		<property name="build.classpath" refid="build.classpath"/>
 		<taskdef resource="scala/tools/ant/antlib.xml"
 			classpath="${build.classpath}"/>
-		<xmlproperty file="${build.base}/etc/config.xml"
+		<property name="build.config" 	value="${build.base}/etc/config.xml"/>
+		<xmlproperty file="${build.config}"
 			collapseattributes="yes"/>
 		<property name="build.version"
 			value="${configuration.version.major}.${configuration.version.minor}.${configuration.version.trivial}"/>
-		<echo level="info">Build information from config.xml:</echo>
+		<echo level="info">Build information from ${build.config}:</echo>
 		<echo level="info">  Name ........ ${configuration.name}</echo>
 		<echo level="info">  Maintainer .. ${configuration.maintainer}</echo>
 		<echo level="info">  Web ......... ${configuration.web}</echo>
@@ -137,11 +138,11 @@ bin, lib, and other folders.</echo>
 		<echo level="info">  Build ....... ${DSTAMP}${TSTAMP}</echo>
 		<echo level="verbose">Using CLASSPATH=${build.classpath}.</echo>
 		<echo level="info">Starting build of Elision on ${TODAY} at ${TSTAMP}.</echo>
-        </target>
+    </target>
 	
 	
 	<!-- A simple target to build both the jars and the documentation. -->
-	<target name="all" depends="jars,docs, build_tests"
+	<target name="all" depends="jars,docs, build-tests"
 		description="Build the jars and the API documentation."/>
 	
 	
@@ -153,13 +154,12 @@ bin, lib, and other folders.</echo>
 	</target>
 	
 
-	<target name="build_tests" depends="compile">
+	<target name="build-tests" depends="compile">
 		<scalac
 			destdir		="${build.bin}"
 			classpathref	="build.classpath"
 			deprecation	="on"
-			unchecked	="on"
-			feature		="on">
+			unchecked	="on">
 			<src path="${build.test}"/>
 		</scalac>
 	</target>
@@ -175,12 +175,32 @@ bin, lib, and other folders.</echo>
 			<dirset dir="${build.base}" includes="20??????/**"/>
 		</delete>
 	</target>
+    
+    
+    <!-- Build the configuration file. -->
+    <target name="configuration" depends="init"
+        description="Create the Elision configuration file.">
+        <mkdir dir="${build.bin}"/>
+        <copy file="${build.base}/etc/elision_configuration.dtd"
+            todir="${build.bin}" overwrite="yes"/>
+                <copy file="${build.base}/etc/EvaIcon.png"
+            todir="${build.bin}" overwrite="yes"/>
+        <copy file="${build.base}/etc/config.xml"
+            tofile="${build.bin}/configuration.xml" overwrite="yes">
+            <filterset>
+                <filter token="DSTAMP" value="${DSTAMP}"/>
+                <filter token="YEAR" value="${YEAR}"/>
+                <filter token="TODAY" value="${TODAY}"/>
+                <filter token="TSTAMP" value="${TSTAMP}"/>
+                <filter token="VERSION" value="${build.version}"/>
+            </filterset>
+        </copy>
+    </target>
 
 	
 	<!-- Compile all the Scala code that is out of date. -->
-	<target name="compile" depends="init"
+	<target name="compile" depends="init,configuration"
 		description="Compile all Scala code.">
-		<mkdir dir="${build.bin}"/>
 		<scalac
 			destdir		="${build.bin}"
 			classpathref	="build.classpath"
@@ -189,13 +209,6 @@ bin, lib, and other folders.</echo>
 			unchecked	="on">
 			<src path="${build.src}"/>
 		</scalac>
-		<!-- javac
-			destdir		="${build.bin}"
-			classpathref	="build.classpath"
-			includeantruntime ="false"
-			deprecation	="on">
-			<src path="${build.src}"/>
-		</javac -->
 		<copy todir="${build.bin}" overwrite="yes">
 			<fileset dir="${build.src}" includes="**/*.eli"/>
 			<filterset>
@@ -206,21 +219,7 @@ bin, lib, and other folders.</echo>
                 <filter token="VERSION" value="${build.version}"/>
 		  	</filterset>
 		</copy>
-		<copy file="${build.base}/etc/elision_configuration.dtd"
-			todir="${build.bin}" overwrite="yes"/>
-        <copy file="${build.base}/etc/EvaIcon.png"
-			todir="${build.bin}" overwrite="yes"/>
-		<copy file="${build.base}/etc/config.xml"
-			tofile="${build.bin}/configuration.xml" overwrite="yes">
-			<filterset>
-				<filter token="DSTAMP" value="${DSTAMP}"/>
-				<filter token="YEAR" value="${YEAR}"/>
-				<filter token="TODAY" value="${TODAY}"/>
-				<filter token="TSTAMP" value="${TSTAMP}"/>
-				<filter token="VERSION" value="${build.version}"/>
-			</filterset>
-		</copy>
-        </target>
+    </target>
 
 
 	<!-- Determine if the documentation is up to date.  If it is, set the
@@ -242,12 +241,12 @@ bin, lib, and other folders.</echo>
 		<mkdir dir="${build.doc}"/>
 		<mkdir dir="${build.doc}/api"/>
 		<scaladoc
-			srcdir		="${build.src}"
-			destdir		="${build.doc}/api"
+			srcdir			="${build.src}"
+			destdir			="${build.doc}/api"
 			classpathref	="build.classpath"
-			deprecation	="on"
-			unchecked	="on"
-			doctitle	="${configuration.name} API Version ${build.version} Build ${DSTAMP}${TSTAMP}">
+			deprecation		="on"
+			unchecked		="on"
+			doctitle		="${configuration.name} API Version ${build.version} Build ${DSTAMP}${TSTAMP}">
 			<include name="**/*.scala"/>
 			<exclude name="**/*.eli"/>
 		</scaladoc>

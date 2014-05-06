@@ -132,7 +132,7 @@ object Version {
   var loaded = false
   
   /** The default command to execute. */
-  private var _default = "repl"
+  private var _default = ""
     
   /** A type for classes that have a main method. */
   type HasMain = Class[_ <: {def main(args: String*): Unit}]
@@ -300,6 +300,15 @@ object Version {
         }
 	    } // Pull out the mains.
 	    
+	    // There must be commands!
+	    if (setdefault) {
+	      println("FATAL: Elision is mis-configured.  No list of commands " +
+	      		"could be\nloaded, and the system cannot continue.  Please " +
+	      		"make sure configuration.xml is\navailable in the classpath " +
+	      		"or jar file.");
+	      System.exit(1)
+	    }
+	    
 	    // Pull out the dialects.
 	    for (dialect <- config.\("dialect")) {
 	      // Pull out the parts.
@@ -318,6 +327,11 @@ object Version {
             		"Reason: " + ex.toString)
 	      }
 	    } // Pull out the dialects.
+	  } else {
+	    println("FATAL: The Elision configuration file configuration.xml is " +
+	    		"missing or corrupt.\nIt must be present in the classpath or in " +
+	    		"the jar file, but was not found.\nElision cannot continue.")
+  		System.exit(1)
 	  }
   }
   _init

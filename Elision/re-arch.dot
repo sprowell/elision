@@ -1,0 +1,138 @@
+digraph Elision {
+	node [shape=rectangle]
+
+	{
+		# All the packages in the tangle.
+		"dialects";
+		"parse";
+		"rewrite";
+		"matcher";
+		"context";
+		"core";
+
+		# The current, tangled structure.
+		"dialects" -> "core" [label="264"; color=green];
+		"dialects" -> "parse" [label="12"; color=green];
+		"dialects" -> "context" [label="61"; color=green];
+
+		"parse" -> "context" [label="92"; color=green];
+		"parse" -> "core" [label="382"; color=green];
+
+		"rewrite" -> "context" [label="28"; color=green];
+		"rewrite" -> "core" [label="73"; color=green];
+
+		"matcher" -> "context" [label="65"; color=green];
+		"matcher" -> "core" [label="571"; color=green];
+
+		# This dependency should be broken by referencing
+		# dialects by name from inside core.  See below
+		# in the core dependencies.
+		#
+		#"context" -> "dialects" [label="2"; color=red];
+		#
+		# The dependency of context on rewrite is entirely
+		# due to the need to have a rewrite strategy for
+		# guards.  This could be eliminated by requiring
+		# that the strategy be specified at startup, in an
+		# .eli file.
+		#
+		#"context" -> "rewrite" [label="6"; color=red];
+		#
+		# Context uses the matcher package because it needs
+		# access to Fail, Many, Match, and MatchIterator. It
+		# also uses Matcher to start the match process, and
+		# Matcher references all the specialized matchers.
+		# The cycle here can be broken by making Matcher
+		# abstract, and then letting it load an
+		# implementation at startup.
+		#
+		# Plan: Move the specialized matchers to a new
+		# ornl.elision.ac package.  Leave the support
+		# classes in the matcher package.  Create a
+		# dispatch class in the new .ac package, and then
+		# supply it to the Matcher class at startup.  This
+		# seems complicated...
+		#
+		#"context" -> "matcher" [label="45"; color=red];
+		"context" -> "core" [label="1145"; color=green];
+		#
+		# The core package needs to generate output in
+		# specified dialects.  As dialects are referenced
+		# using name, we should be able to eliminate this
+		# dependency.  This is the one to eliminate, since
+		# dialects must be able to parse and generate atoms,
+		# which means that they must get to both core and
+		# parser.
+		#
+		# Putting a means to reference a dialect from inside
+		# core should also allow breaking the dependency of
+		# context on dialects.
+		#
+		#"core" -> "dialects" [label="8"; color="red"];
+		#"core" -> "context" [label="4"; color="red"];
+	}
+
+	{
+		"StandardOAH";
+		"NativeCompiler";
+		"Context";
+		"OperatorLibrary";
+
+		"StandardOAH" -> "NativeCompiler" [label="4"; color=green];
+		"StandardOAH" -> "Context" [label="17"; color=green];
+
+		"NativeCompiler" -> "Context" [label="2"; color=green];
+		#
+		# Context uses the StandardOAH in order to apply an operator.
+		#
+		"Context" -> "StandardOAH" [label="2"; color=red];
+		"Context" -> "OperatorLibrary" [label="6"; color=green];
+		#
+		# OperatorLibrary needs to get the Console instance from the
+		# Context, which is responsible for holding it.  Context holds
+		# a reference to the OperatorLibrary instance.  This creates
+		# a cycle.  The Context cannot inject the Console into the
+		# OperatorLibrary, since the Console may change.  Instead it
+		# should inject a closure that gives the OperatorLibrary the
+		# Console on demand.
+		#
+		"OperatorLibrary" -> "Context" [label="5"; color=red];
+	}
+
+	{
+		"MatchIterator";
+		"SubMatchIterator";
+		"Outcome";
+		"Many";
+		"Match";
+		"Outcome";
+		"Fail";
+
+		"MatchIterator" -> "SubMatchIterator" [label="2"; color=green];
+		"MatchIterator" -> "Outcome" [label="3"; color=green];
+		"MatchIterator" -> "Many" [label="2"; color=red];
+		"MatchIterator" -> "Match" [label="2"; color=green];
+		"MatchIterator" -> "Fail" [label="1"; color=green];
+
+		"SubMatchIterator" -> "Many" [label="2"; color=green];
+		"SubMatchIterator" -> "MatchIterator" [label="12"; color=green];
+		"SubMatchIterator" -> "Match" [label="2"; color=green];
+		"SubMatchIterator" -> "Outcome" [label="4"; color=green];
+		"SubMatchIterator" -> "Fail" [label="1"; color=green];
+
+		"Outcome" -> "Many" [label="2"; color=green];
+		"Outcome" -> "MatchIterator" [label="2"; color=green];
+		"Outcome" -> "Outcome" [label="1"; color=green];
+		"Outcome" -> "Fail" [label="1"; color=green];
+
+		"Many" -> "MatchIterator" [label="8"; color=green];
+		"Many" -> "Outcome" [label="2"; color=green];
+
+		"Match" -> "Outcome" [label="2"; color=green];
+
+		"Outcome" -> "MatchIterator" [label="1"; color=red];
+		"Outcome" -> "Fail" [label="1"; color=green];
+
+		"Fail" -> "Outcome" [label="2"; color=red];
+	}
+}

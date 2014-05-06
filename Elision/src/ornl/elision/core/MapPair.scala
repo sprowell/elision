@@ -76,7 +76,7 @@ object MapPair {
 class MapPair(
     loc: Loc,
     val left: BasicAtom,
-    val right: BasicAtom) extends BasicAtom(loc) with Strategy {
+    val right: BasicAtom) extends BasicAtom(loc) with YieldsPair {
   
 	/** A map pair is actually a strategy. */
   val theType = STRATEGY

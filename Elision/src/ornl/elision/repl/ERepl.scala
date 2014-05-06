@@ -47,6 +47,7 @@ import ornl.elision.dialects.Dialect
 import ornl.elision.dialects.ContextGenerator
 import scala.language.reflectiveCalls
 import ornl.elision.context.OperatorApplyHandler
+import ornl.elision.cli.Platform
 
 /**
  * Implement an interface to run the REPL from the prompt.
@@ -116,7 +117,7 @@ object ReplMain {
           }))
       
   // Work out where Elision's runtime store should live on the system.
-  private val _default_root = (if (CLI.iswin) {
+  private val _default_root = (if (Platform.iswin) {
     // On a Windows system the settings should live under %LOCALAPPDATA%
     // in a folder specific to the application.  While the simplest thing is
     // to obtain the local appdata folder from the environment variable, this
@@ -131,12 +132,12 @@ object ReplMain {
           new File(env.get("USERPROFILE"), "Local Settings"),
           "Application Data").getAbsolutePath()
     }, "elision").getAbsolutePath()
-  } else if (CLI.ismac) {
+  } else if (Platform.ismac) {
     // On Darwin the settings should live under the Library/Preferences.
     // We need to make these folders if they do not exist.
     val env = System.getenv("HOME")
     new File(env, "Library/Preferences/elision").getAbsolutePath()
-  } else if (CLI.islin) {
+  } else if (Platform.islin) {
     // On Linux preferences should live under .config.
     new File(System.getenv("HOME"), ".config/elision").getAbsolutePath()
   } else {

@@ -71,7 +71,7 @@ trait Applicable
  * The binding must have the form `atom->`_atom_ `flag->`_boolean_, where the
  * _atom_ is a potentially different atom, and the _boolean_ is a literal.
  */ 
-trait Strategy extends Applicable
+trait YieldsPair extends Applicable
 
 /**
  * The root of all atoms manipulated by the rewriter.

@@ -96,24 +96,6 @@ abstract class Variable(
   /** By default, variables can be bound. */
   override val isBindable = true
   
-  /**
-   * Generate a term variable with the same properties as this variable,
-   * including type, guards, and labels.  If this is already a term variable,
-   * then it is simply returned as-is.
-   * 
-   * @return  A term variable.
-   */
-  def asTermVariable: TermVariable
-  
-  /**
-   * Generate a metavariable with the same properties as this variable,
-   * including type, guards, and labels.  If this is already a metavariable,
-   * then it is simply returned as-is.
-   * 
-   * @return  A metavariable.
-   */
-  def asMetaVariable: MetaVariable
-  
   override def equals(varx: Any) = varx match {
     case ovar:Variable =>
       feq(ovar, this,
@@ -129,9 +111,22 @@ abstract class Variable(
 }
 
 /**
- * Companion object to match metavariables.
+ * Companion object for term variables.
  */
 object TermVariable {
+  
+  /**
+   * Construct a metavariable from another variable.  If the input is already
+   * a metavariable, it is returned as-is.  Otherwise a new metavariable with
+   * the same properties is created and returned.
+   * 
+   * @param vari The other variable.
+   * @return The new metavariable.
+   */
+  def apply(vari: Variable) =
+    if (vari.isInstanceOf[TermVariable]) vari
+    else new TermVariable(vari.loc, vari.theType, vari.name, vari.guard,
+        vari.labels, vari.byName)
   
   /**
    * Extract the parts of a term variable.
@@ -223,26 +218,26 @@ class TermVariable protected[elision] (
   override lazy val hashCode = typ.hashCode * 31 + name.hashCode
   override lazy val otherHashCode = typ.otherHashCode +
     8191*(name.toString).foldLeft(BigInt(0))(other_hashify)+1
-    
-  /**
-   * Make a non-meta version of this metavariable.
-   * @return  The new variable.
-   */
-  override def asTermVariable = this
-  
-  /**
-   * Make a meta version of this metavariable.  I.e., do nothing.
-   * @return  This metavariable.
-   */
-  override def asMetaVariable =
-    new MetaVariable(loc, typ, name, guard, labels, byName)
 }
 
 /**
  * Companion object to match metavariables.
  */
-object MetaVariable {
+object MetaVariable {  
   
+  /**
+   * Construct a metavariable from another variable.  If the input is already
+   * a metavariable, it is returned as-is.  Otherwise a new metavariable with
+   * the same properties is created and returned.
+   * 
+   * @param vari The other variable.
+   * @return The new metavariable.
+   */
+  def apply(vari: Variable) =
+    if (vari.isInstanceOf[MetaVariable]) vari
+    else new MetaVariable(vari.loc, vari.theType, vari.name, vari.guard,
+        vari.labels, vari.byName)
+
   /**
    * Extract the parts of a metavariable.
    * 
@@ -293,17 +288,4 @@ class MetaVariable protected[elision] (
   override lazy val hashCode = typ.hashCode * 37 + name.hashCode
   override lazy val otherHashCode = typ.otherHashCode +
     8193*(name.toString).foldLeft(BigInt(0))(other_hashify)+1
-    
-  /**
-   * Make a non-meta version of this metavariable.
-   * @return  The new variable.
-   */
-  override def asTermVariable =
-    new TermVariable(loc, typ, name, guard, labels, byName)
-  
-  /**
-   * Make a meta version of this metavariable.  I.e., do nothing.
-   * @return  This metavariable.
-   */
-  override def asMetaVariable = this
 }

@@ -50,7 +50,7 @@ case class Setting(
   val varname = envvar match {
     case None => None
     case Some(varname) =>
-      Some((if (CLI.iswin) "%"+varname+"%" else "$"+varname))
+      Some((if (Platform.iswin) "%"+varname+"%" else "$"+varname))
   }
   
   /**

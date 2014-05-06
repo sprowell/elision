@@ -47,7 +47,7 @@ import ornl.elision.matcher.Many
 import ornl.elision.matcher.Match
 import ornl.elision.matcher.SequenceMatcher
 import ornl.elision.core.SimpleApply
-import ornl.elision.core.Strategy
+import ornl.elision.core.YieldsPair
 import ornl.elision.core.Applicable
 import ornl.elision.util.Console
 import ornl.elision.core.OperatorRef
@@ -342,7 +342,7 @@ extends OperatorApplyHandler {
     var result: Option[BasicAtom] = None
     val done = op.cases.exists {
       _ match {
-        case rew: Strategy =>
+        case rew: YieldsPair =>
           val pair = context.applybuilder.test(rew, arg, context.builder,
               context.guardstrategy)
           result = Some(pair._1)

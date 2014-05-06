@@ -644,8 +644,8 @@ abstract class Builder() {
       
       // Create a map.
       val map = Map[BasicAtom, BasicAtom](
-          given_lvar.asTermVariable -> newvar,
-          given_lvar.asMetaVariable -> newmvar)
+          TermVariable(given_lvar) -> newvar,
+          MetaVariable(given_lvar) -> newmvar)
     
       // Bind the old variable to the new one and rewrite the body.
       val (newbody, notfixed) = replace(given_body, map, strategy)
