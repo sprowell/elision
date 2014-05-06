@@ -1,0 +1,141 @@
+/*======================================================================
+ *       _ _     _
+ *   ___| (_)___(_) ___  _ __
+ *  / _ \ | / __| |/ _ \| '_ \
+ * |  __/ | \__ \ | (_) | | | |
+ *  \___|_|_|___/_|\___/|_| |_|
+ * The Elision Term Rewriter
+ * 
+ * Copyright (c) 2012 by UT-Battelle, LLC.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ * 
+ * 1. Redistributions of source code must retain the above copyright notice, this
+ *    list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ * 
+ * Collection of administrative costs for redistribution of the source code or
+ * binary form is allowed. However, collection of a royalty or other fee in excess
+ * of good faith amount for cost recovery for such redistribution is prohibited.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE DOE, OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+ * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+ * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+======================================================================*/
+
+println("Reading Help...")
+
+//======================================================================
+// Help system.
+//======================================================================
+
+decl.{! _help_op($r)
+  #handler=
+  """
+    def givehelp(name: String) = {
+      // Give some help.
+      val width = if(ornl.elision.actors.ReplActor.guiActor != null)
+        {
+          ornl.elision.actors.ReplActor.guiColumns
+        } else {
+          scala.tools.jline.TerminalFactory.create().getWidth()
+        }
+      val op = context.operatorLibrary(name)
+      sendln(context.operatorLibrary.help(
+        new StringBuffer(), op, width).toString)
+      _no_show
+    }
+    args match {
+      case Args(or: OperatorRef) =>
+        givehelp(or.name)
+      case Args(SymbolLiteral(_, _, sym)) =>
+        givehelp(sym.name)
+      case Args(StringLiteral(_, _, name)) =>
+        givehelp(name)
+      case _ =>
+        as_is
+    }
+  """
+  #description="Display detailed help for an operator."
+  #detail="Display help text for the operator referenced by $r."
+}
+
+decl.{! _help_all()
+  #handler=
+  """
+    args match {
+      case Args() =>
+        // Give some help.
+        val width = if(ornl.elision.actors.ReplActor.guiActor != null) {
+          ornl.elision.actors.ReplActor.guiColumns 
+        } else { 
+          scala.tools.jline.TerminalFactory.create().getWidth()
+        }
+        val buf = new StringBuffer()
+        buf.append("Elision Help\n\n")
+        context.operatorLibrary.help(buf, width)
+        buf.append("\nUse ! followed by a number to re-execute a " +
+          "line from the history.\n\nTo quit type :quit.\n")
+        sendln(buf.toString)
+      case _ =>
+    }
+    _no_show
+  """
+  #description="Display a list of known operators."
+  #detail=
+  "Display a list of known operators, along with a short description of each ".
+  "one (if given).  Operators whose name begins with an underscore are ".
+  "suppressed in this list."
+}
+
+decl.{! apropos($str:STRING)
+  #handler=
+  """
+    args match {
+      case Args(StringLiteral(_, apropos)) =>
+        // Give some help.
+        val width = if (ornl.elision.actors.ReplActor.guiActor != null) {
+          ornl.elision.actors.ReplActor.guiColumns
+        }
+        else {
+          scala.tools.jline.TerminalFactory.create().getWidth()
+        }
+        val buf = new StringBuffer()
+        buf.append("Elision Help\n\n")
+        context.operatorLibrary.help(buf, width, apropos)
+        buf.append("\nUse ! followed by a number to re-execute a " +
+          "line from the history.\n\nTo quit type :quit.\n")
+        sendln(buf.toString)
+      case _ =>
+    }
+    _no_show
+  """
+  #description="Display a list of known operators."
+  #detail=
+  "Display a list of known operators, along with a short description of each ".
+  "one (if given).  Operators whose name begins with an underscore are ".
+  "suppressed in this list."
+}
+
+decl.{ operator #name=help #cases
+  %($r:OPREF) -> _help_op($$r), 
+  %($r:SYMBOL) -> _help_op($$r), 
+  %($r:STRING) -> _help_op($$r), 
+  %() -> _help_all.$$_
+  #description="Get general help or help on an operator."
+  #detail=
+  "With no argument, list all operators.  If provided with an operator ".
+  "reference, give detailed help on that operator."
+}
